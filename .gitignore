@@ -6,16 +6,6 @@ dist/
 *.pyc
 __pycache__/
 database/battle.db
-stats/home_doryoku.csv
-stats/home_motimono.csv
-stats/home_terastal.csv
-stats/home_tokusei.csv
-stats/home_waza.csv
-stats/home_seikaku.csv
-stats/last_update.txt
-stats/ranking.json
-stats/ranking.txt
-stats/season.txt
 party/csv/*
 party/txt/*
 party/table/*
