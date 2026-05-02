@@ -1,4 +1,20 @@
-FONT_FAMILY = "Meiryo"
+import sys
+
+IS_MAC = sys.platform == "darwin"
+
+if IS_MAC:
+    FONT_FAMILY = "Hiragino Sans"
+elif sys.platform == "win32":
+    FONT_FAMILY = "Meiryo"
+else:
+    FONT_FAMILY = "Noto Sans CJK JP"
+
+
+def char_width(default: int, mac: int) -> int:
+    """Mac の ttk widget は同じ width 値でも Windows より幅広に描画されるため、
+    width=N (文字数) を Mac では N より小さい値にして実描画幅を Windows と揃える。"""
+    return mac if IS_MAC else default
+
 
 ALL_ITEM_COMBOBOX_VALUES = [
     "なし",

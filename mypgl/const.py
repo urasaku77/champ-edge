@@ -1,3 +1,13 @@
+import sys
+
+if sys.platform == "darwin":
+    _FONT_FAMILY = "Hiragino Sans"
+elif sys.platform == "win32":
+    _FONT_FAMILY = "メイリオ"
+else:
+    _FONT_FAMILY = "Noto Sans CJK JP"
+
+
 class Const(object):
     """
     classdocs
@@ -77,9 +87,9 @@ class Const(object):
     ]
     kikanLabelY = 7
     titleLabelY = 140
-    titleFont = ("メイリオ", 14, "bold")
-    bigFont = ("メイリオ", 12)
-    smallFont = ("メイリオ", 7)
+    titleFont = (_FONT_FAMILY, 14, "bold")
+    bigFont = (_FONT_FAMILY, 12)
+    smallFont = (_FONT_FAMILY, 7)
     DB_CHOICE_X = 1100
     DB_CHOICE_Y = 130
     allBattleHistoryButtonX = 20

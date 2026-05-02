@@ -1,8 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # ttkthemes のテーマファイル（.tcl / 画像）を取得
 ttkthemes_datas = collect_data_files('ttkthemes')
+
+# Windows のみ favicon.ico を適用（macOS は ICNS が必要なので未指定）
+_icon = 'image/favicon.ico' if sys.platform == 'win32' else None
 
 a = Analysis(
     ['main.py'],
@@ -56,7 +60,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='image/favicon.ico',
+    icon=_icon,
 )
 
 coll = COLLECT(

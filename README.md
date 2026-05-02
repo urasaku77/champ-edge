@@ -315,3 +315,79 @@ python main.py
 3. メニュー「バトルデータ」→「構築記事取得」を実行（ranking.json が更新される）
 
 > 構築記事取得には Chrome と ChromeDriver が必要。同日に2回以上の実行はブロックされる。
+
+## 開発者向け：Mac ローカルビルド手順
+
+Windows は GitHub Actions（`.github/workflows/build.yml`）で自動ビルド・リリースされるが、Mac は現状ローカルビルドのみ対応。
+
+### 1. 仮想環境を有効化して依存をインストール
+
+```bash
+cd /path/to/champ-edge
+
+# 仮想環境を有効化（既存の .venv を使用）
+source .venv/bin/activate
+
+# PyInstaller がまだ入っていなければインストール
+pip install pyinstaller
+
+# 依存ライブラリも揃えておく（必要なら）
+pip install -r requirements.txt
+```
+
+### 2. PyInstaller でビルド
+
+```bash
+python -m PyInstaller champedge.spec --noconfirm
+```
+
+成果物：`dist/champedge/` フォルダ（中に実行ファイル `champedge` と `_internal/` リソース）
+
+### 3. 配布用 zip を作る
+
+```bash
+# dist/champedge の実行属性を確実に
+chmod +x dist/champedge/champedge
+
+# ditto で macOS の属性・シンボリックリンクを保ったまま zip 化
+cd dist
+ditto -c -k --sequesterRsrc --keepParent champedge ../champedge_formac.zip
+cd ..
+```
+
+成果物：`champedge_formac.zip`（プロジェクトルートに生成）
+
+### 4. 動作確認
+
+```bash
+# 解凍してそのまま実行
+open dist/champedge/champedge
+# または
+./dist/champedge/champedge
+```
+
+### 5. （任意）GitHub リリースへ手動 upload
+
+`gh` CLI で既存の v1.0.0 リリースに追加：
+
+```bash
+gh release upload v1.0.0 champedge_formac.zip \
+  --repo urasaku77/champ-edge-releases \
+  --clobber
+```
+
+または Web UI（[releases ページ](https://github.com/urasaku77/champ-edge-releases/releases)）から `Edit release` → `Attach binaries` で zip をドラッグ＆ドロップ。
+
+### ワンライナー（毎回これでビルド～zip まで）
+
+```bash
+source .venv/bin/activate && \
+python -m PyInstaller champedge.spec --noconfirm && \
+chmod +x dist/champedge/champedge && \
+cd dist && ditto -c -k --sequesterRsrc --keepParent champedge ../champedge_formac.zip && cd -
+```
+
+### 注意点
+
+- **Gatekeeper 警告**: 配布した zip を開く利用者は、初回起動時に「開発元を確認できないため開けません」と表示される。Finder で右クリック → 「開く」で承認後、以降は通常起動できる。リリースノートに記載するのがおすすめ。
+- **アーキテクチャ依存**: ビルドした Mac の CPU（Intel x86_64 / Apple Silicon arm64）に依存する。ご自身の Mac が Apple Silicon の場合、Intel Mac では動かないので、リリース名に `arm64` / `intel` を入れるか、両方ビルドするか検討する（`uname -m` で確認可能）。

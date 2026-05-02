@@ -46,6 +46,20 @@ from recog.capture import Capture
 from recog.recog import CaptureSetting, ModeSetting, get_recog_value
 from stats.search import get_similar_party
 
+_IS_MAC = sys.platform == "darwin"
+# Mac の ttk ウィジェットは Windows より幅広に描画されるため
+# 横方向だけスケールし、縦方向は Mac 画面の高さに収まるよう微圧縮
+_SCALE_X = 1.0
+_SCALE_Y = 0.92 if _IS_MAC else 1.0
+
+
+def _sx(v: int) -> int:
+    return int(v * _SCALE_X)
+
+
+def _sy(v: int) -> int:
+    return int(v * _SCALE_Y)
+
 
 class MainApp(ThemedTk):
     def __init__(self, **kwargs):
@@ -53,7 +67,136 @@ class MainApp(ThemedTk):
         self.title("ChampEdge")
         if sys.platform == "win32":
             self.iconbitmap(default="image/favicon.ico")
-        self.geometry("950x915")
+        if _IS_MAC:
+            # Mac の named font (TkDefaultFont 等) は 13pt と大きく、
+            # ttk widget の高さ・幅・パディングがこれに比例して大きくなる。
+            # Windows 同等 (10pt 前後) に縮めて全体を圧縮する。
+            import tkinter.font as _tkfont
+
+            for _name in (
+                "TkDefaultFont",
+                "TkTextFont",
+                "TkMenuFont",
+                "TkHeadingFont",
+                "TkCaptionFont",
+                "TkIconFont",
+                "TkTooltipFont",
+                "TkSmallCaptionFont",
+            ):
+                try:
+                    _f = _tkfont.nametofont(_name)
+                    _f.configure(size=10)
+                except Exception:
+                    pass
+        # Mac の dark mode 対策:
+        # arc テーマは TLabel/TButton 等の background は明るく設定するが
+        # TCombobox/TSpinbox/TEntry の fieldbackground は OS デフォルト
+        # にフォールバックするため、dark mode で黒く表示されてしまう。
+        # ここで全 ttk 入力系の field 系色と、tkinter (非 ttk) 系の
+        # デフォルト色を明示的に上書きする。
+        if _IS_MAC:
+            _bg = "#f5f6f7"
+            _field = "white"
+            _fg = "black"
+            style = ttk.Style(self)
+            for widget in (
+                "TEntry",
+                "TCombobox",
+                "TSpinbox",
+            ):
+                style.configure(
+                    widget,
+                    fieldbackground=_field,
+                    foreground=_fg,
+                    background=_bg,
+                    selectbackground="#c0d8f0",
+                    selectforeground=_fg,
+                    insertcolor=_fg,
+                    arrowcolor=_fg,
+                    bordercolor="#cccccc",
+                )
+                style.map(
+                    widget,
+                    fieldbackground=[("readonly", _field), ("disabled", "#e8e8e8")],
+                    foreground=[("disabled", "#888888")],
+                )
+            # ttk.Treeview の dark mode 対策
+            style.configure(
+                "Treeview",
+                background=_field,
+                fieldbackground=_field,
+                foreground=_fg,
+            )
+            style.configure(
+                "Treeview.Heading",
+                background=_bg,
+                foreground=_fg,
+            )
+            # tkinter (非 ttk) widget 用デフォルト
+            # highlightThickness=0 で focus 用の黒い枠線を消す
+            # （これが「黒線」の主因）
+            self.option_add("*highlightThickness", 0)
+            self.option_add("*highlightBackground", _bg)
+            self.option_add("*highlightColor", _bg)
+            self.option_add("*Background", _bg)
+            self.option_add("*Foreground", _fg)
+            self.option_add("*Canvas.Background", _bg)
+            self.option_add("*Canvas.borderWidth", 0)
+            self.option_add("*Canvas.highlightThickness", 0)
+            self.option_add("*Frame.Background", _bg)
+            self.option_add("*Label.Background", _bg)
+            self.option_add("*Label.Foreground", _fg)
+            self.option_add("*Button.Background", _bg)
+            self.option_add("*Button.Foreground", _fg)
+            self.option_add("*Button.activeBackground", "#e0e0e0")
+            self.option_add("*Button.activeForeground", _fg)
+            self.option_add("*Button.highlightBackground", _bg)
+            self.option_add("*Button.highlightThickness", 0)
+            self.option_add("*Button.relief", "raised")
+            self.option_add("*Button.borderWidth", 1)
+            self.option_add("*Entry.Background", _field)
+            self.option_add("*Entry.Foreground", _fg)
+            self.option_add("*Entry.insertBackground", _fg)
+            self.option_add("*Entry.highlightBackground", _bg)
+            self.option_add("*Entry.highlightThickness", 0)
+            self.option_add("*Entry.borderWidth", 1)
+            self.option_add("*Entry.relief", "solid")
+            self.option_add("*Text.Background", _field)
+            self.option_add("*Text.Foreground", _fg)
+            self.option_add("*Text.insertBackground", _fg)
+            self.option_add("*Text.highlightBackground", _bg)
+            self.option_add("*Text.highlightThickness", 0)
+            self.option_add("*Checkbutton.Background", _bg)
+            self.option_add("*Checkbutton.Foreground", _fg)
+            self.option_add("*Checkbutton.activeBackground", "#e0e0e0")
+            self.option_add("*Checkbutton.activeForeground", _fg)
+            self.option_add("*Checkbutton.selectColor", _field)
+            self.option_add("*Checkbutton.highlightBackground", _bg)
+            self.option_add("*Checkbutton.highlightThickness", 0)
+            self.option_add("*Menu.Background", _bg)
+            self.option_add("*Menu.Foreground", _fg)
+            self.option_add("*Menu.activeBackground", "#e0e0e0")
+            self.option_add("*Menu.activeForeground", _fg)
+            self.option_add("*Spinbox.Background", _field)
+            self.option_add("*Spinbox.Foreground", _fg)
+            self.option_add("*Listbox.Background", _field)
+            self.option_add("*Listbox.Foreground", _fg)
+            self.option_add("*Scrollbar.Background", _bg)
+            self.option_add("*Scrollbar.troughColor", _bg)
+            # ttk LabelFrame の border を薄いグレーに
+            style.configure(
+                "TLabelframe",
+                bordercolor="#cccccc",
+                lightcolor="#cccccc",
+                darkcolor="#cccccc",
+            )
+            # カウンタの -/0/+ ボタン用 compact style (padding 詰めて狭い Canvas に収める)
+            style.configure("Counter.TButton", padding=(0, 0))
+        if _IS_MAC:
+            # Mac はメニューバー直下に配置することで縦方向の使える高さを最大化
+            self.geometry(f"{_sx(950)}x{_sy(915)}+0+25")
+        else:
+            self.geometry(f"{_sx(950)}x{_sy(915)}")
 
         self.capture = Capture()
         self.websocket = False
@@ -74,10 +217,14 @@ class MainApp(ThemedTk):
         self.config(menu=menu)
         battle_menu = tkinter.Menu(menu, tearoff=0)
         battle_menu.add_command(label="HOME情報取得", command=self.update_home_data)
-        battle_menu.add_command(label="HOME情報最終更新日", command=self.show_last_update_date)
+        battle_menu.add_command(
+            label="HOME情報最終更新日", command=self.show_last_update_date
+        )
         battle_menu.add_separator()
         battle_menu.add_command(label="構築記事取得", command=self.update_battle_data)
-        battle_menu.add_command(label="構築記事最終更新日", command=self.show_last_battle_update_date)
+        battle_menu.add_command(
+            label="構築記事最終更新日", command=self.show_last_battle_update_date
+        )
         menu.add_cascade(label="バトルデータ", menu=battle_menu)
         menu.add_cascade(label="キャプチャ設定", command=self.capture_setting)
         menu.add_cascade(label="モード切替", command=self.mode_setting)
@@ -90,15 +237,17 @@ class MainApp(ThemedTk):
         for i, side in enumerate(["自分側", "相手側"]):
             sticky = N + W + S if side == "自分側" else N + E + S
             # パーティ＆選出フレーム
-            top_frame = ttk.Frame(master=main_frame, width=500, height=60, padding=5)
+            top_frame = ttk.Frame(
+                master=main_frame, width=_sx(500), height=_sy(60), padding=5
+            )
             top_frame.grid(row=0, column=i * 3, rowspan=2, columnspan=3, sticky=sticky)
             top_frame.grid_propagate(False)
             # パーティ表示フレーム
             party_frame = PartyFrame(
                 master=top_frame,
                 player=i,
-                width=350,
-                height=60,
+                width=_sx(350),
+                height=_sy(60),
                 text=side + "パーティ",
             )
             party_frame.pack(fill="both", expand=0, side="left")
@@ -106,17 +255,23 @@ class MainApp(ThemedTk):
 
             # 選出表示フレーム
             chosen_frame = ChosenFrame(
-                master=top_frame, player=i, width=180, height=60, text=side + "選出"
+                master=top_frame,
+                player=i,
+                width=_sx(180),
+                height=_sy(60),
+                text=side + "選出",
             )
             chosen_frame.pack(fill="both", expand=0, side="left")
             self.chosen_frames.append(chosen_frame)
 
             # 選択ポケモン基本情報表示フレーム
+            # Mac は status row (H A B C D S 値) が 14px に潰される問題があるので明示的に高めに
+            _info_h = 75 if _IS_MAC else _sy(80)
             info_frame = InfoFrame(
                 master=main_frame,
                 player=i,
-                width=475,
-                height=80,
+                width=_sx(475),
+                height=_info_h,
                 text=side + "基本情報",
             )
             info_frame.grid(row=2, column=i * 3, columnspan=3, sticky=sticky)
@@ -124,11 +279,12 @@ class MainApp(ThemedTk):
             self._info_frames.append(info_frame)
 
             # 選択ポケモン表示フレーム
+            _poke_h = 190 if _IS_MAC else _sy(213)
             poke_frame = ActivePokemonFrame(
                 master=main_frame,
                 player=i,
-                width=475,
-                height=213,
+                width=_sx(475),
+                height=_poke_h,
                 text=side + "ポケモン",
             )
             poke_frame.grid(row=3, column=i * 3, columnspan=3, sticky=sticky)
@@ -136,16 +292,29 @@ class MainApp(ThemedTk):
             self.active_poke_frames.append(poke_frame)
 
         # 技・ダメージ表示フレーム(自分)
+        # Mac で 4 行分の表示が押し潰されないよう明示的に高さ指定
+        _waza_my_h = 145 if _IS_MAC else _sy(60)
         waza_frame_my = WazaDamageListFrame(
-            master=main_frame, index=0, width=475, height=60, text="自分わざ情報"
+            master=main_frame,
+            index=0,
+            width=_sx(475),
+            height=_waza_my_h,
+            text="自分わざ情報",
         )
         waza_frame_my.grid(row=4, column=0, columnspan=3, sticky=N + W + S)
         waza_frame_my.grid_propagate(False)
         self._waza_damage_frames.append(waza_frame_my)
 
         # 技・ダメージ表示フレーム(相手)
+        # Mac 画面が低いため、相手わざ情報の rowspan 高さを抑えて
+        # 左カラムの行高さを圧迫しないようにする
+        _waza_your_h = 200 if _IS_MAC else _sy(313)
         waza_frame_your = WazaDamageListFrame(
-            master=main_frame, index=1, width=475, height=313, text="相手わざ情報"
+            master=main_frame,
+            index=1,
+            width=_sx(475),
+            height=_waza_your_h,
+            text="相手わざ情報",
         )
         waza_frame_your.grid(row=4, column=3, rowspan=2, columnspan=3, sticky=N + E + S)
         waza_frame_your.grid_propagate(False)
@@ -153,15 +322,17 @@ class MainApp(ThemedTk):
 
         # HOME情報フレーム
         self.home_frame = HomeFrame(
-            master=main_frame, width=475, height=258, text="HOME情報"
+            master=main_frame, width=_sx(475), height=_sy(258), text="HOME情報"
         )
         self.home_frame.grid(row=6, column=3, rowspan=4, columnspan=3, sticky=N + E + S)
         self.home_frame.grid_propagate(False)
 
         # ツールフレーム（タイマー・カウンター・ダブル・共通）
-        tool_frame = ttk.Frame(main_frame, padding=4)
-        tool_frame.grid(row=5, column=0, rowspan=3, sticky=N + W + S)
-        tool_frame.grid_propagate(False)
+        # 子は pack で管理しているので pack_propagate(False) が必要
+        _tool_h = 105 if _IS_MAC else _sy(250)
+        tool_frame = ttk.Frame(main_frame, padding=4, width=_sx(475), height=_tool_h)
+        tool_frame.grid(row=5, column=0, rowspan=3, columnspan=3, sticky=N + W + S)
+        tool_frame.pack_propagate(False)
 
         # タイマーフレーム
         self.timer_frame = TimerFrame(master=tool_frame, text="タイマー")
@@ -185,51 +356,75 @@ class MainApp(ThemedTk):
         common_frame.pack(fill="both", expand=0, side="left")
 
         # 天候フレーム
-        self.weather_frame = WeatherFrame(master=common_frame, text="天候", padding=6)
+        self.weather_frame = WeatherFrame(
+            master=common_frame,
+            text="天候",
+            padding=1 if _IS_MAC else 6,
+        )
         self.weather_frame.pack(fill="x", expand=0)
 
         # フィールドフレーム
-        self.field_frame = FieldFrame(master=common_frame, text="フィールド", padding=6)
+        self.field_frame = FieldFrame(
+            master=common_frame,
+            text="フィールド",
+            padding=1 if _IS_MAC else 6,
+        )
         self.field_frame.pack(fill="x", expand=0)
 
         # 比較ボタンフレーム（素早さ・重さ）
-        compare_frame = ttk.Frame(common_frame)
-        compare_frame.pack(fill="both", expand=0)
+        # common_frame の 3 段目に置くと Mac で潰れるので tool_frame 直下の独立列に
+        compare_frame = ttk.Frame(tool_frame)
+        compare_frame.pack(fill="both", expand=0, side="left")
 
         # 素早さ比較ボタン
+        _cmp_pad = 1 if _IS_MAC else 5
         self.speed_button = CompareButton(
             master=compare_frame,
             text="S比較",
-            width=6,
-            padding=5,
+            width=6 if not _IS_MAC else 5,
+            padding=_cmp_pad,
             command=self.speed_comparing,
         )
-        self.speed_button.pack(fill="both", expand=0, side="left")
+        self.speed_button.pack(fill="x", expand=0)
 
         # 重さ比較ボタン
         self.weight_button = CompareButton(
             master=compare_frame,
             text="重さ比較",
-            width=8,
-            padding=5,
+            width=8 if not _IS_MAC else 6,
+            padding=_cmp_pad,
             command=self.weight_comparing,
         )
-        self.weight_button.pack(fill="both", expand=0, side="left")
+        self.weight_button.pack(fill="x", expand=0)
 
         # 対戦記録フレーム
+        _record_h = 135 if _IS_MAC else _sy(157)
         self.record_frame = RecordFrame(
-            master=main_frame, width=474, height=157, text="対戦記録"
+            master=main_frame, width=_sx(474), height=_record_h, text="対戦記録"
         )
         self.record_frame.grid(row=8, column=0, columnspan=3, sticky=N + W + S)
         self.record_frame.grid_propagate(False)
 
         # 最終メニューフレーム
-        last_menu_frame = ttk.Frame(master=main_frame, padding=4)
+        # 子は pack 管理なので pack_propagate(False)
+        # height は LabelFrame title + 内部ボタン (約 30+30) に合わせる
+        last_menu_frame = ttk.Frame(
+            master=main_frame, padding=2, width=_sx(475), height=50
+        )
         last_menu_frame.grid(row=9, column=0, columnspan=3, sticky=N + W)
+        last_menu_frame.pack_propagate(False)
 
         # 制御フレーム
         control_frame = ttk.LabelFrame(master=last_menu_frame, text="制御", padding=5)
         control_frame.pack(fill="both", expand=0, side="left")
+
+        from component.parts import const as _parts_const
+
+        # フォント縮小済みなので、ボタン幅も小さめに
+        _ctrl_btn_w = _parts_const.char_width(default=0, mac=6)
+        _ws_btn_w = _parts_const.char_width(default=0, mac=11)
+        _btn_kwargs_ctrl = {"width": _ctrl_btn_w} if _ctrl_btn_w else {}
+        _btn_kwargs_ws = {"width": _ws_btn_w} if _ws_btn_w else {}
 
         # Websocket接続ボタン
         self.websocket_var = tkinter.StringVar()
@@ -239,6 +434,7 @@ class MainApp(ThemedTk):
             control_frame,
             textvariable=self.websocket_var,
             command=self.connect_websocket,
+            **_btn_kwargs_ws,
         )
         self.websocket_button.pack(fill="both", expand=0, side="left")
 
@@ -250,6 +446,7 @@ class MainApp(ThemedTk):
             textvariable=self.monitor_var,
             command=self.image_recognize,
             state=tkinter.DISABLED,
+            **_btn_kwargs_ctrl,
         )
         self.monitor_button.pack(fill="both", expand=0, side="left")
 
@@ -259,6 +456,7 @@ class MainApp(ThemedTk):
             text="選出取得",
             command=self.manual_capture,
             state=tkinter.DISABLED,
+            **_btn_kwargs_ctrl,
         )
         self.shot_button.pack(fill="both", expand=0, side="left")
 
@@ -273,6 +471,7 @@ class MainApp(ThemedTk):
             search_frame,
             text="構築記事",
             command=self.search_similar_party,
+            **_btn_kwargs_ctrl,
         )
         self.search_button.pack(fill="both", expand=0, side="left")
 
@@ -281,6 +480,7 @@ class MainApp(ThemedTk):
             search_frame,
             text="対戦履歴",
             command=self.search_record,
+            **_btn_kwargs_ctrl,
         )
         self.search_button.pack(fill="both", expand=0, side="left")
 
@@ -576,6 +776,7 @@ class MainApp(ThemedTk):
         def _run():
             try:
                 from stats.home import main as home_main
+
                 home_main()
                 self.after(0, lambda: self._on_home_update_done(True, None, today))
             except Exception as e:
@@ -590,7 +791,9 @@ class MainApp(ThemedTk):
                 f.write(today)
             messagebox.showinfo("HOME情報更新", "更新が完了しました")
         else:
-            messagebox.showerror("HOME情報更新", f"更新中にエラーが発生しました\n{(error or '')[:300]}")
+            messagebox.showerror(
+                "HOME情報更新", f"更新中にエラーが発生しました\n{(error or '')[:300]}"
+            )
 
     def show_last_update_date(self):
         try:
@@ -613,6 +816,7 @@ class MainApp(ThemedTk):
         def _run():
             try:
                 from stats.search import Search
+
                 Search().search_latest_party()
                 self.after(0, lambda: self._on_battle_update_done(True, None, today))
             except Exception as e:
@@ -627,7 +831,9 @@ class MainApp(ThemedTk):
                 f.write(today)
             messagebox.showinfo("構築記事取得", "更新が完了しました")
         else:
-            messagebox.showerror("構築記事取得", f"更新中にエラーが発生しました\n{(error or '')[:300]}")
+            messagebox.showerror(
+                "構築記事取得", f"更新中にエラーが発生しました\n{(error or '')[:300]}"
+            )
 
     def show_last_battle_update_date(self):
         try:
@@ -668,7 +874,9 @@ class MainApp(ThemedTk):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception as e:
-            messagebox.showerror("アップデート確認", f"確認中にエラーが発生しました\n{e}")
+            messagebox.showerror(
+                "アップデート確認", f"確認中にエラーが発生しました\n{e}"
+            )
             return
 
         latest = data["tag_name"].lstrip("v")
@@ -679,7 +887,9 @@ class MainApp(ThemedTk):
 
         assets = [a for a in data.get("assets", []) if a["name"].endswith(".zip")]
         if not assets:
-            messagebox.showerror("アップデート確認", "ダウンロードファイルが見つかりませんでした")
+            messagebox.showerror(
+                "アップデート確認", "ダウンロードファイルが見つかりませんでした"
+            )
             return
 
         if not messagebox.askyesno(
@@ -710,11 +920,14 @@ class MainApp(ThemedTk):
         def _run():
             try:
                 asset_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/assets/{asset_id}"
-                req = urllib.request.Request(asset_url, headers={
-                    "User-Agent": "champedge-updater/1.0",
-                    "Authorization": f"token {self._RELEASE_TOKEN}",
-                    "Accept": "application/octet-stream",
-                })
+                req = urllib.request.Request(
+                    asset_url,
+                    headers={
+                        "User-Agent": "champedge-updater/1.0",
+                        "Authorization": f"token {self._RELEASE_TOKEN}",
+                        "Accept": "application/octet-stream",
+                    },
+                )
                 with urllib.request.urlopen(req) as resp:
                     with open(zip_path, "wb") as f:
                         while chunk := resp.read(65536):
@@ -722,13 +935,13 @@ class MainApp(ThemedTk):
 
                 bat = (
                     "@echo off\n"
-                    "cd /d \"%~dp0\"\n"
+                    'cd /d "%~dp0"\n'
                     "timeout /t 5 /nobreak > nul\n"
                     "powershell -Command "
                     "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
                     "-DestinationPath '.' -Force\"\n"
                     "del _champedge_update.zip\n"
-                    "del \"%~f0\"\n"
+                    'del "%~f0"\n'
                     "start champedge.exe\n"
                 )
                 with open(bat_path, "w", encoding="ascii") as f:
@@ -737,7 +950,12 @@ class MainApp(ThemedTk):
                 self.after(0, lambda: self._launch_updater(bat_path))
             except Exception as e:
                 err = str(e)
-                self.after(0, lambda: messagebox.showerror("アップデート", f"ダウンロードエラー\n{err}"))
+                self.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "アップデート", f"ダウンロードエラー\n{err}"
+                    ),
+                )
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -769,6 +987,9 @@ class MainApp(ThemedTk):
         dialog.open()
 
     def on_change_transport(self, event):
+        # -transparentcolor は Windows 専用の Tk 属性
+        if sys.platform != "win32":
+            return
         # ウィンドウが最大化されたかどうかをチェック
         if self.winfo_width() >= 1200:
             self.attributes("-transparentcolor", "gray97")

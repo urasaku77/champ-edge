@@ -24,7 +24,10 @@ class WeatherFrame(ttk.LabelFrame):
 
         self._stage: Stage | None = None
         self._weather_combobox = MyCombobox(
-            self, width=10, height=30, values=WEATHER_COMBOBOX_VALUES
+            self,
+            width=const.char_width(default=10, mac=6),
+            height=30,
+            values=WEATHER_COMBOBOX_VALUES,
         )
         self._weather_combobox.set(WEATHER_COMBOBOX_VALUES[0])
         self._weather_combobox.bind("<<ComboboxSelected>>", self.change_weather)
@@ -52,7 +55,10 @@ class FieldFrame(ttk.LabelFrame):
 
         self._stage: Stage | None = None
         self._field_combobox = MyCombobox(
-            self, width=10, height=30, values=FIELD_COMBOBOX_VALUES
+            self,
+            width=const.char_width(default=10, mac=6),
+            height=30,
+            values=FIELD_COMBOBOX_VALUES,
         )
         self._field_combobox.set(FIELD_COMBOBOX_VALUES[0])
         self._field_combobox.bind("<<ComboboxSelected>>", self.change_field)
@@ -103,17 +109,27 @@ class HomeFrame(ttk.LabelFrame):
             # Treeviewの生成
             tree = ttk.Treeview(self, columns=column, height=9)
             tree["show"] = "headings"
-            # 列の設定
-            tree.column("No", width=10)
+            # 列の設定 (Mac はフォント縮小済みなのでさらに詰める)
+            _no_w = const.char_width(default=10, mac=8)
+            _pct_w = const.char_width(default=22, mac=18)
+            tree.column("No", width=_no_w, minwidth=_no_w)
             if i == 0:
-                tree.column(self._type[i][0], width=70)
+                tree.column(
+                    self._type[i][0], width=const.char_width(default=70, mac=60)
+                )
             elif i == 1:
-                tree.column(self._type[i][0], width=70)
+                tree.column(
+                    self._type[i][0], width=const.char_width(default=70, mac=60)
+                )
             elif i == 3:
-                tree.column(self._type[i][0], width=80)
+                tree.column(
+                    self._type[i][0], width=const.char_width(default=80, mac=70)
+                )
             else:
-                tree.column(self._type[i][0], width=47)
-            tree.column("%", width=22)
+                tree.column(
+                    self._type[i][0], width=const.char_width(default=47, mac=40)
+                )
+            tree.column("%", width=_pct_w, minwidth=_pct_w)
             # 列の見出し設定
             tree.heading("No", text="No")
             tree.heading(self._type[i][0], text=self._type[i][0])
@@ -187,20 +203,30 @@ class TimerFrame(ttk.LabelFrame):
         self.button_text.set("スタート")
 
         self.bg = tkinter.StringVar()
-        self.canvas_time = tkinter.Canvas(self, width=130, height=70, bg="lightgreen")
+        # Mac は canvas を低くして上部の空白を除去
+        _canvas_h = const.char_width(default=70, mac=50)
+        self.canvas_time = tkinter.Canvas(
+            self, width=130, height=_canvas_h, bg="lightgreen"
+        )
         self.canvas_time.grid(column=0, row=0, columnspan=2)
 
+        _btn_w = const.char_width(default=9, mac=5)
+        _btn_h = const.char_width(default=2, mac=1)
         start_button = tkinter.Button(
             self,
-            width=9,
-            height=2,
+            width=_btn_w,
+            height=_btn_h,
             textvariable=self.button_text,
             command=self.start_button_clicked,
         )
         start_button.grid(column=0, row=1)
 
         self.reset_button = tkinter.Button(
-            self, width=9, height=2, text="リセット", command=self.reset_button_clicked
+            self,
+            width=_btn_w,
+            height=_btn_h,
+            text="リセット",
+            command=self.reset_button_clicked,
         )
         self.reset_button.grid(column=1, row=1)
 
@@ -273,11 +299,13 @@ class TimerFrame(ttk.LabelFrame):
     # 分の表示更新
     def update_min_text(self):
         self.canvas_time.delete("min_text")  # 表示時間（分）を消去
+        _y = int(self.canvas_time["height"]) // 2
+        _font_size = const.char_width(default=36, mac=26)
         self.canvas_time.create_text(
             74,
-            38,
+            _y,
             text=str(self.left_min).zfill(2) + ":",
-            font=("MSゴシック体", "36", "bold"),
+            font=(const.FONT_FAMILY, _font_size, "bold"),
             tag="min_text",
             anchor="e",
         )  # 分を表示
@@ -285,11 +313,13 @@ class TimerFrame(ttk.LabelFrame):
     # 秒の表示更新
     def update_sec_text(self):
         self.canvas_time.delete("sec_text")  # 表示時間（秒）を消去
+        _y = int(self.canvas_time["height"]) // 2
+        _font_size = const.char_width(default=36, mac=26)
         self.canvas_time.create_text(
             76,
-            38,
+            _y,
             text=str(self.left_sec).zfill(2),
-            font=("MSゴシック体", "36", "bold"),
+            font=(const.FONT_FAMILY, _font_size, "bold"),
             tag="sec_text",
             anchor="w",
         )  # 秒を表示
@@ -298,9 +328,17 @@ class TimerFrame(ttk.LabelFrame):
 # カウンターフレーム(1個)
 class CounterFrame(tkinter.Canvas):
     def __init__(self, master, **kwargs):
+        # Canvas は明示 width を指定しないと内部子要素より大きく取られる
+        # Mac で各カウンタが 165px と過大になる対策。
+        # grid_propagate(False) で children に合わせて拡大するのを止める。
+        if "width" not in kwargs:
+            kwargs["width"] = const.char_width(default=130, mac=80)
+        if "height" not in kwargs:
+            kwargs["height"] = const.char_width(default=130, mac=80)
         super().__init__(master, **kwargs)
+        self.grid_propagate(False)
 
-        self.name_label = tkinter.Entry(self, width=7)
+        self.name_label = tkinter.Entry(self, width=const.char_width(default=7, mac=4))
         self.name_label.grid(column=0, row=0, columnspan=3)
         self.count_num = tkinter.IntVar()
         self.count_num.set(0)
@@ -308,24 +346,52 @@ class CounterFrame(tkinter.Canvas):
             self,
             textvariable=self.count_num,
             anchor="center",
-            font=(const.FONT_FAMILY, 24, "bold"),
+            font=(const.FONT_FAMILY, const.char_width(default=24, mac=18), "bold"),
         )
         self.label_count.grid(column=0, row=1, columnspan=3)
 
-        self.btn_count_down = tkinter.Button(
-            self, text="  -  ", command=self.CountDown, height=2
-        )
-        self.btn_count_down.grid(column=0, row=2)
-
-        self.btn_count_reset = tkinter.Button(
-            self, text="0", command=self.CountReset, height=2
-        )
-        self.btn_count_reset.grid(column=1, row=2)
-
-        self.btn_count_reset = tkinter.Button(
-            self, text="  ＋  ", command=self.CountUp, height=2
-        )
-        self.btn_count_reset.grid(column=2, row=2)
+        # Mac native tk.Button は最小サイズが大きく 3 つ並べると Canvas に入らないので
+        # ttk.Button を使う (Mac 以外は元の tk.Button のまま)
+        if const.IS_MAC:
+            self.btn_count_down = ttk.Button(
+                self,
+                text="-",
+                width=2,
+                style="Counter.TButton",
+                command=self.CountDown,
+            )
+            self.btn_count_down.grid(column=0, row=2, sticky="ew")
+            self.btn_count_reset = ttk.Button(
+                self,
+                text="0",
+                width=2,
+                style="Counter.TButton",
+                command=self.CountReset,
+            )
+            self.btn_count_reset.grid(column=1, row=2, sticky="ew")
+            self.btn_count_reset = ttk.Button(
+                self,
+                text="＋",
+                width=2,
+                style="Counter.TButton",
+                command=self.CountUp,
+            )
+            self.btn_count_reset.grid(column=2, row=2, sticky="ew")
+        else:
+            _cbtn_w = 5
+            _cbtn_h = 2
+            self.btn_count_down = tkinter.Button(
+                self, text="-", width=_cbtn_w, command=self.CountDown, height=_cbtn_h
+            )
+            self.btn_count_down.grid(column=0, row=2)
+            self.btn_count_reset = tkinter.Button(
+                self, text="0", width=_cbtn_w, command=self.CountReset, height=_cbtn_h
+            )
+            self.btn_count_reset.grid(column=1, row=2)
+            self.btn_count_reset = tkinter.Button(
+                self, text="＋", width=_cbtn_w, command=self.CountUp, height=_cbtn_h
+            )
+            self.btn_count_reset.grid(column=2, row=2)
 
     def CountDown(self):
         decrease_num = self.count_num.get()
@@ -467,20 +533,31 @@ class RecordFrame(ttk.LabelFrame):
         super().__init__(master, **kwargs)
         self._stage: Stage | None = None
         self.result = -1
+        # entry / memo 列を expand させて右余白を埋める
+        self.columnconfigure(1, weight=1)
 
         self.tn_lbl = MyLabel(self, text="TN")
         self.tn_lbl.grid(column=0, row=0)
-        self.tn = tkinter.Entry(self)
+        # ttk.Entry を使うことで Mac dark mode の黒い border を回避
+        self.tn = ttk.Entry(self)
         self.tn.grid(column=1, row=0, sticky=N + E + W + S)
 
         self.rank_lbl = MyLabel(self, text="ランク")
         self.rank_lbl.grid(column=0, row=1)
-        self.rank = tkinter.Entry(self)
+        self.rank = ttk.Entry(self)
         self.rank.grid(column=1, row=1, sticky=N + E + W + S)
 
         self.memo_lbl = MyLabel(self, text="メモ")
         self.memo_lbl.grid(column=0, row=2)
-        self.memo = ScrolledText(self, font=("", 15), height=4, width=41)
+        self.memo = ScrolledText(
+            self,
+            font=("", 15),
+            height=const.char_width(default=4, mac=4),
+            width=const.char_width(default=41, mac=30),
+            bg="white",
+            fg="black",
+            insertbackground="black",
+        )
         self.memo.grid(column=1, row=2, columnspan=4, sticky=N + E + W + S)
 
         self.favo = tkinter.BooleanVar()
@@ -490,17 +567,21 @@ class RecordFrame(ttk.LabelFrame):
         )
         self.favo_checkbox.grid(column=2, row=0, columnspan=2)
 
-        win_btn = MyButton(self, width=4, text="勝ち", command=lambda: self.register(1))
+        # 引き分け は 4 文字 + Mac Hiragino は幅広なので width=7
+        _btn_w = const.char_width(default=4, mac=7)
+        win_btn = MyButton(
+            self, width=_btn_w, text="勝ち", command=lambda: self.register(1)
+        )
         win_btn.grid(column=2, row=1, sticky=N + E + W + S)
         lose_btn = MyButton(
-            self, width=4, text="負け", command=lambda: self.register(0)
+            self, width=_btn_w, text="負け", command=lambda: self.register(0)
         )
         lose_btn.grid(column=3, row=1, sticky=N + E + W + S)
         draw_btn = MyButton(
-            self, width=4, text="引き分け", command=lambda: self.register(-1)
+            self, width=_btn_w, text="引き分け", command=lambda: self.register(-1)
         )
         draw_btn.grid(column=4, row=0, sticky=N + E + W + S)
-        clear_btn = MyButton(self, width=4, text="クリア", command=self.clear)
+        clear_btn = MyButton(self, width=_btn_w, text="クリア", command=self.clear)
         clear_btn.grid(column=4, row=1, sticky=N + E + W + S)
 
     def set_stage(self, stage: Stage):

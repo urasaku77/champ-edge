@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tkinter
 import webbrowser
 from tkinter import E, N, S, W, ttk
@@ -11,6 +12,20 @@ from component.parts.combobox import MyCombobox, WazaNameCombobox
 from component.parts.const import ITEM_COMBOBOX_VALUES, WALL_COMBOBOX_VALUES
 from component.parts.dialog import PokemonMemoLabelDialog
 from component.parts.label import MyLabel
+
+_IS_MAC = sys.platform == "darwin"
+_SCALE_X = 1.0
+_SCALE_Y = 0.92 if _IS_MAC else 1.0
+
+
+def _sx(v: int) -> int:
+    return int(v * _SCALE_X)
+
+
+def _sy(v: int) -> int:
+    return int(v * _SCALE_Y)
+
+
 from pokedata.calc import DamageCalcResult
 from pokedata.const import ABILITY_VALUES, Ailments, Types, Walls
 from pokedata.exception import changeble_form_in_battle
@@ -194,17 +209,21 @@ class ActivePokemonFrame(ttk.LabelFrame):
 
         self._form_button_state = tkinter.BooleanVar()
         self._form_button_state.set(False)
+        _form_kwargs = {"width": 5} if const.IS_MAC else {}
         self._form_button = MyButton(
             left_frame,
             text="フォーム",
             state=tkinter.DISABLED,
             command=self.change_form,
+            **_form_kwargs,
         )
         self._form_button.grid(column=0, row=2, pady=5)
 
         seikakus = get_seikaku_list()
         seikakus.insert(0, "まじめ")
-        self._seikaku_combobox = MyCombobox(left_frame, values=seikakus, width=8)
+        self._seikaku_combobox = MyCombobox(
+            left_frame, values=seikakus, width=const.char_width(default=8, mac=6)
+        )
         self._seikaku_combobox.set(seikakus[0])
         self._seikaku_combobox.bind("<<ComboboxSelected>>", self.on_select_seikaku)
         self._seikaku_combobox.bind("<Return>", self.on_select_seikaku)
@@ -450,7 +469,7 @@ class StatusFrame(ttk.LabelFrame):
                 from_=0,
                 to=32,
                 increment=1,
-                width=4,
+                width=const.char_width(default=4, mac=3),
                 validate="key",
                 validatecommand=(self.doryoku_validate, "%P"),
                 command=lambda key=statskey: self.on_push_doryoku_spin(key),
@@ -469,7 +488,7 @@ class StatusFrame(ttk.LabelFrame):
                     from_=-6,
                     to=6,
                     increment=1,
-                    width=3,
+                    width=const.char_width(default=3, mac=2),
                     command=lambda key=statskey: self.on_push_rank_spin(
                         key, int(self._rank_spinbox_dict[key].get())
                     ),
@@ -777,14 +796,14 @@ class InfoFrame(ttk.LabelFrame):
             [tkinter.PhotoImage(file=Types.なし.icon).subsample(3, 3)] * 2,
             [tkinter.PhotoImage(file=Types.なし.icon).subsample(3, 3)] * 2,
         ]
-        self.size = (457, 77)
+        self.size = (_sx(457), _sy(77))
         self.pack_propagate(False)
-        basic_info_flame = ttk.Frame(self, width=457, height=37)
+        basic_info_flame = ttk.Frame(self, width=_sx(457), height=_sy(37))
         basic_info_flame.pack_propagate(False)
-        basic_info_flame.columnconfigure(0, minsize=210)
-        basic_info_flame.columnconfigure(1, minsize=70)
-        basic_info_flame.columnconfigure(2, minsize=100)
-        basic_info_flame.columnconfigure(3, minsize=50)
+        basic_info_flame.columnconfigure(0, minsize=_sx(210))
+        basic_info_flame.columnconfigure(1, minsize=_sx(70))
+        basic_info_flame.columnconfigure(2, minsize=_sx(100))
+        basic_info_flame.columnconfigure(3, minsize=_sx(50))
         self.name = tkinter.StringVar()
         self.name.set("")
         self.name_text = ttk.Label(
@@ -821,8 +840,8 @@ class InfoFrame(ttk.LabelFrame):
 
         status_flame = ttk.Frame(
             self,
-            width=457,
-            height=35,
+            width=_sx(457),
+            height=_sy(35),
         )
         status_flame.pack_propagate(False)
         for i, statskey in enumerate([x for x in StatsKey]):
@@ -835,7 +854,7 @@ class InfoFrame(ttk.LabelFrame):
             text = ttk.Label(
                 status_flame, textvariable=value, font=(const.FONT_FAMILY, 15, "bold")
             )
-            status_flame.columnconfigure(i * 2 + 1, minsize=45)
+            status_flame.columnconfigure(i * 2 + 1, minsize=_sx(45))
             text.grid(column=i * 2 + 1, row=1)
             self.syuzoku[statskey] = value
         status_flame.pack(side="top", anchor="w")
