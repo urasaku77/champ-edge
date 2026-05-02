@@ -12,6 +12,7 @@ stats/home_terastal.csv
 stats/home_tokusei.csv
 stats/home_waza.csv
 stats/home_seikaku.csv
+stats/last_update.txt
 stats/ranking.json
 stats/ranking.txt
 stats/season.txt
