@@ -97,7 +97,7 @@ class Search:
         try:
             for season in seasons:
                 driver.get(
-                    f"https://sv.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
+                    f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
                 )
 
                 trainer_classes = driver.find_elements(
