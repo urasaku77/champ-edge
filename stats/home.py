@@ -1,652 +1,320 @@
-#!python3.10
+#!/usr/bin/env python3
+"""champs.pokedb.tokyo からポケモンデータをスクレイピングして CSV に保存する
+
+取得対象:
+  home_waza.csv      技
+  home_tokusei.csv   特性
+  home_motimono.csv  持ち物
+  home_seikaku.csv   性格
+  home_doryoku.csv   努力値（個別上位10件）
+
+CSV フォーマット: ポケモン名, 値, パーセント
+"""
 import csv
-import json
 import os
+import re
 import ssl
 import sys
+import time
 import urllib.request
+from html.parser import HTMLParser
 
-import jaconv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database.pokemon import DB_pokemon
 
-ssl._create_default_https_context = ssl._create_unverified_context
+_SSL_CTX = ssl._create_unverified_context()
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; svcalc/1.0)"}
 
-sys.path.append("../svcalc-modified")
-from pokedata.exception import unrecognizable_and_same_pokemon_in_home
+CSV_PATHS = {
+    "waza":     "stats/home_waza.csv",
+    "tokusei":  "stats/home_tokusei.csv",
+    "motimono": "stats/home_motimono.csv",
+    "seikaku":  "stats/home_seikaku.csv",
+    "doryoku":  "stats/home_doryoku.csv",
+}
+
+_PCT_RE  = re.compile(r"^\d+\.\d+%$")   # "99.0%" 結合形式
+_PCT_NUM = re.compile(r"^\d+\.\d+$")    # "99.0"  分割形式の数値部分
+_STAT_LETTERS = frozenset("HABCDS")
+# 合算ラベル: "AS", "AS + h", "HB + bd" など（大文字 + オプションの +小文字）
+_AGG_RE = re.compile(r"^[A-Z]+(\s*\+\s*[a-z]+)*$")
+
+# ページ上の実際のセクション見出しトークン
+_SECTION_KEYS = ["技", "特性", "能力補正", "持ち物", "能力ポイント"]
 
 
-def get_pokemon_name_for_home(pokenum: str, p_detail_id: str) -> str:
-    if pokenum == "26":
-        if p_detail_id == "0":
-            return "ライチュウ"
-        elif p_detail_id == "1":
-            return "アローラライチュウ"
-    elif pokenum == "27":
-        if p_detail_id == "0":
-            return "サンド"
-        elif p_detail_id == "1":
-            return "アローラサンド"
-    elif pokenum == "28":
-        if p_detail_id == "0":
-            return "サンドパン"
-        elif p_detail_id == "1":
-            return "アローラサンドパン"
-    elif pokenum == "37":
-        if p_detail_id == "0":
-            return "ロコン"
-        elif p_detail_id == "1":
-            return "アローラロコン"
-    elif pokenum == "38":
-        if p_detail_id == "0":
-            return "キュウコン"
-        elif p_detail_id == "1":
-            return "アローラキュウコン"
-    elif pokenum == "50":
-        if p_detail_id == "0":
-            return "ディグダ"
-        elif p_detail_id == "1":
-            return "アローラディグダ"
-    elif pokenum == "51":
-        if p_detail_id == "0":
-            return "ダグトリオ"
-        elif p_detail_id == "1":
-            return "アローラダグトリオ"
-    elif pokenum == "52":
-        if p_detail_id == "0":
-            return "ニャース"
-        elif p_detail_id == "1":
-            return "アローラニャース"
-        elif p_detail_id == "2":
-            return "ガラルニャース"
-    elif pokenum == "53":
-        if p_detail_id == "0":
-            return "ペルシアン"
-        elif p_detail_id == "1":
-            return "アローラペルシアン"
-    elif pokenum == "58":
-        if p_detail_id == "0":
-            return "ガーディ"
-        elif p_detail_id == "1":
-            return "ガーディ(ヒスイ)"
-    elif pokenum == "59":
-        if p_detail_id == "0":
-            return "ウインディ"
-        elif p_detail_id == "1":
-            return "ウインディ(ヒスイ)"
-    elif pokenum == "74":
-        if p_detail_id == "0":
-            return "イシツブテ"
-        elif p_detail_id == "1":
-            return "アローライシツブテ"
-    elif pokenum == "75":
-        if p_detail_id == "0":
-            return "ゴローン"
-        elif p_detail_id == "1":
-            return "アローラゴローン"
-    elif pokenum == "76":
-        if p_detail_id == "0":
-            return "ゴローニャ"
-        elif p_detail_id == "1":
-            return "アローラゴローニャ"
-    elif pokenum == "79":
-        if p_detail_id == "0":
-            return "ヤドン"
-        elif p_detail_id == "1":
-            return "ガラルヤドン"
-    elif pokenum == "80":
-        if p_detail_id == "0":
-            return "ヤドラン"
-        elif p_detail_id == "2":
-            return "ガラルヤドラン"
-    elif pokenum == "88":
-        if p_detail_id == "0":
-            return "ベトベター"
-        elif p_detail_id == "1":
-            return "アローラベトベター"
-    elif pokenum == "89":
-        if p_detail_id == "0":
-            return "ベトベトン"
-        elif p_detail_id == "1":
-            return "アローラベトベトン"
-    elif pokenum == "100":
-        if p_detail_id == "0":
-            return "ビリリダマ"
-        elif p_detail_id == "1":
-            return "ビリリダマ(ヒスイ)"
-    elif pokenum == "101":
-        if p_detail_id == "0":
-            return "マルマイン"
-        elif p_detail_id == "1":
-            return "マルマイン(ヒスイ)"
-    elif pokenum == "110":
-        if p_detail_id == "0":
-            return "マタドガス"
-        elif p_detail_id == "1":
-            return "ガラルマタドガス"
-    elif pokenum == "128":
-        if p_detail_id == "0":
-            return "ケンタロス"
-        elif p_detail_id == "1":
-            return "ケンタロス(パルデア単)"
-        elif p_detail_id == "2":
-            return "ケンタロス(パルデア炎)"
-        elif p_detail_id == "3":
-            return "ケンタロス(パルデア水)"
-    elif pokenum == "144":
-        if p_detail_id == "0":
-            return "フリーザー"
-        elif p_detail_id == "1":
-            return "ガラルフリーザー"
-    elif pokenum == "145":
-        if p_detail_id == "0":
-            return "サンダー"
-        elif p_detail_id == "1":
-            return "ガラルサンダー"
-    elif pokenum == "146":
-        if p_detail_id == "0":
-            return "ファイヤー"
-        elif p_detail_id == "1":
-            return "ガラルファイヤー"
-    elif pokenum == "157":
-        if p_detail_id == "0":
-            return "バクフーン"
-        elif p_detail_id == "1":
-            return "バクフーン(ヒスイ)"
-    elif pokenum == "194":
-        if p_detail_id == "0":
-            return "ウパー"
-        elif p_detail_id == "1":
-            return "ウパー(パルデア)"
-    elif pokenum == "199":
-        if p_detail_id == "0":
-            return "ヤドキング"
-        elif p_detail_id == "1":
-            return "ガラルヤドキング"
-    elif pokenum == "211":
-        if p_detail_id == "0":
-            return "ハリーセン"
-        elif p_detail_id == "1":
-            return "ハリーセン(ヒスイ)"
-    elif pokenum == "215":
-        if p_detail_id == "0":
-            return "ニューラ"
-        elif p_detail_id == "1":
-            return "ニューラ(ヒスイ)"
-    elif pokenum == "479":
-        if p_detail_id == "0":
-            return "ロトム"
-        elif p_detail_id == "1":
-            return "ヒートロトム"
-        elif p_detail_id == "2":
-            return "ウォッシュロトム"
-        elif p_detail_id == "3":
-            return "フロストロトム"
-        elif p_detail_id == "4":
-            return "スピンロトム"
-        elif p_detail_id == "5":
-            return "カットロトム"
-    elif pokenum == "483":
-        if p_detail_id == "0":
-            return "ディアルガ"
-        elif p_detail_id == "1":
-            return "ディアルガ(オリジン)"
-    elif pokenum == "484":
-        if p_detail_id == "0":
-            return "パルキア"
-        elif p_detail_id == "1":
-            return "パルキア(オリジン)"
-    elif pokenum == "487":
-        if p_detail_id == "0":
-            return "ギラティナ(アナザー)"
-        elif p_detail_id == "1":
-            return "ギラティナ(オリジン)"
-    elif pokenum == "493":
-        if p_detail_id == "0":
-            return "アルセウス"
-        elif p_detail_id == "1":
-            return "アルセウス(かくとう)"
-        elif p_detail_id == "2":
-            return "アルセウス(ひこう)"
-        elif p_detail_id == "3":
-            return "アルセウス(どく)"
-        elif p_detail_id == "4":
-            return "アルセウス(じめん)"
-        elif p_detail_id == "5":
-            return "アルセウス(いわ)"
-        elif p_detail_id == "6":
-            return "アルセウス(むし)"
-        elif p_detail_id == "7":
-            return "アルセウス(ゴースト)"
-        elif p_detail_id == "8":
-            return "アルセウス(はがね)"
-        elif p_detail_id == "9":
-            return "アルセウス(ほのお)"
-        elif p_detail_id == "10":
-            return "アルセウス(みず)"
-        elif p_detail_id == "11":
-            return "アルセウス(くさ)"
-        elif p_detail_id == "12":
-            return "アルセウス(でんき)"
-        elif p_detail_id == "13":
-            return "アルセウス(エスパー)"
-        elif p_detail_id == "14":
-            return "アルセウス(こおり)"
-        elif p_detail_id == "15":
-            return "アルセウス(ドラゴン)"
-        elif p_detail_id == "16":
-            return "アルセウス(あく)"
-        elif p_detail_id == "17":
-            return "アルセウス(フェアリー)"
-    elif pokenum == "503":
-        if p_detail_id == "0":
-            return "ダイケンキ"
-        elif p_detail_id == "1":
-            return "ダイケンキ(ヒスイ)"
-    elif pokenum == "549":
-        if p_detail_id == "0":
-            return "ドレディア"
-        elif p_detail_id == "1":
-            return "ドレディア(ヒスイ)"
-    elif pokenum == "550":
-        if p_detail_id == "0":
-            return "バスラオ(赤)"
-        elif p_detail_id == "1":
-            return "バスラオ(青)"
-        elif p_detail_id == "2":
-            return "バスラオ(白)"
-    elif pokenum == "570":
-        if p_detail_id == "0":
-            return "ゾロア"
-        elif p_detail_id == "1":
-            return "ゾロア(ヒスイ)"
-    elif pokenum == "571":
-        if p_detail_id == "0":
-            return "ゾロアーク"
-        elif p_detail_id == "1":
-            return "ゾロアーク(ヒスイ)"
-    elif pokenum == "628":
-        if p_detail_id == "0":
-            return "ウォーグル"
-        elif p_detail_id == "1":
-            return "ウォーグル(ヒスイ)"
-    elif pokenum == "641":
-        if p_detail_id == "0":
-            return "トルネロス(化身)"
-        elif p_detail_id == "1":
-            return "トルネロス(霊獣)"
-    elif pokenum == "642":
-        if p_detail_id == "0":
-            return "ボルトロス(化身)"
-        elif p_detail_id == "1":
-            return "ボルトロス(霊獣)"
-    elif pokenum == "645":
-        if p_detail_id == "0":
-            return "ランドロス(化身)"
-        elif p_detail_id == "1":
-            return "ランドロス(霊獣)"
-    elif pokenum == "646":
-        if p_detail_id == "0":
-            return "キュレム"
-        elif p_detail_id == "1":
-            return "ホワイトキュレム"
-        elif p_detail_id == "2":
-            return "ブラックキュレム"
-    elif pokenum == "705":
-        if p_detail_id == "0":
-            return "ヌメイル"
-        elif p_detail_id == "1":
-            return "ヌメイル(ヒスイ)"
-    elif pokenum == "706":
-        if p_detail_id == "0":
-            return "ヌメルゴン"
-        elif p_detail_id == "1":
-            return "ヌメルゴン(ヒスイ)"
-    elif pokenum == "713":
-        if p_detail_id == "0":
-            return "クレベース"
-        elif p_detail_id == "1":
-            return "クレベース(ヒスイ)"
-    elif pokenum == "720":
-        if p_detail_id == "0":
-            return "フーパ(いましめ)"
-        elif p_detail_id == "1":
-            return "フーパ(ときはな)"
-    elif pokenum == "724":
-        if p_detail_id == "0":
-            return "ジュナイパー"
-        elif p_detail_id == "1":
-            return "ジュナイパー(ヒスイ)"
-    elif pokenum == "741":
-        if p_detail_id == "0":
-            return "オドリドリ(めらめら)"
-        elif p_detail_id == "1":
-            return "オドリドリ(ぱちぱち)"
-        elif p_detail_id == "2":
-            return "オドリドリ(ふらふら)"
-        elif p_detail_id == "3":
-            return "オドリドリ(まいまい)"
-    elif pokenum == "745":
-        if p_detail_id == "0":
-            return "ルガルガン(まひる)"
-        elif p_detail_id == "1":
-            return "ルガルガン(まよなか)"
-        elif p_detail_id == "2":
-            return "ルガルガン(たそがれ)"
-    elif pokenum == "800":
-        if p_detail_id == "0":
-            return "ネクロズマ"
-        elif p_detail_id == "1":
-            return "ネクロズマ(日食)"
-        elif p_detail_id == "2":
-            return "ネクロズマ(月食)"
-    elif pokenum == "849":
-        if p_detail_id == "0":
-            return "ストリンダー(ハイ)"
-        elif p_detail_id == "1":
-            return "ストリンダー(ロー)"
-    elif pokenum == "876":
-        if p_detail_id == "0":
-            return "イエッサン♂"
+# ──────────────────────────────────────────────
+# HTML テキスト抽出
+# ──────────────────────────────────────────────
+
+class _TextExtractor(HTMLParser):
+    """script/style を除いた可視テキストを収集する"""
+    _SKIP = {"script", "style", "noscript"}
+
+    def __init__(self):
+        super().__init__()
+        self._depth = 0
+        self.tokens: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._SKIP:
+            self._depth += 1
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP and self._depth > 0:
+            self._depth -= 1
+
+    def handle_data(self, data):
+        if self._depth == 0:
+            text = data.strip()
+            if text:
+                self.tokens.append(text)
+
+
+def _fetch_tokens(pid: str, season: str) -> list[str]:
+    url = f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
+    req = urllib.request.Request(url, headers=_HEADERS)
+    with urllib.request.urlopen(req, context=_SSL_CTX) as resp:
+        html = resp.read().decode("utf-8")
+    p = _TextExtractor()
+    p.feed(html)
+    return p.tokens
+
+
+# ──────────────────────────────────────────────
+# セクション解析
+# ──────────────────────────────────────────────
+
+def _section_range(tokens: list[str], keyword: str, start_from: int = 0) -> tuple[int, int]:
+    """keyword と完全一致するトークンの直後から次のセクション見出しまでの範囲を返す。
+    start_from 以降でのみ検索する（誤マッチ防止用）。
+    """
+    start = None
+    for i in range(start_from, len(tokens)):
+        if tokens[i] == keyword:
+            start = i + 1
+            break
+    if start is None:
+        return (0, 0)
+    other_keys = [k for k in _SECTION_KEYS if k != keyword]
+    end = len(tokens)
+    for i in range(start, len(tokens)):
+        if tokens[i] in other_keys:
+            end = i
+            break
+    return (start, end)
+
+
+def _parse_pairs(tokens: list[str], start: int, end: int, limit: int = 10) -> list[tuple[str, str]]:
+    """技・特性・持ち物用。(名前, パーセント数値文字列) ペアを最大 limit 件返す。
+
+    パーセントは結合形式 "99.0%" と分割形式 "99.0" + "%" の両方に対応。
+    """
+    results: list[tuple[str, str]] = []
+    i = start
+    while i < end and len(results) < limit:
+        t = tokens[i]
+        nxt  = tokens[i + 1] if i + 1 < end else ""
+        nxt2 = tokens[i + 2] if i + 2 < end else ""
+        # パーセント・数値・ランク番号はスキップ
+        if t == "%" or _PCT_RE.match(t) or _PCT_NUM.match(t) or re.match(r"^\d+$", t):
+            i += 1
+            continue
+        if _PCT_RE.match(nxt):                          # 結合形式: 名前 + "99.0%"
+            results.append((t, nxt.rstrip("%")))
+            i += 2
+        elif _PCT_NUM.match(nxt) and nxt2 == "%":       # 分割形式: 名前 + "99.0" + "%"
+            results.append((t, nxt))
+            i += 3
         else:
-            return "イエッサン♀"
-    elif pokenum == "888":
-        if p_detail_id == "0":
-            return "ザシアン"
-        elif p_detail_id == "1":
-            return "ザシアン(王)"
-    elif pokenum == "889":
-        if p_detail_id == "0":
-            return "ザマゼンタ"
-        elif p_detail_id == "1":
-            return "ザマゼンタ(王)"
-    elif pokenum == "892":
-        if p_detail_id == "0":
-            return "ウーラオス(いちげき)"
-        elif p_detail_id == "1":
-            return "ウーラオス(れんげき)"
-    elif pokenum == "898":
-        if p_detail_id == "0":
-            return "バドレックス"
-        elif p_detail_id == "1":
-            return "バドレックス(白馬)"
-        elif p_detail_id == "2":
-            return "バドレックス(黒馬)"
-    elif pokenum == "901":
-        if p_detail_id == "0":
-            return "ガチグマ"
-        elif p_detail_id == "1":
-            return "ガチグマ(アカツキ)"
-    elif pokenum == "902":
-        if p_detail_id == "0":
-            return "イダイトウ♂"
+            i += 1
+    return results
+
+
+def _parse_seikaku(tokens: list[str], start: int, end: int, limit: int = 10) -> list[tuple[str, str]]:
+    """性格セクション: rank, name, '(', 'X↑', 'Y↓', ')', pct, pct_dup の形式
+
+    名前と % の間に括弧・矢印トークンが挟まるため、
+    名前の直後 8 トークン以内の最初の % を採用する。
+    """
+    results: list[tuple[str, str]] = []
+    i = start
+    _SKIP = {"(", ")", "%"}
+    while i < end and len(results) < limit:
+        t = tokens[i]
+        if (re.match(r"^\d+$", t) or t in _SKIP
+                or "↑" in t or "↓" in t
+                or _PCT_RE.match(t) or _PCT_NUM.match(t)):
+            i += 1
+            continue
+        # 直後 8 トークン以内の最初の % を探す
+        found = False
+        for j in range(i + 1, min(i + 9, end)):
+            tj = tokens[j]
+            if _PCT_RE.match(tj):
+                results.append((t, tj.rstrip("%")))
+                i = j + 1
+                found = True
+                break
+            elif _PCT_NUM.match(tj) and j + 1 < end and tokens[j + 1] == "%":
+                results.append((t, tj))
+                i = j + 2
+                found = True
+                break
+        if not found:
+            i += 1
+    return results
+
+
+def _parse_doryoku(tokens: list[str], start: int, end: int, limit: int = 10) -> list[tuple[str, str]]:
+    """能力ポイントセクション: 個別形式（例 H2A32S32）を上位 limit 件取得
+
+    ページ構造:
+      (合算ラベル)(pct)[(stat_letter)(value)]... を繰り返す
+      合算ラベル: "AS", "AS + h", "HB + bd" など (_AGG_RE にマッチ)
+      個別 stat: 1文字の HABCDS + 数値 の交互列
+    """
+    results: list[tuple[str, str]] = []
+    i = start
+    while i < end and len(results) < limit:
+        t = tokens[i]
+        nxt = tokens[i + 1] if i + 1 < end else ""
+        # スキップ: タブ/余り/+/ランク番号/パーセント/件を合算
+        if (t in ("合算", "個別", "+", "余り")
+                or re.match(r"^\d+$", t)
+                or "件を合算" in t
+                or t == "%" or _PCT_RE.match(t) or _PCT_NUM.match(t)):
+            i += 1
+            continue
+        # 合算ラベル + パーセント → 続く個別 stat 列を結合して記録
+        if _AGG_RE.match(t) and _PCT_RE.match(nxt):
+            pct = nxt.rstrip("%")
+            i += 2
+            stat_parts: list[str] = []
+            while i < end:
+                st = tokens[i]
+                st_nxt = tokens[i + 1] if i + 1 < end else ""
+                if len(st) == 1 and st in _STAT_LETTERS and re.match(r"^\d+$", st_nxt):
+                    stat_parts.append(st + st_nxt)
+                    i += 2
+                else:
+                    break
+            if stat_parts:
+                results.append(("".join(stat_parts), pct))
         else:
-            return "イダイトウ♀"
-    elif pokenum == "905":
-        if p_detail_id == "0":
-            return "ラブトロス(化身)"
-        elif p_detail_id == "1":
-            return "ラブトロス(霊獣)"
-    elif pokenum == "916":
-        if p_detail_id == "0":
-            return "パフュートン♂"
-        else:
-            return "パフュートン♀"
-    elif pokenum == "931":
-        if p_detail_id == "0":
-            return "イキリンコ(緑)"
-        elif p_detail_id == "1":
-            return "イキリンコ(青)"
-        elif p_detail_id == "2":
-            return "イキリンコ(黄)"
-        elif p_detail_id == "3":
-            return "イキリンコ(白)"
-    elif pokenum == "978":
-        if p_detail_id == "0":
-            return "シャリタツ(そったすがた)"
-        elif p_detail_id == "1":
-            return "シャリタツ(たれたすがた)"
-        elif p_detail_id == "2":
-            return "シャリタツ(のびたすがた)"
-    else:
-        return ""
+            i += 1
+    return results
 
 
-class home:
-    cid = ""
-    rst = 0
-    ts2 = ""
-    pdetail = {}
+# ──────────────────────────────────────────────
+# ポケモン名取得
+# ──────────────────────────────────────────────
 
-    print("ランクマッチ情報取得")
-    url = "https://api.battle.pokemon-home.com/tt/cbd/competition/rankmatch/list"
-    headers = {
-        "accept": "application/json, text/javascript, */*",
-        "countrycode": 304,
-        "authorization": "Bearer",
-        "langcode": 1,
-        "user-agent": "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Mobile Safari/537.36",
-        "content-type": "application/json",
-    }
-    param = {"soft": "Sc"}
-    req = urllib.request.Request(url, json.dumps(param).encode(), headers)
-    with urllib.request.urlopen(req) as res:
-        rankmatch_list = json.load(res)
-        cid = 0
-        for item in rankmatch_list["list"][next(iter(rankmatch_list["list"]))]:
-            if (
-                rankmatch_list["list"][next(iter(rankmatch_list["list"]))][item]["rule"]
-                == 0
-            ):
-                cid = item
-        rst = rankmatch_list["list"][next(iter(rankmatch_list["list"]))][cid]["rst"]
-        ts2 = rankmatch_list["list"][next(iter(rankmatch_list["list"]))][cid]["ts2"]
+def _get_name(pid: str, tokens: list[str]) -> str:
+    """ranking.txt 形式 (0445-00) → DB 名前取得。失敗時はタイトルから抽出"""
+    try:
+        no, form = pid.split("-")
+        return DB_pokemon.get_pokemon_name_by_pid(f"{int(no)}-{int(form)}")
+    except Exception:
+        pass
+    for t in tokens[:20]:
+        m = re.match(r"^(.+?)の", t)
+        if m:
+            return m.group(1)
+    return pid
 
-    with open("stats/season.txt", mode="w", encoding="utf-8") as ranking_txt:
-        ranking_txt.write(next(iter(rankmatch_list["list"])))
 
-    print("ポケモンランキング取得")
-    url = (
-        "https://resource.pokemon-home.com/battledata/ranking/scvi/"
-        + str(cid)
-        + "/"
-        + str(rst)
-        + "/"
-        + str(ts2)
-        + "/pokemon"
-    )
-    headers = {
-        "accept": "application/json, text/javascript, */*",
-        "user-agent": "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Mobile Safari/537.36",
-    }
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req) as res:
-        ranking = json.load(res)
-        if os.path.isfile("stats/ranking.txt") is True:
-            os.remove("stats/ranking.txt")
+# ──────────────────────────────────────────────
+# CSV 書き込み
+# ──────────────────────────────────────────────
 
-        for pokemon in ranking:
-            pid = str(pokemon["id"]).zfill(4) + "-0" + str(pokemon["form"])
-            with open("stats/ranking.txt", mode="a", encoding="utf-8") as ranking_txt:
-                ranking_txt.write(pid + "\n")
-                if pokemon["id"] == 1017:
-                    ranking_txt.write(str(pokemon["id"]) + "-01\n")
-                    ranking_txt.write(str(pokemon["id"]) + "-02\n")
-                    ranking_txt.write(str(pokemon["id"]) + "-03\n")
+def _append_csv(path: str, rows: list[list]):
+    if not rows:
+        return
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        csv.writer(f, lineterminator="\n").writerows(rows)
 
-    print("ポケモン情報取得")
-    for i in range(1, 7):
-        url = (
-            "https://resource.pokemon-home.com/battledata/ranking/scvi/"
-            + str(cid)
-            + "/"
-            + str(rst)
-            + "/"
-            + str(ts2)
-            + "/pdetail-"
-            + str(i)
-        )
-        headers = {
-            "accept": "application/json, text/javascript, */*",
-            "user-agent": "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Mobile Safari/537.36",
-        }
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req) as res:
-            pdetail_tmp = json.load(res)
-            pdetail = dict(pdetail, **pdetail_tmp)
 
-    pokedex = ""
-    with open("stats/bundle.json", "r", encoding="utf-8") as json_open:
-        pokedex = json.load(json_open)
+# ──────────────────────────────────────────────
+# ランキングリスト取得
+# ──────────────────────────────────────────────
 
-    if os.path.isfile("stats/home_waza.csv") is True:
-        os.remove("stats/home_waza.csv")
-    if os.path.isfile("stats/home_tokusei.csv") is True:
-        os.remove("stats/home_tokusei.csv")
-    if os.path.isfile("stats/home_seikaku.csv") is True:
-        os.remove("stats/home_seikaku.csv")
-    if os.path.isfile("stats/home_motimono.csv") is True:
-        os.remove("stats/home_motimono.csv")
-    if os.path.isfile("stats/home_terastal.csv") is True:
-        os.remove("stats/home_terastal.csv")
+_LIST_URL = "https://champs.pokedb.tokyo/pokemon/list?rule=0"
+_PID_RE    = re.compile(r"/pokemon/show/(\d{4}-\d{2})")
+_SEASON_RE = re.compile(r"season=(\d+)")
 
-    print("CSV更新")
-    for pokenum in pdetail.keys():
-        for p_detail_id in pdetail[pokenum].keys():
-            name = get_pokemon_name_for_home(pokenum, p_detail_id)
-            if name == "":
-                name = pokedex["poke"][int(pokenum) - 1]
 
-            with open("stats/home_waza.csv", "a", encoding="utf-8") as waza_csv:
-                for waza in pdetail[pokenum][p_detail_id]["temoti"]["waza"]:
-                    writer = csv.writer(waza_csv, lineterminator="\n")
-                    writer.writerow(
-                        [
-                            name,
-                            jaconv.z2h(
-                                pokedex["waza"][waza["id"]],
-                                kana=False,
-                                digit=True,
-                                ascii=True,
-                            ),
-                            waza["val"],
-                        ]
-                    )
-                    if name in unrecognizable_and_same_pokemon_in_home.keys():
-                        writer.writerow(
-                            [
-                                name + "(王)",
-                                jaconv.z2h(
-                                    pokedex["waza"][waza["id"]],
-                                    kana=False,
-                                    digit=True,
-                                    ascii=True,
-                                )
-                                if jaconv.z2h(
-                                    pokedex["waza"][waza["id"]],
-                                    kana=False,
-                                    digit=True,
-                                    ascii=True,
-                                )
-                                != "アイアンヘッド"
-                                else unrecognizable_and_same_pokemon_in_home[name],
-                                waza["val"],
-                            ]
-                        )
+def _fetch_ranking() -> tuple[list[str], str]:
+    """ランキングページから (pid リスト, シーズン番号) を取得する"""
+    req = urllib.request.Request(_LIST_URL, headers=_HEADERS)
+    with urllib.request.urlopen(req, context=_SSL_CTX) as resp:
+        html = resp.read().decode("utf-8")
+    pids = _PID_RE.findall(html)
+    m = _SEASON_RE.search(html)
+    season = m.group(1) if m else "1"
+    return pids, season
 
-            with open("stats/home_tokusei.csv", "a", encoding="utf-8") as tokusei_csv:
-                for tokusei in pdetail[pokenum][p_detail_id]["temoti"]["tokusei"]:
-                    writer = csv.writer(tokusei_csv, lineterminator="\n")
-                    writer.writerow(
-                        [
-                            name,
-                            jaconv.z2h(
-                                pokedex["tokusei"][tokusei["id"]],
-                                kana=False,
-                                digit=True,
-                                ascii=True,
-                            ),
-                            tokusei["val"],
-                        ]
-                    )
-                    if name in unrecognizable_and_same_pokemon_in_home.keys():
-                        writer.writerow(
-                            [
-                                name + "(王)",
-                                jaconv.z2h(
-                                    pokedex["tokusei"][tokusei["id"]],
-                                    kana=False,
-                                    digit=True,
-                                    ascii=True,
-                                ),
-                                tokusei["val"],
-                            ]
-                        )
 
-            with open("stats/home_seikaku.csv", "a", encoding="utf-8") as seikaku_csv:
-                for seikaku in pdetail[pokenum][p_detail_id]["temoti"]["seikaku"]:
-                    writer = csv.writer(seikaku_csv, lineterminator="\n")
-                    writer.writerow(
-                        [
-                            name,
-                            jaconv.z2h(
-                                pokedex["seikaku"][seikaku["id"]],
-                                kana=False,
-                                digit=True,
-                                ascii=True,
-                            ),
-                            seikaku["val"],
-                        ]
-                    )
-                    if name in unrecognizable_and_same_pokemon_in_home.keys():
-                        writer.writerow(
-                            [
-                                name + "(王)",
-                                jaconv.z2h(
-                                    pokedex["seikaku"][seikaku["id"]],
-                                    kana=False,
-                                    digit=True,
-                                    ascii=True,
-                                ),
-                                seikaku["val"],
-                            ]
-                        )
+# ──────────────────────────────────────────────
+# メイン処理
+# ──────────────────────────────────────────────
 
-            with open("stats/home_motimono.csv", "a", encoding="utf-8") as motimono_csv:
-                for motimono in pdetail[pokenum][p_detail_id]["temoti"]["motimono"]:
-                    writer = csv.writer(motimono_csv, lineterminator="\n")
-                    writer.writerow(
-                        [
-                            name,
-                            jaconv.z2h(
-                                pokedex["itemname"][motimono["id"]],
-                                kana=False,
-                                digit=True,
-                                ascii=True,
-                            ),
-                            motimono["val"],
-                        ]
-                    )
-                    if name in unrecognizable_and_same_pokemon_in_home.keys():
-                        writer.writerow(
-                            [
-                                name + "(王)",
-                                jaconv.z2h(
-                                    pokedex["itemname"][motimono["id"]],
-                                    kana=False,
-                                    digit=True,
-                                    ascii=True,
-                                ),
-                                motimono["val"],
-                            ]
-                        )
+def scrape_one(pid: str, season: str) -> str | None:
+    """1体をスクレイピングして各 CSV に追記する。ポケモン名を返す"""
+    try:
+        tokens = _fetch_tokens(pid, season)
+    except Exception as e:
+        print(f"  取得失敗 {pid}: {e}")
+        return None
 
-            with open("stats/home_terastal.csv", "a", encoding="utf-8") as terastal_csv:
-                for terastal in pdetail[pokenum][p_detail_id]["temoti"]["terastal"]:
-                    teras = int(terastal["id"]) if int(terastal["id"]) != 99 else 18
-                    writer = csv.writer(terastal_csv, lineterminator="\n")
-                    writer.writerow([name, pokedex["pokeType"][teras], terastal["val"]])
-                    if name in unrecognizable_and_same_pokemon_in_home.keys():
-                        writer.writerow(
-                            [name + "(王)", pokedex["pokeType"][teras], terastal["val"]]
-                        )
+    name = _get_name(pid, tokens)
 
-    print("CSV更新完了")
+    # 技セクションを基準点として検出（使用データ部の先頭）
+    waza_s, waza_e = _section_range(tokens, "技")
+    anchor = waza_s - 1 if waza_s > 0 else 0  # 技トークン自体の位置
+
+    _append_csv(CSV_PATHS["waza"],     [[name, n, p] for n, p in _parse_pairs(tokens, waza_s, waza_e)])
+
+    # 残セクションは技以降から検索（ページ上部の基本情報との誤マッチ防止）
+    s, e = _section_range(tokens, "特性", anchor)
+    _append_csv(CSV_PATHS["tokusei"],  [[name, n, p] for n, p in _parse_pairs(tokens, s, e)])
+
+    s, e = _section_range(tokens, "持ち物", anchor)
+    _append_csv(CSV_PATHS["motimono"], [[name, n, p] for n, p in _parse_pairs(tokens, s, e)])
+
+    s, e = _section_range(tokens, "能力補正", anchor)
+    _append_csv(CSV_PATHS["seikaku"],  [[name, n, p] for n, p in _parse_seikaku(tokens, s, e)])
+
+    s, e = _section_range(tokens, "能力ポイント", anchor)
+    _append_csv(CSV_PATHS["doryoku"],  [[name, n, p] for n, p in _parse_doryoku(tokens, s, e)])
+
+    return name
+
+
+def main():
+    print("ランキングリストを取得中...")
+    pids, season = _fetch_ranking()
+    print(f"シーズン {season}、{len(pids)} 体分のデータを取得します")
+
+    # ranking.txt を最新のランキング順で上書き
+    with open("stats/ranking.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(pids) + "\n")
+    # season.txt も更新
+    with open("stats/season.txt", "w", encoding="utf-8") as f:
+        f.write(season)
+
+    for path in CSV_PATHS.values():
+        if os.path.isfile(path):
+            os.remove(path)
+
+    for i, pid in enumerate(pids, 1):
+        name = scrape_one(pid, season)
+        label = f"{name} ({pid})" if name else pid
+        print(f"  [{i}/{len(pids)}] {label}")
+        time.sleep(0.5)
+
+    print("CSV 更新完了")
+
+
+if __name__ == "__main__":
+    main()

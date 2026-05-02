@@ -328,6 +328,7 @@ class DamageCalc:
                     | "スカイスキン"
                     | "フェアリースキン"
                     | "フリーズスキン"
+                    | "ドラゴンスキン"
                 ):
                     if waza.type == Types.ノーマル:
                         waza.type = DamageCalc.__skin_abilities[attacker.ability]
@@ -1196,6 +1197,7 @@ class DamageCalc:
         "スカイスキン": Types.ひこう,
         "フェアリースキン": Types.フェアリー,
         "フリーズスキン": Types.こおり,
+        "ドラゴンスキン": Types.ドラゴン,
     }
     # タイプ強化系の特性
     __type_buff_abilities: dict[str, Types] = {

@@ -3,7 +3,7 @@ from pokedata.calc import DamageCalc
 from pokedata.const import Ailments, Fields, Types, Walls, Weathers
 from pokedata.nature import get_default_doryoku
 from pokedata.pokemon import Pokemon
-from pokedata.stats import Stats
+from pokedata.stats import Stats, StatsKey
 from pokedata.waza import WazaBase
 from recog.recog import get_recog_value
 
@@ -99,10 +99,17 @@ class Stage:
                 pokemon.doryoku.set_values_from_stats(
                     get_default_doryoku(seikaku, pokemon.syuzoku)
                 )
-                self._app.set_active_pokemon(player, pokemon)
+            self._app.set_active_pokemon(player, pokemon)
         if doryoku_text is not None:
-            pokemon.doryoku.init_values(0)
-            pokemon.doryoku.set_values_from_string(doryoku_text)
+            new_doryoku = Stats()
+            new_doryoku.set_values_from_string(doryoku_text)
+            if is_same and all(
+                pokemon.doryoku[k] == new_doryoku[k] for k in StatsKey
+            ):
+                pokemon.doryoku.init_values(0)
+            else:
+                pokemon.doryoku.init_values(0)
+                pokemon.doryoku.set_values_from_string(doryoku_text)
             self._app.set_active_pokemon(player, pokemon)
         if doryoku_number is not None:
             pokemon.doryoku.init_values(0)

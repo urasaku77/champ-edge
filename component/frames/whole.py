@@ -12,7 +12,6 @@ from component.parts.button import MyButton
 from component.parts.combobox import MyCombobox
 from component.parts.const import FIELD_COMBOBOX_VALUES, WEATHER_COMBOBOX_VALUES
 from component.parts.label import MyLabel
-from pokedata.const import Types
 
 if TYPE_CHECKING:
     from component.stage import Stage
@@ -96,7 +95,7 @@ class HomeFrame(ttk.LabelFrame):
             ["もちもの", "./stats/home_motimono.csv"],
             ["とくせい", "./stats/home_tokusei.csv"],
             ["せいかく", "./stats/home_seikaku.csv"],
-            ["テラスタル", "./stats/home_terastal.csv"],
+            ["どりょくち", "./stats/home_doryoku.csv"],
         ]
         for i in range(len(self._type)):
             # 列の識別名を指定
@@ -109,9 +108,11 @@ class HomeFrame(ttk.LabelFrame):
             if i == 0:
                 tree.column(self._type[i][0], width=70)
             elif i == 1:
-                tree.column(self._type[i][0], width=74)
+                tree.column(self._type[i][0], width=70)
+            elif i == 3:
+                tree.column(self._type[i][0], width=80)
             else:
-                tree.column(self._type[i][0], width=45)
+                tree.column(self._type[i][0], width=47)
             tree.column("%", width=22)
             # 列の見出し設定
             tree.heading("No", text="No")
@@ -165,7 +166,7 @@ class HomeFrame(ttk.LabelFrame):
                     )
                 case 3:
                     self._stage.set_value_to_active_pokemon(
-                        player=1, terastype=Types.get(value[1]), is_same=True
+                        player=1, doryoku_text=value[1], is_same=True
                     )
 
 

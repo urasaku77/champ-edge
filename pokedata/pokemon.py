@@ -11,6 +11,13 @@ from pokedata.nature import get_default_doryoku, get_seikaku_hosei
 from pokedata.stats import Stats, StatsKey
 from pokedata.waza import Waza, WazaBase
 
+_terastal_enabled: bool = True
+
+
+def set_terastal_enabled(enabled: bool):
+    global _terastal_enabled
+    _terastal_enabled = enabled
+
 
 class Pokemon:
     def __init__(self, db_data=None):
@@ -212,6 +219,8 @@ class Pokemon:
 
     @property
     def battle_terastype(self) -> Types:
+        if not _terastal_enabled:
+            return Types.なし
         return self.__battle_terastype
 
     @battle_terastype.setter
@@ -417,19 +426,38 @@ class Pokemon:
 
     @property
     def next_form_pid(self) -> Optional[str]:
-        if self.__no in changeble_form_in_battle:
-            return get_next_form(self.pid)
+        # バトル中フォルムチェンジ（メロエッタ・イルカマン・テラパゴス）
+        result = get_next_form(self.pid)
+        if result is not None:
+            return result
+
+        # メガシンカ: DB の form 10-19 を動的にサイクル
+        # 0 → 11 → 12 → 0  (フォーム数に応じて自動対応)
+        mega_forms = DB_pokemon.get_mega_forms_by_no(self.__no)
+        if not mega_forms:
+            return None
+        if self.__form == 0:
+            return f"{self.__no}-{mega_forms[0]}"
+        if self.__form in mega_forms:
+            idx = mega_forms.index(self.__form)
+            if idx + 1 < len(mega_forms):
+                return f"{self.__no}-{mega_forms[idx + 1]}"
+            return f"{self.__no}-0"
+        return None
 
     @property
     def next_form_icon(self) -> str:
         form_pid = self.next_form_pid
-        return "image/pokeicon/" + form_pid + ".png" if form_pid is not None else ""
+        if form_pid is None:
+            return ""
+        no, _, form = form_pid.partition("-")
+        return f"image/pokemon/{int(no):04d}-{form}.png"
 
     @property
     def changeable_icon(self) -> str:
         return (
             "image/other/change.png"
-            if str(self.__no) in changeble_form_in_battle
+            if self.__no in changeble_form_in_battle
             else ""
         )
 
@@ -451,20 +479,20 @@ class Pokemon:
 
     # endregion
 
-    # 実数値
+    # 実数値（努力値は0-32スケール、1単位=2の実数値寄与）
     def __get_stats(self, key: StatsKey) -> int:
         if key == StatsKey.H:
             value = (
                 (self.__syuzoku[key] * 2)
                 + self.kotai[key]
-                + math.floor(self.doryoku[key] / 4)
+                + self.doryoku[key] * 2
             )
             return math.floor(value * self.__lv / 100) + 10 + self.__lv
         else:
             value = (
                 (self.__syuzoku[key] * 2)
                 + self.kotai[key]
-                + math.floor(self.doryoku[key] / 4)
+                + self.doryoku[key] * 2
             )
             value = math.floor(value * self.__lv / 100) + 5
             value = math.floor(value * get_seikaku_hosei(self.__seikaku, key))
@@ -538,9 +566,10 @@ class Pokemon:
             )
 
     # CSV読み込みデータの設定
-    def set_load_data(self, data, use_data: bool):
+    def set_load_data(self, data, use_data: bool, load_kotai: bool = True):
         if len(data):
-            self.__kotai.set_values_from_string(data[1])
+            if load_kotai:
+                self.__kotai.set_values_from_string(data[1])
             self.__doryoku.set_values_from_string(data[2])
             self.__seikaku = data[3]
             self.__item = data[4]
@@ -667,8 +696,9 @@ class Pokemon:
             self.__form_name = next_form.__form_name
             self.__syuzoku.set_values_from_stats(next_form.syuzoku)
             self.__weight = next_form.__weight
-            # self.__ability = next_form.ability
-            # self.__type = list(next_form.type)
+            self.__type = list(next_form.type)
+            self.__abilities = list(next_form.abilities)
+            self.__ability = next_form.ability
             self.statechanged()
 
     def on_stage(self):

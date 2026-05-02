@@ -1,5 +1,5 @@
 [project]
-name = "svcalc-modified"
+name = "champ-edge"
 version = "0.1.0"
 description = "Add your description here"
 authors = [
@@ -16,6 +16,7 @@ dependencies = [
     "selenium>=4.17.2",
     "pyinstaller>=6.7.0",
     "natsort>=8.4.0",
+    "pytesseract>=0.3.13",
     ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -41,7 +42,7 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/svcalc_modified"]
+packages = ["src/champ_edge"]
 
 [tool.ruff]
 target-version = "py310"

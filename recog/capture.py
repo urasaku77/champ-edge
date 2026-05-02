@@ -2,6 +2,7 @@ import asyncio
 import base64
 import glob
 import os
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -18,7 +19,7 @@ from recog.recog import get_recog_value
 class Capture:
     def __init__(self):
         self.coords = ConfCoordinate()
-        self.path_tesseract = r"E:\Tesseract-OCR"
+        self.path_tesseract = get_recog_value("tesseract_path")
 
         # party(相手パーティ待ち)→chosen(対戦画面待ち)→一旦終了
         self.phase = "wait"
@@ -35,7 +36,7 @@ class Capture:
             )
             self.phase = "wait"
             return True
-        except:
+        except Exception:
             return False
 
     # Websocket切断
@@ -43,7 +44,7 @@ class Capture:
         try:
             self.loop.run_until_complete(self.obs.break_request())
             return True
-        except:
+        except Exception:
             return False
 
     # キャプチャ画像取得
@@ -284,7 +285,7 @@ class Capture:
             self.save_screenshot("opoPokemon", "recog/outputImg/opoPokemon.jpg")
             self.set_my_party_img()
 
-        pokemonImages = glob.glob("recog/recogImg/pokemon/*")
+        pokemonImages = glob.glob("image/pokemon/*")
         coordsList = [
             "opoPoke1",
             "opoPoke2",
@@ -359,30 +360,16 @@ class Capture:
         gray = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
         max_val_list: list[float] = []
         for image in temp_imgge_name:
-            tmp_max_val: list[float] = []
-            if "493" in image:
-                try:
-                    temp = cv2.imread(image, cv2.IMREAD_COLOR)
-                    match = cv2.matchTemplate(img1, temp, cv2.TM_CCOEFF_NORMED)
-                    _, max_val, _, max_loc = cv2.minMaxLoc(match)
-                    tmp_max_val.append(max_val)
-                except:
-                    pass
-            else:
-                for shrink_rate in (0.56, 0.69, 0.86):
-                    try:
-                        temp = cv2.imread(image)
-                        temp = cv2.cvtColor(temp, cv2.COLOR_RGB2GRAY)
-                        temp = cv2.resize(temp, None, None, shrink_rate, shrink_rate)
-                        match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
-                        _, max_val, _, max_loc = cv2.minMaxLoc(match)
-                        tmp_max_val.append(max_val)
-                    except:
-                        pass
+            try:
+                temp = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+                temp = cv2.resize(temp, None, None, 1.06, 1.06)
+                match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, _ = cv2.minMaxLoc(match)
+                max_val_list.append(max_val)
+            except Exception:
+                max_val_list.append(0.0)
 
-            max_val_list.append(max(tmp_max_val))
-
-        if max(max_val_list) >= accuracy:
+        if max_val_list and max(max_val_list) >= accuracy:
             return temp_imgge_name[max_val_list.index(max(max_val_list))]
         else:
             return ""
@@ -440,20 +427,13 @@ class Capture:
             break
         return coordinate
 
-    # ポケモンの画像からPIDを取得
+    # ポケモンの画像ファイル名からPIDを取得 (例: "image/pokemon/0003-11.png" → "3-11")
     def shape_poke_num(self, origin: str):
         try:
-            except_folder = origin.rsplit("\\", 1)[1].rsplit(".", 1)[0]
-            except_top_zero = (
-                except_folder.lstrip("0") if except_folder[0] == "0" else except_folder
-            )
-            check_hyphen = (
-                except_top_zero + "-0"
-                if except_top_zero not in "-"
-                else except_top_zero
-            )
-            return check_hyphen
-        except:
+            stem = Path(origin).stem        # "0003-11"
+            no, sep, form = stem.partition("-")
+            return f"{int(no)}-{form}" if sep else f"{int(no)}-0"
+        except Exception:
             return ""
 
     # 全体OCR

@@ -181,7 +181,14 @@ class ActivePokemonFrame(ttk.LabelFrame):
         teras_frame.columnconfigure(0, weight=1)
 
         self._teras_button = TypeIconButton(
-            teras_frame, types=Types.なし, command=self.on_push_terasbutton
+            teras_frame,
+            types=Types.なし,
+            command=self.on_push_terasbutton
+            if get_recog_value("terastal_enabled")
+            else None,
+            state=tkinter.NORMAL
+            if get_recog_value("terastal_enabled")
+            else tkinter.DISABLED,
         )
         self._teras_button.grid(column=0, row=0, sticky=W + E)
 
@@ -358,6 +365,9 @@ class ActivePokemonFrame(ttk.LabelFrame):
     def change_form(self):
         self._pokemon.form_change()
         self._pokemon_icon.set_pokemon_icon(pid=self._pokemon.pid, size=(60, 60))
+        self._ability_combobox["values"] = self._pokemon.abilities
+        self._ability_combobox.set(self._pokemon.ability)
+        self.set_ability_values(self._pokemon.ability)
         self._status_frame.update_pokemon(self._pokemon, False)
         self._stage.set_info(self._player)
         self._stage.calc_damage()
@@ -370,11 +380,12 @@ class ActivePokemonFrame(ttk.LabelFrame):
 
 # ステータスフレーム
 class StatusFrame(ttk.LabelFrame):
-    def on_validate_3(self, P):
-        if P.isdigit() or P == "":
-            return len(P) <= 3
-        else:
-            return False
+    def on_validate_2(self, P):
+        if P == "":
+            return True
+        if P.isdigit():
+            return int(P) <= 32
+        return False
 
     def __init__(self, master, player: int, **kwargs):
         super().__init__(master, **kwargs)
@@ -387,7 +398,7 @@ class StatusFrame(ttk.LabelFrame):
         self._player = player
         self._stage: Stage | None = None
 
-        self.doryoku_validate = self.register(self.on_validate_3)
+        self.doryoku_validate = self.register(self.on_validate_2)
 
         self.is_rank = tkinter.BooleanVar()
         self.is_rank__check = tkinter.Checkbutton(
@@ -421,11 +432,10 @@ class StatusFrame(ttk.LabelFrame):
         rank_label.grid(column=0, row=3, padx=2)
 
         for i, statskey in enumerate([x for x in StatsKey]):
-            label = tkinter.Button(
+            label = tkinter.Label(
                 self,
                 text=statskey.name,
                 anchor=tkinter.CENTER,
-                command=lambda statskey=statskey: self.on_kotai_value_change(statskey),
             )
             label.grid(column=i + 1, row=0, padx=2)
 
@@ -438,8 +448,8 @@ class StatusFrame(ttk.LabelFrame):
             doryoku_spin = ttk.Spinbox(
                 self,
                 from_=0,
-                to=252,
-                increment=8,
+                to=32,
+                increment=1,
                 width=4,
                 validate="key",
                 validatecommand=(self.doryoku_validate, "%P"),
@@ -515,8 +525,6 @@ class StatusFrame(ttk.LabelFrame):
 
     # 努力値Spinboxの上下ボタン押下時処理
     def on_push_doryoku_spin(self, key: StatsKey):
-        if int(self._doryoku_spinbox_dict[key].get()) == 8:
-            self._doryoku_spinbox_dict[key].set("4")
         self._doryoku[key] = int(self._doryoku_spinbox_dict[key].get())
         if self._stage is not None:
             self._stage.set_value_to_active_pokemon(
@@ -524,9 +532,9 @@ class StatusFrame(ttk.LabelFrame):
                 doryoku_number=self._doryoku,
             )
 
-    # 努力値Spinboxの右クリック時処理
+    # 努力値Spinboxの右クリック時処理（32と0をトグル）
     def on_right_click_doryoku_spin(self, key: StatsKey):
-        self._doryoku[key] = 252 if self._doryoku[key] != 252 else 0
+        self._doryoku[key] = 32 if self._doryoku[key] != 32 else 0
         if self._stage is not None:
             self._stage.set_value_to_active_pokemon(
                 self._player,
@@ -584,18 +592,19 @@ class StatusFrame(ttk.LabelFrame):
         self.wait_window(dialog)
 
     def show_party_memo(self):
-        from party.party import PokemonMemoInputDialog
         from pokedata.loader import get_party_csv
 
         party_file = get_party_csv().replace("csv", "txt")
         memo = ""
+        try:
+            with open(party_file, "r") as txt:
+                memo = txt.read()
+        except FileNotFoundError:
+            pass
 
-        with open(party_file, "r") as txt:
-            memo = txt.read()
-            txt.close()
-
-        dialog = PokemonMemoInputDialog()
-        dialog.open(memo=memo, location=(self.winfo_x(), self.winfo_y()))
+        dialog = PokemonMemoLabelDialog()
+        dialog.open(memo, location=(self.winfo_x(), self.winfo_y()))
+        self.wait_window(dialog)
 
 
 # 技・ダメージ表示リストフレーム
@@ -865,5 +874,7 @@ class InfoFrame(ttk.LabelFrame):
             with open("stats/season.txt", encoding="utf-8") as ranking_txt:
                 season = ranking_txt.read()
 
-            url = f"https://sv.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
+            url = (
+                f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
+            )
             webbrowser.open(url)

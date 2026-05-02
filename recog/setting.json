@@ -5,5 +5,7 @@
   "doryoku_reset_auto": true,
   "similar_party_auto": false,
   "search_record_auto": false,
-  "panipani_auto": true
+  "panipani_auto": true,
+  "terastal_enabled": false,
+  "tesseract_path": "E:\\Tesseract-OCR"
 }

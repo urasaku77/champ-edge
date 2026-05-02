@@ -1,6 +1,9 @@
 import copy
 import dataclasses
+import datetime
+import os
 import sys
+import threading
 import tkinter
 from tkinter import E, N, S, W, messagebox, ttk
 
@@ -47,7 +50,7 @@ from stats.search import get_similar_party
 class MainApp(ThemedTk):
     def __init__(self, **kwargs):
         super().__init__(theme="arc", **kwargs)
-        self.title("SV Auto Damage Calculator")
+        self.title("ChampEdge")
         if sys.platform == "win32":
             self.iconbitmap(default="image/favicon.ico")
         self.geometry("950x915")
@@ -69,12 +72,20 @@ class MainApp(ThemedTk):
 
         menu = tkinter.Menu(self)
         self.config(menu=menu)
+        battle_menu = tkinter.Menu(menu, tearoff=0)
+        battle_menu.add_command(label="HOME情報取得", command=self.update_home_data)
+        battle_menu.add_command(label="HOME情報最終更新日", command=self.show_last_update_date)
+        battle_menu.add_separator()
+        battle_menu.add_command(label="構築記事取得", command=self.update_battle_data)
+        battle_menu.add_command(label="構築記事最終更新日", command=self.show_last_battle_update_date)
+        menu.add_cascade(label="バトルデータ", menu=battle_menu)
         menu.add_cascade(label="キャプチャ設定", command=self.capture_setting)
         menu.add_cascade(label="モード切替", command=self.mode_setting)
         menu.add_cascade(label="パーティ編集", command=self.edit_party_csv)
         menu.add_cascade(label="ボックス編集", command=self.open_box)
         menu.add_cascade(label="対戦履歴", command=self.open_records)
         menu.add_cascade(label="対戦分析", command=self.open_analytics)
+        menu.add_command(label="アップデート確認", command=self.check_update)
 
         for i, side in enumerate(["自分側", "相手側"]):
             sticky = N + W + S if side == "自分側" else N + E + S
@@ -285,6 +296,7 @@ class MainApp(ThemedTk):
         self.rowconfigure(0, weight=True)
 
         self._stage = None
+        self._after_id: int | None = None
 
     # 各フレームにStageクラスを配置
     def set_stage(self, stage):
@@ -335,35 +347,36 @@ class MainApp(ThemedTk):
                 self.home_frame.set_home_data(pokemon.name)
 
     def after_appear(self, pokemon: Pokemon, player: int):
-        if pokemon.name in ["カバルドン", "バンギラス"]:
-            self.weather_frame.change_weather_from_ability("砂嵐")
-        elif pokemon.name in ["コライドン", "グラードン", "コータス", "キュウコン"]:
-            self.weather_frame.change_weather_from_ability("晴れ")
-        elif pokemon.name in ["カイオーガ", "ペリッパー", "ニョロトノ"]:
-            self.weather_frame.change_weather_from_ability("雨")
-        elif pokemon.name in ["アローラキュウコン", "ユキノオー"]:
-            self.weather_frame.change_weather_from_ability("雪")
-        elif pokemon.name in ["ミライドン", "バチンウニ"]:
-            self.field_frame.change_field_from_ability("エレキ")
-        elif pokemon.name in ["ゴリランダー", "バチンキー"]:
-            self.field_frame.change_field_from_ability("グラス")
-        elif pokemon.name in ["ミライドン", "バチンウニ"]:
-            self.field_frame.change_field_from_ability("エレキ")
-        elif pokemon.name in ["イエッサン♂", "イエッサン♀"]:
-            self.field_frame.change_field_from_ability("サイコ")
-        elif pokemon.name == "メタモン":
-            after_ditto = (
-                copy.deepcopy(self.active_poke_frames[1]._pokemon)
-                if player == 0
-                else copy.deepcopy(self.active_poke_frames[0]._pokemon)
-            )
-            after_ditto.syuzoku.__setitem__(StatsKey.H, 48)
-            after_ditto.doryoku.__setitem__(StatsKey.H, 252)
-            self.active_poke_frames[player].set_pokemon(after_ditto)
-            if player == 1:
-                self._waza_damage_frames[player].set_waza_info(
-                    self.active_poke_frames[0]._pokemon.waza_list
+        match pokemon.ability:
+            case "すなおこし":
+                self.weather_frame.change_weather_from_ability("砂嵐")
+            case "ひでり" | "ひひいろのこどう" | "メガソーラー":
+                self.weather_frame.change_weather_from_ability("晴れ")
+            case "あめふらし":
+                self.weather_frame.change_weather_from_ability("雨")
+            case "ゆきふらし":
+                self.weather_frame.change_weather_from_ability("雪")
+            case "エレキメイカー" | "ハドロンエンジン":
+                self.field_frame.change_field_from_ability("エレキ")
+            case "グラスメイカー":
+                self.field_frame.change_field_from_ability("グラス")
+            case "ミストメイカー":
+                self.field_frame.change_field_from_ability("ミスト")
+            case "サイコメイカー":
+                self.field_frame.change_field_from_ability("サイコ")
+            case _ if pokemon.name == "メタモン":
+                after_ditto = (
+                    copy.deepcopy(self.active_poke_frames[1]._pokemon)
+                    if player == 0
+                    else copy.deepcopy(self.active_poke_frames[0]._pokemon)
                 )
+                after_ditto.syuzoku.__setitem__(StatsKey.H, 48)
+                after_ditto.doryoku.__setitem__(StatsKey.H, 32)
+                self.active_poke_frames[player].set_pokemon(after_ditto)
+                if player == 1:
+                    self._waza_damage_frames[player].set_waza_info(
+                        self.active_poke_frames[0]._pokemon.waza_list
+                    )
 
     # ダメージ計算
     def set_calc_results(self, player: int, results):
@@ -471,7 +484,6 @@ class MainApp(ThemedTk):
 
     # 画像認識ループ開始
     def loop_image_recognize(self):
-        global after_id
         result = self.capture.image_recognize()
         match result:
             case tuple():
@@ -499,7 +511,7 @@ class MainApp(ThemedTk):
                     self.record_frame.rank.insert(0, result)
             case _:
                 pass
-        after_id = self.after(1000, self.loop_image_recognize)
+        self._after_id = self.after(1000, self.loop_image_recognize)
         self.monitor = True
         self.monitor_var.set("監視停止")
         self.websocket_button["state"] = tkinter.DISABLED
@@ -508,7 +520,7 @@ class MainApp(ThemedTk):
     # 画像認識ループ停止
     def stop_image_recognize(self):
         if self.monitor:
-            self.after_cancel(after_id)
+            self.after_cancel(self._after_id)
             self.monitor = False
             self.monitor_var.set("監視開始")
             self.websocket_button["state"] = tkinter.NORMAL
@@ -541,6 +553,184 @@ class MainApp(ThemedTk):
             dialog.full_frame.get_battle_data(current_party)
             dialog.part_frame.get_battle_data(current_party)
             dialog.open()
+
+    # HOME情報更新
+    _LAST_UPDATE_FILE = "stats/last_update.txt"
+    _LAST_BATTLE_UPDATE_FILE = "stats/last_update_battle.txt"
+
+    # アップデート
+    _RELEASES_REPO = "urasaku77/champ-edge-release"
+    _VERSION_FILE = "version.txt"
+
+    def update_home_data(self):
+        today = datetime.date.today().isoformat()
+        try:
+            with open(self._LAST_UPDATE_FILE, encoding="utf-8") as f:
+                if f.read().strip() == today:
+                    messagebox.showinfo("HOME情報更新", "本日は取得済みです")
+                    return
+        except FileNotFoundError:
+            pass
+
+        def _run():
+            try:
+                from stats.home import main as home_main
+                home_main()
+                self.after(0, lambda: self._on_home_update_done(True, None, today))
+            except Exception as e:
+                err = str(e)
+                self.after(0, lambda: self._on_home_update_done(False, err, today))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_home_update_done(self, success: bool, error: str | None, today: str):
+        if success:
+            with open(self._LAST_UPDATE_FILE, "w", encoding="utf-8") as f:
+                f.write(today)
+            messagebox.showinfo("HOME情報更新", "更新が完了しました")
+        else:
+            messagebox.showerror("HOME情報更新", f"更新中にエラーが発生しました\n{(error or '')[:300]}")
+
+    def show_last_update_date(self):
+        try:
+            with open(self._LAST_UPDATE_FILE, encoding="utf-8") as f:
+                date = f.read().strip()
+            messagebox.showinfo("HOME情報更新日", f"最終更新日: {date}")
+        except FileNotFoundError:
+            messagebox.showinfo("HOME情報更新日", "まだ更新されていません")
+
+    def update_battle_data(self):
+        today = datetime.date.today().isoformat()
+        try:
+            with open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8") as f:
+                if f.read().strip() == today:
+                    messagebox.showinfo("構築記事取得", "本日は取得済みです")
+                    return
+        except FileNotFoundError:
+            pass
+
+        def _run():
+            try:
+                from stats.search import Search
+                Search().search_latest_party()
+                self.after(0, lambda: self._on_battle_update_done(True, None, today))
+            except Exception as e:
+                err = str(e)
+                self.after(0, lambda: self._on_battle_update_done(False, err, today))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_battle_update_done(self, success: bool, error: str | None, today: str):
+        if success:
+            with open(self._LAST_BATTLE_UPDATE_FILE, "w", encoding="utf-8") as f:
+                f.write(today)
+            messagebox.showinfo("構築記事取得", "更新が完了しました")
+        else:
+            messagebox.showerror("構築記事取得", f"更新中にエラーが発生しました\n{(error or '')[:300]}")
+
+    def show_last_battle_update_date(self):
+        try:
+            with open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8") as f:
+                date = f.read().strip()
+            messagebox.showinfo("構築記事取得日", f"最終更新日: {date}")
+        except FileNotFoundError:
+            messagebox.showinfo("構築記事取得日", "まだ更新されていません")
+
+    # アップデート確認
+    def _get_current_version(self) -> str:
+        try:
+            with open(self._VERSION_FILE, encoding="utf-8") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return "0.0.0"
+
+    @staticmethod
+    def _parse_version(v: str) -> tuple:
+        try:
+            return tuple(int(x) for x in v.lstrip("v").split("."))
+        except ValueError:
+            return (0, 0, 0)
+
+    def check_update(self):
+        import json as _json
+        import urllib.request
+
+        current = self._get_current_version()
+        api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
+
+        try:
+            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            messagebox.showerror("アップデート確認", f"確認中にエラーが発生しました\n{e}")
+            return
+
+        latest = data["tag_name"].lstrip("v")
+
+        if self._parse_version(latest) <= self._parse_version(current):
+            messagebox.showinfo("アップデート確認", f"最新バージョンです（v{current}）")
+            return
+
+        assets = [a for a in data.get("assets", []) if a["name"].endswith(".zip")]
+        if not assets:
+            messagebox.showerror("アップデート確認", "ダウンロードファイルが見つかりませんでした")
+            return
+
+        if not messagebox.askyesno(
+            "アップデート確認",
+            f"新しいバージョンがあります\n\n現在: v{current}  →  最新: v{latest}\n\n"
+            "アップデートしますか？\n（パーティやDBのデータは保持されます）",
+        ):
+            return
+
+        self._apply_update(assets[0]["browser_download_url"])
+
+    def _apply_update(self, download_url: str):
+        import urllib.request
+
+        if not getattr(sys, "frozen", False):
+            messagebox.showinfo("アップデート", "開発環境ではアップデートできません")
+            return
+
+        # champedge.exe の隣（_internal/ の親）に zip と bat を置く
+        app_dir = os.path.dirname(sys.executable)
+        zip_path = os.path.join(app_dir, "_champedge_update.zip")
+        bat_path = os.path.join(app_dir, "_update.bat")
+
+        messagebox.showinfo(
+            "アップデート",
+            "ダウンロードを開始します\n完了後アプリが自動で再起動します",
+        )
+
+        def _run():
+            try:
+                urllib.request.urlretrieve(download_url, zip_path)
+
+                bat = (
+                    "@echo off\n"
+                    "cd /d \"%~dp0\"\n"
+                    "timeout /t 5 /nobreak > nul\n"
+                    "powershell -Command "
+                    "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
+                    "-DestinationPath '.' -Force\"\n"
+                    "del _champedge_update.zip\n"
+                    "del \"%~f0\"\n"
+                    "start champedge.exe\n"
+                )
+                with open(bat_path, "w", encoding="ascii") as f:
+                    f.write(bat)
+
+                self.after(0, lambda: self._launch_updater(bat_path))
+            except Exception as e:
+                err = str(e)
+                self.after(0, lambda: messagebox.showerror("アップデート", f"ダウンロードエラー\n{err}"))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _launch_updater(self, bat_path: str):
+        os.startfile(bat_path)
+        self.quit()
 
     # フォーム選択画面
     def form_select(self, no: int):

@@ -1,0 +1,61 @@
+name: Build and Release
+
+# v* タグをpushしたときに自動ビルド・リリース
+# 例: git tag v1.0.1 && git push origin v1.0.1
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          # requirements.lock から -e（ローカルパッケージ）とコメント行を除外してインストール
+          $deps = Get-Content requirements.lock |
+            Where-Object { $_ -notmatch "^-e\s" -and $_ -notmatch "^#" -and $_.Trim() -ne "" }
+          $deps | Out-File -FilePath requirements_ci.txt -Encoding utf8
+          pip install -r requirements_ci.txt
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller champedge.spec --noconfirm
+
+      - name: Create update zip
+        run: python scripts/create_update_zip.py
+
+      - name: Get version
+        id: get_version
+        shell: pwsh
+        run: |
+          $ver = (Get-Content version.txt).Trim()
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+
+      # ──────────────────────────────────────────────────────────────────
+      # 事前準備（一度だけ実施）:
+      #   1. GitHub で champ-edge-releases という名前のパブリックリポジトリを作成
+      #   2. Settings > Developer settings > Personal access tokens で
+      #      public_repo スコープを持つ PAT を発行
+      #   3. このリポジトリの Settings > Secrets > RELEASES_PAT に登録
+      # ──────────────────────────────────────────────────────────────────
+      - name: Create GitHub Release on public releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.get_version.outputs.VERSION }}"
+          gh release create "v$ver" "dist/champedge_update.zip" `
+            --repo urasaku77/champ-edge-releases `
+            --title "v$ver" `
+            --notes "バージョン $ver のリリース"

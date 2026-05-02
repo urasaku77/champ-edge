@@ -1,7 +1,7 @@
 # キャプチャ設定画面
 import json
 import tkinter
-from tkinter import ttk
+from tkinter import filedialog, ttk
 
 from component.parts.button import MyButton
 
@@ -107,6 +107,8 @@ class ModeSetting(tkinter.Toplevel):
                 "similar_party_auto": False,
                 "search_record_auto": False,
                 "panipani_auto": True,
+                "terastal_enabled": True,
+                "tesseract_path": "",
             }
 
         # ルールの選択
@@ -179,24 +181,56 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.panipani_auto_checkbox.grid(row=6, column=0, columnspan=2, pady=5)
 
+        # チェックボックス7
+        self.terastal_enabled_var = tkinter.BooleanVar()
+        self.terastal_enabled_var.set(self.initial_data.get("terastal_enabled", True))
+        self.terastal_enabled_checkbox = tkinter.Checkbutton(
+            self,
+            text="テラスタル有効",
+            variable=self.terastal_enabled_var,
+        )
+        self.terastal_enabled_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
+
+        # Tesseractフォルダ
+        tess_frame = ttk.Frame(self)
+        tkinter.Label(tess_frame, text="Tesseractフォルダ:").pack(side="left", padx=5)
+        self.tesseract_path_var = tkinter.StringVar()
+        self.tesseract_path_var.set(self.initial_data.get("tesseract_path", ""))
+        tkinter.Entry(tess_frame, textvariable=self.tesseract_path_var, width=30).pack(
+            side="left", padx=5
+        )
+        MyButton(tess_frame, text="参照", command=self.browse_tesseract_path).pack(
+            side="left", padx=5
+        )
+        tess_frame.grid(row=8, column=0, columnspan=2, pady=5)
+
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=7, column=0, pady=10)
+        self.submit_button.grid(row=9, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=7, column=1, pady=10)
+        self.cancel_button.grid(row=9, column=1, pady=10)
         caution = ttk.Label(
             self,
             text="※設定を反映するには、再起動が必要です。",
             foreground="red",
             padding=10,
         )
-        caution.grid(row=8, column=0, columnspan=2, pady=5)
+        caution.grid(row=10, column=0, columnspan=2, pady=5)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
         self.focus_set()
         self.geometry("+{0}+{1}".format(location[0], location[1]))
+
+    def browse_tesseract_path(self):
+        current = self.tesseract_path_var.get()
+        folder = filedialog.askdirectory(
+            title="Tesseractのインストールフォルダを選択",
+            initialdir=current if current else "C:\\",
+        )
+        if folder:
+            self.tesseract_path_var.set(folder.replace("/", "\\"))
 
     def submit_form(self):
         # 入力された値をJSONファイルに保存
@@ -208,6 +242,8 @@ class ModeSetting(tkinter.Toplevel):
             "similar_party_auto": self.similar_party_auto_var.get(),
             "search_record_auto": self.search_record_auto_var.get(),
             "panipani_auto": self.panipani_auto_var.get(),
+            "terastal_enabled": self.terastal_enabled_var.get(),
+            "tesseract_path": self.tesseract_path_var.get(),
         }
 
         with open(self.path, "w") as json_file:
@@ -234,6 +270,8 @@ def get_recog_value(key: str):
         "similar_party_auto",
         "search_record_auto",
         "panipani_auto",
+        "terastal_enabled",
+        "tesseract_path",
         "source_name",
         "host_name",
         "port",
@@ -259,6 +297,8 @@ def get_recog_value(key: str):
             "similar_party_auto": False,
             "search_record_auto": False,
             "panipani_auto": True,
+            "terastal_enabled": True,
+            "tesseract_path": "",
             "source_name": "",
             "host_name": "",
             "port": "",

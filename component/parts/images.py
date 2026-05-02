@@ -18,7 +18,12 @@ def get_blank_image(size: tuple[int, int]):
 
 
 def get_pokemon_icon(pid: str, size: tuple[int, int] = None):
-    return _load_image("image/pokeicon/" + pid + ".png", size)
+    try:
+        no, _, form = pid.partition("-")
+        filename = f"{int(no):04d}-{form}.png"
+        return _load_image("image/pokemon/" + filename, size)
+    except Exception:
+        return get_blank_image(size or (30, 30))
 
 
 def get_type_icon(t: Types, size: tuple[int, int] = (20, 20)):

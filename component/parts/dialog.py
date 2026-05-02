@@ -1,4 +1,5 @@
 import csv
+import math
 import tkinter
 import webbrowser
 from tkinter import E, N, S, W, messagebox, ttk
@@ -261,35 +262,12 @@ class SpeedComparing(tkinter.Toplevel):
             tkinter.Label(self, textvariable=self.base_stat_var[i]) for i in range(2)
         ]
 
-        # 個体値
+        # 個体値（31固定）
         self.iv_box = [ttk.Frame(self, padding=10), ttk.Frame(self, padding=10)]
-        self.iv_entry = [
-            ModifiedEntry(
-                self.iv_box[i],
-                validate="key",
-                width=4,
-                validatecommand=(self.validate_cmd_2, "%P", "%V"),
-            )
+        self.iv_label = [
+            tkinter.Label(self.iv_box[i], text="31")
             for i in range(2)
         ]
-        self.iv_max = [
-            MyButton(
-                self.iv_box[i],
-                text="31",
-                command=lambda index=i: self.change_iv(True, index),
-            )
-            for i in range(2)
-        ]
-        self.iv_min = [
-            MyButton(
-                self.iv_box[i],
-                text="0",
-                command=lambda index=i: self.change_iv(False, index),
-            )
-            for i in range(2)
-        ]
-        self.iv_entry[0].bind("<<TextModified>>", self.calc_speed)
-        self.iv_entry[1].bind("<<TextModified>>", self.calc_speed)
 
         # 努力値
         self.ev_box = [ttk.Frame(self, padding=10), ttk.Frame(self, padding=10)]
@@ -298,14 +276,14 @@ class SpeedComparing(tkinter.Toplevel):
                 self.ev_box[i],
                 validate="key",
                 width=4,
-                validatecommand=(self.validate_cmd_3, "%P", "%V"),
+                validatecommand=(self.validate_cmd_2, "%P", "%V"),
             )
             for i in range(2)
         ]
         self.ev_max = [
             MyButton(
                 self.ev_box[i],
-                text="252",
+                text="32",
                 command=lambda index=i: self.change_ev(True, index),
             )
             for i in range(2)
@@ -495,9 +473,7 @@ class SpeedComparing(tkinter.Toplevel):
         ]
 
         self.all_sub_components: list[list] = [
-            self.iv_entry,
-            self.iv_min,
-            self.iv_max,
+            self.iv_label,
             self.ev_entry,
             self.ev_min,
             self.ev_max,
@@ -531,8 +507,6 @@ class SpeedComparing(tkinter.Toplevel):
             self.pokemon_icon[i].set_pokemon_icon(pokemons[i].pid, [60, 60])
             self.name_var[i].set(pokemons[i].name)
             self.base_stat_var[i].set(pokemons[i].syuzoku.S)
-            self.iv_entry[i].delete(0, tkinter.END)
-            self.iv_entry[i].insert(0, pokemons[i].kotai.S)
             self.ev_entry[i].delete(0, tkinter.END)
             self.ev_entry[i].insert(0, pokemons[i].doryoku.S)
             self.rank_var[i].set(pokemons[i].rank.S)
@@ -553,18 +527,10 @@ class SpeedComparing(tkinter.Toplevel):
         self.rank_var[player].set(rank)
         self.calc_speed()
 
-    def change_iv(self, up: bool, player: int):
-        self.iv_entry[player].delete(0, tkinter.END)
-        if up:
-            self.iv_entry[player].insert(0, "31")
-        else:
-            self.iv_entry[player].insert(0, "0")
-        self.calc_speed()
-
     def change_ev(self, up: bool, player: int):
         self.ev_entry[player].delete(0, tkinter.END)
         if up:
-            self.ev_entry[player].insert(0, "252")
+            self.ev_entry[player].insert(0, "32")
         else:
             self.ev_entry[player].insert(0, "0")
         self.calc_speed()
@@ -596,13 +562,15 @@ class SpeedComparing(tkinter.Toplevel):
         ]
         base = [
             (
-                (
-                    self.base_stat_var[i].get() * 2
-                    + int(self.iv_entry[i].get())
-                    + int(self.ev_entry[i].get()) / 4
+                math.floor(
+                    (
+                        self.base_stat_var[i].get() * 2
+                        + 31
+                        + int(self.ev_entry[i].get()) * 2
+                    )
+                    * 50
+                    / 100
                 )
-                * 50
-                / 100
                 + 5
             )
             * float(self.nature_var[i].get())

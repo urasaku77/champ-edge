@@ -27,6 +27,14 @@ __natures = {
 }
 
 
+def get_seikaku_from_arrows(up_key: StatsKey, down_key: StatsKey) -> str:
+    """Return the nature name that has (up_key ↑, down_key ↓), or 'まじめ'."""
+    for name, nat in __natures.items():
+        if nat.up == up_key and nat.down == down_key:
+            return name
+    return "まじめ"
+
+
 def get_seikaku_list() -> list[str]:
     return [x for x in __natures.keys()]
 
@@ -41,29 +49,29 @@ def get_seikaku_hosei(seikaku: str, key: StatsKey) -> float:
 def get_default_doryoku(seikaku: str, syuzoku: Stats) -> Stats:
     doryoku = Stats()
     if seikaku == "ようき":
-        doryoku.set_values(a=252, s=252)
+        doryoku.set_values(a=32, s=32)
     if seikaku == "おくびょう":
-        doryoku.set_values(c=252, s=252)
+        doryoku.set_values(c=32, s=32)
     if seikaku == "ゆうかん":
-        doryoku.set_values(h=252, a=252)
+        doryoku.set_values(h=32, a=32)
     if seikaku == "れいせい":
-        doryoku.set_values(h=252, c=252)
+        doryoku.set_values(h=32, c=32)
     if seikaku in ["ずぶとい", "わんぱく", "のんき"]:
-        doryoku.set_values(h=252, b=252)
+        doryoku.set_values(h=32, b=32)
     if seikaku in ["おだやか", "しんちょう", "なまいき"]:
-        doryoku.set_values(h=252, d=252)
+        doryoku.set_values(h=32, d=32)
     if seikaku in ["いじっぱり", "さみしがり", "やんちゃ"]:
         doryoku.set_values(
-            a=252, s=252 if syuzoku.S >= 90 else 0, h=252 if syuzoku.S < 90 else 0
+            a=32, s=32 if syuzoku.S >= 90 else 0, h=32 if syuzoku.S < 90 else 0
         )
     if seikaku in ["ひかえめ", "おっとり", "うっかりや"]:
         doryoku.set_values(
-            c=252, s=252 if syuzoku.S >= 90 else 0, h=252 if syuzoku.S < 90 else 0
+            c=32, s=32 if syuzoku.S >= 90 else 0, h=32 if syuzoku.S < 90 else 0
         )
     if seikaku in ["せっかち", "むじゃき"]:
         doryoku.set_values(
-            a=252 if syuzoku.A > syuzoku.C else 0,
-            c=252 if syuzoku.C > syuzoku.A else 0,
-            s=252,
+            a=32 if syuzoku.A > syuzoku.C else 0,
+            c=32 if syuzoku.C > syuzoku.A else 0,
+            s=32,
         )
     return doryoku

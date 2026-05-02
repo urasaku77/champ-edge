@@ -26,6 +26,7 @@ from pokedata.const import Types
 from pokedata.nature import get_seikaku_hosei, get_seikaku_list
 from pokedata.pokemon import Pokemon
 from pokedata.stats import StatsKey
+from recog.recog import get_recog_value
 
 
 # パーティCSV編集用ダイアログ
@@ -67,6 +68,13 @@ class PartyEditor(tkinter.Toplevel):
             row=1, column=1, padx=5, pady=5, sticky=N + S + W + E
         )
 
+        self.image_import_button = MyButton(
+            csv_button, text="画像読込", command=self.import_from_images
+        )
+        self.image_import_button.grid(
+            row=0, column=2, rowspan=2, padx=5, pady=5, sticky=N + S + W + E
+        )
+
         csv_button.grid(
             row=0,
             column=2,
@@ -77,7 +85,7 @@ class PartyEditor(tkinter.Toplevel):
         )
 
         self.using = UseParty(main_frame, text="使用するパーティ", padding=5)
-        self.using.grid(row=0, column=3, columnspan=2, sticky=N + E + S + W)
+        self.using.grid(row=0, column=4, columnspan=1, sticky=N + E + S + W)
 
         self.pokemons = PokemonEditors(main_frame, text="パーティ編集", padding=5)
         self.pokemons.grid(row=1, column=0, columnspan=5, sticky=N + E + W + S)
@@ -187,8 +195,12 @@ class PartyEditor(tkinter.Toplevel):
         from pokedata.loader import get_party_data
 
         for i, data in enumerate(get_party_data(file_path="party/csv/" + csv)):
-            pokemon: Pokemon = Pokemon.by_name(data[0])
-            pokemon.set_load_data(data, True)
+            try:
+                pokemon: Pokemon = Pokemon.by_name(data[0])
+            except (IndexError, KeyError):
+                self.pokemons.pokemon_panel_list[i].clear_pokemon()
+                continue
+            pokemon.set_load_data(data, True, load_kotai=False)
             self.pokemons.pokemon_panel_list[i].set_pokemon(pokemon)
             self.pokemons.pokemon_panel_list[i].change_ev()
 
@@ -200,6 +212,90 @@ class PartyEditor(tkinter.Toplevel):
             self.settings.clear_setting()
             for pokemon in self.pokemons.pokemon_panel_list:
                 pokemon.clear_pokemon()
+
+    def import_from_images(self):
+        from party.image_parser import CardData, check_available, parse_party_images
+
+        ok, reason = check_available()
+        if not ok:
+            messagebox.showerror("OCRエラー", reason)
+            return
+
+        # 画像選択（片方のみでも続行、両方未選択はエラー）
+        current_directory = os.getcwd()
+        img1_path: str | None = filedialog.askopenfilename(
+            title="1枚目の画像（ポケモン名・特性・持ち物・技）を選択",
+            filetypes=[("画像ファイル", "*.png *.jpg *.jpeg *.bmp")],
+            initialdir=current_directory,
+        ) or None
+        img2_path: str | None = filedialog.askopenfilename(
+            title="2枚目の画像（努力値・性格）を選択",
+            filetypes=[("画像ファイル", "*.png *.jpg *.jpeg *.bmp")],
+            initialdir=current_directory,
+        ) or None
+        if not img1_path and not img2_path:
+            messagebox.showerror("エラー", "画像が選択されませんでした。")
+            return
+
+        try:
+            data_list: list[CardData] = parse_party_images(img1_path, img2_path)
+        except Exception as e:
+            messagebox.showerror("解析エラー", str(e))
+            return
+
+        # パーティ情報設定ダイアログ
+        dialog = ImageImportSettingDialog(self)
+        dialog.open(location=(self.winfo_x() + 50, self.winfo_y() + 50))
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+
+        num = dialog.result["num"]
+        sub_num = dialog.result["sub_num"]
+        title = dialog.result["title"]
+        memo = dialog.result["memo"]
+        is_use = dialog.result["is_use"]
+
+        # 連番の自動採番（空欄時）
+        if not sub_num:
+            file_list = sorted(glob.glob("party/csv/*"))
+            same_num_list = [
+                f for f in file_list if os.path.basename(f).startswith(num + "-")
+            ]
+            last = (
+                natsorted(same_num_list)[-1] if same_num_list else f"party/csv/{num}-0_"
+            )
+            sub_num = str(int(os.path.basename(last).split("-")[1].split("_")[0]) + 1)
+
+        # CSV書き込み
+        filepath = f"party\\csv\\{num}-{sub_num}_{title}.csv"
+        with open(filepath, "w", newline="", encoding="cp932", errors="replace") as party_csv:
+            writer = csv.writer(party_csv, lineterminator="\n")
+            writer.writerow(
+                ["名前", "個体値", "努力値", "性格", "持ち物", "特性", "テラス", "メモ", "技", "技", "技", "技"]
+            )
+            for d in data_list:
+                writer.writerow(
+                    [d.name, "", d.ev_str(), d.nature, d.item, d.ability, "", ""]
+                    + d.moves
+                )
+
+        # メモファイル作成
+        os.makedirs("party\\txt", exist_ok=True)
+        txt_path = f"party\\txt\\{num}-{sub_num}_{title}.txt"
+        with open(txt_path, "w") as txt:
+            txt.write(memo)
+
+        # 使用するパーティに設定
+        if is_use:
+            self.using.change_csv(value=f"{num}-{sub_num}_{title}.csv")
+
+        # PartyEditorに表示
+        self.select_csv(csv=f"{num}-{sub_num}_{title}.csv")
+        messagebox.showinfo(
+            "完了",
+            f"{len(data_list)}体のデータを読み込みました。\n内容を確認・修正してから保存してください。",
+        )
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -303,18 +399,18 @@ class PartySettings(ttk.Frame):
 class UseParty(ttk.LabelFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master=master, **kwargs)
-        self.grid_columnconfigure([0, 1, 2, 3], weight=1)
+        self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure([0, 1], weight=1)
 
         self.using_var = tkinter.StringVar()
         self.using_var.set("test.csv")
-        self.using_label = MyLabel(self, textvariable=self.using_var)
+        self.using_label = MyLabel(self, textvariable=self.using_var, width=15)
         self.using_label.grid(
-            column=0, row=0, rowspan=2, columnspan=3, sticky=N + W + E + S
+            column=0, row=0, sticky=N + W + E + S
         )
 
         self.using_button = MyButton(self, text="変更", command=self.change_csv)
-        self.using_button.grid(column=3, row=0, rowspan=2, sticky=E)
+        self.using_button.grid(column=0, row=1, sticky=N + S + W + E)
 
         self.get_using_csv()
         self.using_var.set(self.using_party)
@@ -417,12 +513,14 @@ class PokemonEditor(ttk.LabelFrame):
         self._clear_button.grid(column=2, row=0)
 
         self._teras_var = Types.なし
+        _tera_enabled = get_recog_value("terastal_enabled")
         self._teras_button = TypeButton(
-            self, type_=Types.なし, command=self.on_push_terasbutton
+            self,
+            type_=Types.なし,
+            command=self.on_push_terasbutton if _tera_enabled else None,
+            state=tkinter.NORMAL if _tera_enabled else tkinter.DISABLED,
         )
         self._teras_button.grid(column=0, row=3, columnspan=2, sticky=W + E + N + S)
-
-        self._memo_var = ""
 
         self.img = [tkinter.PhotoImage(file=Types.なし.icon).subsample(3, 3)] * 2
         self.type_img = ttk.Frame(self)
@@ -455,14 +553,6 @@ class PokemonEditor(ttk.LabelFrame):
             cbx.grid(column=5, row=i)
             self.waza_list.append(cbx)
 
-        self.memo_btn = MyButton(
-            master=self,
-            image=images.get_menu_icon("load"),
-            padding=0,
-            command=lambda: self.input_memo(),
-        )
-        self.memo_btn.grid(column=0, row=4)
-
         for i, text in enumerate(["HP", "攻撃", "防御", "特攻", "特防", "素早さ"]):
             label = MyLabel(self, text=text)
             label.grid(column=0, row=i + 5, padx=5, pady=5)
@@ -487,8 +577,6 @@ class PokemonEditor(ttk.LabelFrame):
         self._ev_label = MyLabel(self, textvariable=self._ev_total)
         self._ev_label.grid(column=3, row=4, padx=5, pady=5)
 
-        self._iv_label = MyLabel(self, text="個体値")
-        self._iv_label.grid(column=4, row=4, columnspan=2, padx=5, pady=5)
         self._register_button = MyButton(
             self,
             image=images.get_menu_icon("edit"),
@@ -502,9 +590,9 @@ class PokemonEditor(ttk.LabelFrame):
             column=3, row=5, rowspan=6, padx=5, pady=5, sticky=N + W + E
         )
 
-        self._iv_frame = IvEditors(master=self, callback=self.calc_status)
-        self._iv_frame.grid(
-            column=4, row=5, columnspan=2, rowspan=6, padx=5, pady=5, sticky=N + W + E
+        self._memo_text = ScrolledText(self, height=6, width=20, wrap=tkinter.WORD)
+        self._memo_text.grid(
+            column=4, row=5, columnspan=2, rowspan=6, padx=5, pady=5, sticky=N + S + E + W
         )
 
     def edit_pokemon(self):
@@ -543,14 +631,12 @@ class PokemonEditor(ttk.LabelFrame):
         for i, statskey in enumerate([x for x in StatsKey]):
             self._ev_frame.ev_list[i].set_value(pokemon.doryoku[statskey], True)
 
-        for i, statskey in enumerate([x for x in StatsKey]):
-            self._iv_frame.iv_list[i].set_value(pokemon.kotai[statskey], True)
-
         for i, waza in enumerate(self.waza_list):
             value = pokemon.waza_list[i]
             waza.set(value.name if value is not None else "")
 
-        self._memo_var = pokemon.memo
+        self._memo_text.delete("1.0", tkinter.END)
+        self._memo_text.insert("1.0", pokemon.memo)
 
         self.calc_status()
 
@@ -582,9 +668,8 @@ class PokemonEditor(ttk.LabelFrame):
             jissu.set(0)
 
         self._ev_frame.init_all_value()
-        self._iv_frame.init_all_value()
 
-        self._memo_var = ""
+        self._memo_text.delete("1.0", tkinter.END)
         self.pokemon = Pokemon()
 
     def on_push_terasbutton(self):
@@ -611,22 +696,19 @@ class PokemonEditor(ttk.LabelFrame):
                 if i == 0:
                     value = (
                         (syuzoku.get() * 2)
-                        + self._iv_frame.iv_list[i]._iv_entry.value.get()
-                        + math.floor(
-                            self._ev_frame.ev_list[i]._ev_entry.value.get() / 4
-                        )
-                    )
-                    value = math.floor(value / 2) + 60
+                        + 31
+                        + self._ev_frame.ev_list[i]._ev_entry.value.get() * 2
+                    ) * 50
+                    value = math.floor(value / 100) + 60
                     self.jissu_list[i].set(value)
                 else:
                     value = (
                         (syuzoku.get() * 2)
-                        + self._iv_frame.iv_list[i]._iv_entry.value.get()
-                        + math.floor(self._ev_frame.ev_list[i]._ev_entry.value.get())
-                        / 4
-                    )
+                        + 31
+                        + self._ev_frame.ev_list[i]._ev_entry.value.get() * 2
+                    ) * 50
 
-                    value = math.floor(value / 2) + 5
+                    value = math.floor(value / 100) + 5
                     value = math.floor(
                         value
                         * get_seikaku_hosei(self._seikaku_combobox.get(), StatsKey(i))
@@ -635,7 +717,6 @@ class PokemonEditor(ttk.LabelFrame):
 
     def set_csv_row(self):
         waza_list = self.get_all_waza()
-        all_kotai = self._iv_frame.get_all_iv()
         all_doryoku = self._ev_frame.get_all_ev()
 
         if self._pokemon_name_var.get() == "":
@@ -643,13 +724,13 @@ class PokemonEditor(ttk.LabelFrame):
         else:
             return [
                 self._pokemon_name_var.get(),
-                all_kotai,
+                "",
                 all_doryoku,
                 self._seikaku_combobox.get(),
                 self._item_combobox.get(),
                 self._ability_combobox.get(),
                 self._teras_var.name if self._teras_var != Types.なし else "",
-                self._memo_var,
+                self._memo_text.get("1.0", "end-1c"),
                 waza_list[0],
                 waza_list[1],
                 waza_list[2],
@@ -661,12 +742,6 @@ class PokemonEditor(ttk.LabelFrame):
         for waza in self.waza_list:
             waza_list.append(waza.get())
         return waza_list
-
-    def input_memo(self):
-        dialog = PokemonMemoInputDialog()
-        dialog.open(self._memo_var, location=(self.winfo_x(), self.winfo_y()))
-        self.wait_window(dialog)
-        self._memo_var = dialog.memo
 
     def register_pokemon_in_box(self):
         if self.pokemon.no == -1:
@@ -714,92 +789,6 @@ class EvEditors(ttk.Frame):
 
 
 class EvEditor(ttk.Frame):
-    def on_validate_3(self, P, V):
-        if P.isdigit() or P == "":
-            return len(P) <= 3
-        else:
-            return False
-
-    def __init__(self, master, **kwargs):
-        super().__init__(master=master, **kwargs)
-        self.validate_cmd_3 = self.register(self.on_validate_3)
-
-        self._ev_min_button = tkinter.Button(
-            self, text="0", command=lambda: self.set_value(0, True)
-        )
-        self._ev_min_button["takefocus"] = False
-        self._ev_min_button.pack(side="left")
-
-        self._ev_count_down = tkinter.Button(
-            self, text="↓", command=lambda: self.set_value(-4, False)
-        )
-        self._ev_count_down["takefocus"] = False
-        self._ev_count_down.pack(side="left")
-
-        self._ev_entry = ModifiedEntry(
-            self,
-            validate="key",
-            width=4,
-            validatecommand=(self.validate_cmd_3, "%P", "%V"),
-        )
-        self._ev_entry.insert(0, 0)
-        self._ev_entry.pack(side="left")
-
-        self._ev_count_up = tkinter.Button(
-            self, text="↑", command=lambda: self.set_value(4, False)
-        )
-        self._ev_count_up["takefocus"] = False
-        self._ev_count_up.pack(side="left")
-
-        self._ev_max_button = tkinter.Button(
-            self, text="252", command=lambda: self.set_value(252, True)
-        )
-        self._ev_max_button["takefocus"] = False
-        self._ev_max_button.pack(side="left")
-
-    def set_value(self, value: int, override: bool):
-        if override:
-            self._ev_entry.delete(0, tkinter.END)
-            self._ev_entry.value.set(value)
-        else:
-            increase_num = self._ev_entry.value.get() + value
-            if increase_num == 0 or increase_num == 4:
-                self._ev_entry.delete(0, tkinter.END)
-                self._ev_entry.value.set(increase_num)
-            elif 0 <= increase_num <= 252:
-                self._ev_entry.delete(0, tkinter.END)
-                self._ev_entry.value.set(increase_num + value)
-
-    def setCallback(self, func):
-        self._ev_entry.bind("<<TextModified>>", func)
-
-
-class IvEditors(ttk.Frame):
-    def __init__(self, master, callback, **kwargs):
-        super().__init__(master=master, **kwargs)
-        self.iv_list: list[IvEditor] = []
-        for _i in range(6):
-            self.iv_editor = IvEditor(self)
-            self.iv_editor.setCallback(callback)
-            self.iv_editor.pack(pady=5)
-            self.iv_list.append(self.iv_editor)
-
-    def init_all_value(self):
-        for i in range(6):
-            self.iv_list[i]._iv_entry.value.set(31)
-            self.iv_list[i]._iv_entry.delete(0, tkinter.END)
-            self.iv_list[i]._iv_entry.insert(0, 31)
-
-    def get_all_iv(self):
-        status_list = ["H", "A", "B", "C", "D", "S"]
-        all_iv = ""
-        for i in range(6):
-            if self.iv_list[i]._iv_entry.value.get() != 31:
-                all_iv += status_list[i] + str(self.iv_list[i]._iv_entry.value.get())
-        return all_iv
-
-
-class IvEditor(ttk.Frame):
     def on_validate_2(self, P, V):
         if P.isdigit() or P == "":
             return len(P) <= 2
@@ -810,51 +799,50 @@ class IvEditor(ttk.Frame):
         super().__init__(master=master, **kwargs)
         self.validate_cmd_2 = self.register(self.on_validate_2)
 
-        self._iv_min_button = tkinter.Button(
+        self._ev_min_button = tkinter.Button(
             self, text="0", command=lambda: self.set_value(0, True)
         )
-        self._iv_min_button["takefocus"] = False
-        self._iv_min_button.pack(side="left")
+        self._ev_min_button["takefocus"] = False
+        self._ev_min_button.pack(side="left")
 
-        self._iv_count_down = tkinter.Button(
+        self._ev_count_down = tkinter.Button(
             self, text="↓", command=lambda: self.set_value(-1, False)
         )
-        self._iv_count_down["takefocus"] = False
-        self._iv_count_down.pack(side="left")
+        self._ev_count_down["takefocus"] = False
+        self._ev_count_down.pack(side="left")
 
-        self._iv_entry = ModifiedEntry(
+        self._ev_entry = ModifiedEntry(
             self,
             validate="key",
-            width=4,
+            width=3,
             validatecommand=(self.validate_cmd_2, "%P", "%V"),
         )
-        self._iv_entry.insert(0, 31)
-        self._iv_entry.pack(side="left")
+        self._ev_entry.insert(0, 0)
+        self._ev_entry.pack(side="left")
 
-        self._iv_count_up = tkinter.Button(
+        self._ev_count_up = tkinter.Button(
             self, text="↑", command=lambda: self.set_value(1, False)
         )
-        self._iv_count_up["takefocus"] = False
-        self._iv_count_up.pack(side="left")
+        self._ev_count_up["takefocus"] = False
+        self._ev_count_up.pack(side="left")
 
-        self._iv_max_button = tkinter.Button(
-            self, text="31", command=lambda: self.set_value(31, True)
+        self._ev_max_button = tkinter.Button(
+            self, text="32", command=lambda: self.set_value(32, True)
         )
-        self._iv_max_button["takefocus"] = False
-        self._iv_max_button.pack(side="left")
+        self._ev_max_button["takefocus"] = False
+        self._ev_max_button.pack(side="left")
 
     def set_value(self, value: int, override: bool):
         if override:
-            self._iv_entry.delete(0, tkinter.END)
-            self._iv_entry.value.set(value)
+            self._ev_entry.delete(0, tkinter.END)
+            self._ev_entry.value.set(value)
         else:
-            increase_num = self._iv_entry.value.get() + value
-            if 0 <= increase_num <= 31:
-                self._iv_entry.delete(0, tkinter.END)
-                self._iv_entry.value.set(increase_num)
+            new_val = max(0, min(32, self._ev_entry.value.get() + value))
+            self._ev_entry.delete(0, tkinter.END)
+            self._ev_entry.value.set(new_val)
 
     def setCallback(self, func):
-        self._iv_entry.bind("<<TextModified>>", func)
+        self._ev_entry.bind("<<TextModified>>", func)
 
 
 class PokemonInputDialog(tkinter.Toplevel):
@@ -867,8 +855,7 @@ class PokemonInputDialog(tkinter.Toplevel):
     ):
         super().__init__()
         self.title("ポケモン入力")
-        self.pokemon = Pokemon()
-        self.base_pokemon_name = base_pokemon_name
+        self.pokemon = Pokemon.by_name(base_pokemon_name, default=True)
 
         notebook = ttk.Notebook(self)
 
@@ -888,7 +875,7 @@ class PokemonInputDialog(tkinter.Toplevel):
 
 
 class PokemonFromHomeDialog(ttk.Frame):
-    def __init__(self, master, parent, **kwargs):
+    def __init__(self, master, parent: PokemonInputDialog, **kwargs):
         super().__init__(master, **kwargs)
 
         self.parent: PokemonInputDialog = parent
@@ -959,7 +946,7 @@ class PokemonFromHomeDialog(ttk.Frame):
 
 
 class PokemonFromBoxDialog(ttk.Frame):
-    def __init__(self, master, parent, **kwargs):
+    def __init__(self, master, parent: PokemonInputDialog, **kwargs):
         super().__init__(master, **kwargs)
 
         self.parent: PokemonInputDialog = parent
@@ -980,8 +967,8 @@ class PokemonFromBoxDialog(ttk.Frame):
         self._name_input: AutoCompleteCombobox = AutoCompleteCombobox.pokemons(
             self._labelframe
         )
-        if self.parent.base_pokemon_name != "":
-            self._name_input.set(self.parent.base_pokemon_name)
+        if self.parent.pokemon.name != "":
+            self._name_input.set(self.parent.pokemon.name)
         self._name_input.bind("<<submit>>", self.on_input_name)
         self._name_input.pack(side="left")
 
@@ -1019,15 +1006,16 @@ class PokemonFromBoxDialog(ttk.Frame):
         )
         clear_button.pack(side="right", padx=20)
 
-        self.update_box_list()
-        self.set_pokemon_list()
+        self.on_input_name()
 
     def update_box_list(self):
         self.box_data = self.read_csv("party\\csv\\box.csv")
         self.box_data.reverse()
         if self.parent.pokemon.no != -1:
             box = [
-                pokemon for pokemon in self.box_data if pokemon[0] == self.pokemon.name
+                pokemon
+                for pokemon in self.box_data
+                if pokemon[0] == self.parent.pokemon.name
             ]
             if len(box) > 0:
                 self.box_data = box
@@ -1099,7 +1087,7 @@ class PokemonFromBoxDialog(ttk.Frame):
 
     def on_input_name(self, *args):
         pokemon_name = self._name_input.get()
-        self.pokemon = Pokemon.by_name(pokemon_name, default=True)
+        self.parent.pokemon = Pokemon.by_name(pokemon_name, default=True)
         self.update_box_list()
         self.set_pokemon_list()
 
@@ -1115,7 +1103,7 @@ class PokemonFromBoxDialog(ttk.Frame):
         self.parent.destroy()
 
     def reset(self):
-        self.pokemon = Pokemon()
+        self.parent.pokemon = Pokemon()
         self._name_input.set("")
         self.update_box_list()
         self.set_pokemon_list()
@@ -1129,35 +1117,6 @@ class PokemonFromBoxDialog(ttk.Frame):
         if self.current_page_num.get() < self.all_page_num.get():
             self.current_page_num.set(self.current_page_num.get() + 1)
             self.set_pokemon_list()
-
-
-class PokemonMemoInputDialog(tkinter.Toplevel):
-    def __init__(self, title: str = "", width: int = 400, height: int = 300):
-        super().__init__()
-        self.title("メモ入力")
-        self.memo = ""
-
-        # ウィジェットの配置
-        main_frame = ttk.Frame(self, padding=10)
-        main_frame.pack()
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        self.memo_input = ScrolledText(main_frame, height=3, width=60, padx=3, pady=3)
-        self.memo_input.pack(padx=10, pady=10)
-
-        self.button = MyButton(main_frame, text="決定", command=self.close)
-        self.button.pack(padx=10, pady=10)
-
-    def open(self, memo: str, location=tuple[int, int]):
-        self.grab_set()
-        self.memo_input.insert(tkinter.END, memo)
-        self.memo_input.focus_set()
-        self.geometry("+{0}+{1}".format(location[0], location[1]))
-
-    def close(self, *args):
-        self.memo = self.memo_input.get("1.0", "end-1c")
-        self.destroy()
 
 
 class TableNumInputDialog(tkinter.Toplevel):
@@ -1208,3 +1167,76 @@ class TableNumInputDialog(tkinter.Toplevel):
             else 30
         )
         self.destroy()
+
+
+class ImageImportSettingDialog(tkinter.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("パーティ情報の設定")
+        self.result = None
+        self.validate_cmd_4 = self.register(self._on_validate_4)
+
+        main_frame = ttk.Frame(self, padding=10)
+        main_frame.pack(fill="both", expand=True)
+        main_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(main_frame, text="番号").grid(row=0, column=0, sticky=W, padx=3, pady=3)
+        self.num_entry = ModifiedEntry(
+            main_frame, validate="key", width=8,
+            validatecommand=(self.validate_cmd_4, "%P", "%V"),
+        )
+        self.num_entry.grid(row=0, column=1, sticky=E + W, padx=3, pady=3)
+
+        ttk.Label(main_frame, text="連番").grid(row=0, column=2, sticky=W, padx=3, pady=3)
+        self.sub_num_entry = ModifiedEntry(
+            main_frame, validate="key", width=8,
+            validatecommand=(self.validate_cmd_4, "%P", "%V"),
+        )
+        self.sub_num_entry.grid(row=0, column=3, sticky=E + W, padx=3, pady=3)
+
+        ttk.Label(main_frame, text="タイトル").grid(row=1, column=0, sticky=W, padx=3, pady=3)
+        self.title_entry = tkinter.Entry(main_frame)
+        self.title_entry.grid(row=1, column=1, columnspan=3, sticky=E + W, padx=3, pady=3)
+
+        ttk.Label(main_frame, text="メモ").grid(row=2, column=0, sticky=N + W, padx=3, pady=3)
+        self.memo_text = ScrolledText(main_frame, height=4, width=40, padx=3, pady=3)
+        self.memo_text.grid(row=2, column=1, columnspan=3, sticky=E + W, padx=3, pady=3)
+
+        self.is_use_var = tkinter.BooleanVar(value=False)
+        tkinter.Checkbutton(
+            main_frame, text="使用するパーティに設定", variable=self.is_use_var
+        ).grid(row=3, column=0, columnspan=4, sticky=W, padx=3, pady=3)
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=4, column=0, columnspan=4, pady=5)
+        MyButton(btn_frame, text="登録", command=self._on_ok).pack(side="left", padx=5)
+        MyButton(btn_frame, text="キャンセル", command=self.destroy).pack(side="left", padx=5)
+
+        self.grab_set()
+        self.num_entry.focus_set()
+
+    def _on_validate_4(self, P, *_):
+        if P.isdigit() or P == "":
+            return len(P) <= 4
+        return False
+
+    def _on_ok(self):
+        title = self.title_entry.get()
+        if not title:
+            self.destroy()  # save_csv と同じくサイレントキャンセル
+            return
+        num = self.num_entry.get()
+        if not num:
+            messagebox.showinfo("警告", "番号を入力してください", parent=self)
+            return
+        self.result = {
+            "num": num,
+            "sub_num": self.sub_num_entry.get(),
+            "title": title,
+            "memo": self.memo_text.get("1.0", "end-1c"),
+            "is_use": self.is_use_var.get(),
+        }
+        self.destroy()
+
+    def open(self, location: tuple[int, int]):
+        self.geometry("+{0}+{1}".format(location[0], location[1]))

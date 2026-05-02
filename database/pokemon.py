@@ -17,69 +17,69 @@ class DB_pokemon:
     __db.row_factory = sqlite3.Row
     __type_effectives: list[TypeEffective] = []
     __pokemon_namelist: list[str] = []
+    __pokemon_namelist_for_party: list[str] = []
     __waza_namedict: dict[str, str] = {}
 
     @staticmethod
     def get_pokemon_data_by_name(name: str):
-        sql = "SELECT * FROM pokemon_data where name = '{0}'".format(name)
-        result = DB_pokemon.__select(sql)
+        result = DB_pokemon.__select(
+            "SELECT * FROM pokemon_data where name = ?", (name,)
+        )
         return result[0]
 
     @staticmethod
     def get_pokemons_name_by_no(no: str):
-        sql = "SELECT name FROM pokemon_data where no = '{0}'".format(no)
-        result = DB_pokemon.__select(sql)
-
-        names = []
-        for row in result:
-            names.append(row["name"])
-        return names
+        result = DB_pokemon.__select(
+            "SELECT name FROM pokemon_data where no = ?", (no,)
+        )
+        return [row["name"] for row in result]
 
     @staticmethod
     def get_pokemon_data_by_pid(pid: str):
-        no = pid.split("-")[0]
-        form = pid.split("-")[1]
-        sql = "SELECT * FROM pokemon_data where no = {0} and form = {1}".format(
-            no, form
+        no, form = pid.split("-")
+        result = DB_pokemon.__select(
+            "SELECT * FROM pokemon_data where no = ? and form = ?", (no, form)
         )
-        result = DB_pokemon.__select(sql)
         return result[0]
 
     @staticmethod
     def get_pokemon_name_by_pid(pid: str):
-        no = pid.split("-")[0]
-        form = pid.split("-")[1]
-        sql = "SELECT name FROM pokemon_data where no = {0} and form = {1}".format(
-            no, form
+        no, form = pid.split("-")
+        result = DB_pokemon.__select(
+            "SELECT name FROM pokemon_data where no = ? and form = ?", (no, form)
         )
-        result = DB_pokemon.__select(sql)
         return result[0]["name"]
 
     @staticmethod
     def get_pokemon_pid_by_name(name: str) -> str:
-        sql = (
-            "SELECT no || '-' || form pid FROM pokemon_data where name = '{0}'".format(
-                name
-            )
+        result = DB_pokemon.__select(
+            "SELECT no || '-' || form pid FROM pokemon_data where name = ?", (name,)
         )
-        result = DB_pokemon.__select(sql)
         return result[0]["pid"]
 
     @staticmethod
     def get_pokemon_namelist(form: bool = False) -> list[str]:
-        if len(DB_pokemon.__pokemon_namelist) == 0:
-            sql = "SELECT name FROM pokemon_data"
-            for row in DB_pokemon.__select(sql):
-                DB_pokemon.__pokemon_namelist.append(row["name"])
-            if form:
+        if form:
+            if len(DB_pokemon.__pokemon_namelist_for_party) == 0:
+                sql = "SELECT name FROM pokemon_data WHERE name NOT LIKE 'メガ%'"
+                for row in DB_pokemon.__select(sql):
+                    DB_pokemon.__pokemon_namelist_for_party.append(row["name"])
                 for pokemon in remove_pokemon_name_from_party:
-                    DB_pokemon.__pokemon_namelist.remove(pokemon)
-        return DB_pokemon.__pokemon_namelist
+                    if pokemon in DB_pokemon.__pokemon_namelist_for_party:
+                        DB_pokemon.__pokemon_namelist_for_party.remove(pokemon)
+            return DB_pokemon.__pokemon_namelist_for_party
+        else:
+            if len(DB_pokemon.__pokemon_namelist) == 0:
+                sql = "SELECT name FROM pokemon_data"
+                for row in DB_pokemon.__select(sql):
+                    DB_pokemon.__pokemon_namelist.append(row["name"])
+            return DB_pokemon.__pokemon_namelist
 
     @staticmethod
     def get_waza_data_by_name(name: str):
-        sql = "SELECT * FROM waza_data where name = '{0}'".format(name)
-        result = DB_pokemon.__select(sql)
+        result = DB_pokemon.__select(
+            "SELECT * FROM waza_data where name = ?", (name,)
+        )
         return result[0]
 
     @staticmethod
@@ -118,12 +118,22 @@ class DB_pokemon:
         )
 
     @staticmethod
-    def __select(sql: str) -> list:
+    def get_mega_forms_by_no(no: int) -> list[int]:
+        """図鑑番号 no のメガシンカフォーム番号リスト (10-19) を昇順で返す"""
+        return [
+            row["form"]
+            for row in DB_pokemon.__select(
+                "SELECT form FROM pokemon_data WHERE no = ? AND form >= 10 AND form <= 19 ORDER BY form",
+                (no,),
+            )
+        ]
+
+    @staticmethod
+    def __select(sql: str, params: tuple = ()) -> list:
         result = []
         cur = DB_pokemon.__db.cursor()
-        cur.execute(sql)
+        cur.execute(sql, params)
         for row in cur:
             result.append(row)
         cur.close()
-
         return result

@@ -1,0 +1,9 @@
+ttkthemes
+Pillow
+opencv-python
+numpy
+jaconv
+natsort
+pyocr
+selenium
+simpleobsws
