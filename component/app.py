@@ -559,7 +559,8 @@ class MainApp(ThemedTk):
     _LAST_BATTLE_UPDATE_FILE = "stats/last_update_battle.txt"
 
     # アップデート
-    _RELEASES_REPO = "urasaku77/champ-edge-release"
+    _RELEASES_REPO = "urasaku77/champ-edge"
+    _RELEASE_TOKEN = "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"
     _VERSION_FILE = "version.txt"
 
     def update_home_data(self):
@@ -657,9 +658,13 @@ class MainApp(ThemedTk):
 
         current = self._get_current_version()
         api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
+        _headers = {
+            "User-Agent": "champedge-updater/1.0",
+            "Authorization": f"token {self._RELEASE_TOKEN}",
+        }
 
         try:
-            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
+            req = urllib.request.Request(api_url, headers=_headers)
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception as e:
@@ -684,16 +689,15 @@ class MainApp(ThemedTk):
         ):
             return
 
-        self._apply_update(assets[0]["browser_download_url"])
+        self._apply_update(assets[0]["id"])
 
-    def _apply_update(self, download_url: str):
+    def _apply_update(self, asset_id: int):
         import urllib.request
 
         if not getattr(sys, "frozen", False):
             messagebox.showinfo("アップデート", "開発環境ではアップデートできません")
             return
 
-        # champedge.exe の隣（_internal/ の親）に zip と bat を置く
         app_dir = os.path.dirname(sys.executable)
         zip_path = os.path.join(app_dir, "_champedge_update.zip")
         bat_path = os.path.join(app_dir, "_update.bat")
@@ -705,7 +709,16 @@ class MainApp(ThemedTk):
 
         def _run():
             try:
-                urllib.request.urlretrieve(download_url, zip_path)
+                asset_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/assets/{asset_id}"
+                req = urllib.request.Request(asset_url, headers={
+                    "User-Agent": "champedge-updater/1.0",
+                    "Authorization": f"token {self._RELEASE_TOKEN}",
+                    "Accept": "application/octet-stream",
+                })
+                with urllib.request.urlopen(req) as resp:
+                    with open(zip_path, "wb") as f:
+                        while chunk := resp.read(65536):
+                            f.write(chunk)
 
                 bat = (
                     "@echo off\n"
