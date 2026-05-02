@@ -5,6 +5,7 @@ dist/
 .venv
 *.pyc
 __pycache__/
+stats\home_doryoku.csv
 stats/home_motimono.csv
 stats/home_terastal.csv
 stats/home_tokusei.csv
