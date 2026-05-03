@@ -5,7 +5,10 @@
 既存インストール先に展開しても上書きされないようにする。
 """
 import os
+import sys
 import zipfile
+
+sys.stdout.reconfigure(encoding="utf-8")
 
 # アップデートzipから除外するパス（_internal/ 以下の相対パスで指定）
 # battle.db のみ除外（対戦履歴はユーザーデータのため上書き不可）
