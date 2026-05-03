@@ -73,6 +73,11 @@ jobs:
         shell: bash
         run: |
           ver="${{ needs.prepare-release.outputs.version }}"
+          echo "=== zip files ==="
+          ls -lh champedge_forwin.zip champedge_forwin_update.zip
+          echo "=== uploading ==="
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }} \
             --clobber
+          echo "=== release assets after upload ==="
+          gh release view "v$ver" --repo ${{ github.repository }}
