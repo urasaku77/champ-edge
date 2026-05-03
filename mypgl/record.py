@@ -111,66 +111,69 @@ class Record(tkinter.Toplevel):
             x=Const.searchX + 130, y=Const.searchY + Const.searchDY * 3
         )
 
-        self.regend_filter_bln = tkinter.BooleanVar()
-        self.regend_filter_bln.set(False)
-        self.regend_filter_btn = tkinter.Checkbutton(
-            self,
-            variable=self.regend_filter_bln,
-            text="伝説絞込",
-            command=self.set_regend,
-        )
-        self.regend_filter_btn.place(
-            x=Const.searchX + 200, y=Const.searchY + Const.searchDY * 2.7
-        )
-        self.regends_dict = {
-            "コライドン": "1007-0",
-            "ミライドン": "1008-0",
-            "黒バドレックス": "898-2",
-            "ザシアン（王）": "888-1",
-            "テラパゴス": "1024-0",
-            "ホウオウ": "250-0",
-            "ルギア": "249-0",
-            "ルナアーラ": "792-0",
-            "白バドレックス": "898-1",
-            "ムゲンダイナ": "890-0",
-            "カイオーガ": "382-0",
-            "レックウザ": "384-0",
-            "日食ネクロズマ": "800-1",
-            "黒キュレム": "646-2",
-            "ザマゼンタ（王）": "889-1",
-            "グラードン": "383-0",
-            "白キュレム": "646-1",
-            "ソルガレオ": "791-0",
-            "月食ネクロズマ": "800-2",
-            "レシラム": "643-0",
-            "ゼクロム": "644-0",
-            "ギラティナ（アナザー）": "487-0",
-            "ギラティナ（オリジン）": "487-1",
-            "ディアルガ": "483-0",
-            "ディアルガ（オリジン）": "483-1",
-            "パルキア": "484-0",
-            "パルキア（オリジン）": "484-1",
-            "ザシアン": "888-0",
-            "ザマゼンタ": "889-0",
-            "ミュウツー": "150-0",
-            "キュレム": "646-0",
-            "ネクロズマ": "800-0",
-            "バドレックス": "898-0",
-        }
-
+        # --- 伝説絞り込み機能（未使用） ---
+        # self.regend_filter_bln = tkinter.BooleanVar()
+        # self.regend_filter_bln.set(False)
+        # self.regend_filter_btn = tkinter.Checkbutton(
+        #     self,
+        #     variable=self.regend_filter_bln,
+        #     text="伝説絞込",
+        #     command=self.set_regend,
+        # )
+        # self.regend_filter_btn.place(
+        #     x=Const.searchX + 200, y=Const.searchY + Const.searchDY * 2.7
+        # )
+        # self.regends_dict = {
+        #     "コライドン": "1007-0",
+        #     "ミライドン": "1008-0",
+        #     "黒バドレックス": "898-2",
+        #     "ザシアン（王）": "888-1",
+        #     "テラパゴス": "1024-0",
+        #     "ホウオウ": "250-0",
+        #     "ルギア": "249-0",
+        #     "ルナアーラ": "792-0",
+        #     "白バドレックス": "898-1",
+        #     "ムゲンダイナ": "890-0",
+        #     "カイオーガ": "382-0",
+        #     "レックウザ": "384-0",
+        #     "日食ネクロズマ": "800-1",
+        #     "黒キュレム": "646-2",
+        #     "ザマゼンタ（王）": "889-1",
+        #     "グラードン": "383-0",
+        #     "白キュレム": "646-1",
+        #     "ソルガレオ": "791-0",
+        #     "月食ネクロズマ": "800-2",
+        #     "レシラム": "643-0",
+        #     "ゼクロム": "644-0",
+        #     "ギラティナ（アナザー）": "487-0",
+        #     "ギラティナ（オリジン）": "487-1",
+        #     "ディアルガ": "483-0",
+        #     "ディアルガ（オリジン）": "483-1",
+        #     "パルキア": "484-0",
+        #     "パルキア（オリジン）": "484-1",
+        #     "ザシアン": "888-0",
+        #     "ザマゼンタ": "889-0",
+        #     "ミュウツー": "150-0",
+        #     "キュレム": "646-0",
+        #     "ネクロズマ": "800-0",
+        #     "バドレックス": "898-0",
+        # }
+        # self.regend_num = tkinter.StringVar()
+        # self.regend_num.set("0")
+        # self.selected_regend = tkinter.StringVar()
+        # self.selected_regend.set(list(self.regends_dict.keys())[0])
+        # self.regends_filter = tkinter.OptionMenu(
+        #     self,
+        #     self.selected_regend,
+        #     *list(self.regends_dict.keys()),
+        #     command=self.set_regend,
+        # )
+        # self.regends_filter.place(
+        #     x=Const.searchX + 270, y=Const.searchY + Const.searchDY * 2.6
+        # )
         self.regend_num = tkinter.StringVar()
         self.regend_num.set("0")
-        self.selected_regend = tkinter.StringVar()
-        self.selected_regend.set(list(self.regends_dict.keys())[0])
-        self.regends_filter = tkinter.OptionMenu(
-            self,
-            self.selected_regend,
-            *list(self.regends_dict.keys()),
-            command=self.set_regend,
-        )
-        self.regends_filter.place(
-            x=Const.searchX + 270, y=Const.searchY + Const.searchDY * 2.6
-        )
+        # --- ここまで ---
 
         search_button = tkinter.Button(
             self,
@@ -224,13 +227,15 @@ class Record(tkinter.Toplevel):
         )
         paging_right_button.place(x=1600, y=Const.koumokuY)
 
-    def set_regend(self, *args):
-        if self.regend_filter_bln.get():
-            self.regends_filter.config(state="normal")
-            self.regend_num.set(self.selected_regend.get())
-        else:
-            self.regends_filter.config(state="disabled")
-            self.regend_num.set("0")
+    # --- 伝説絞り込み機能（未使用） ---
+    # def set_regend(self, *args):
+    #     if self.regend_filter_bln.get():
+    #         self.regends_filter.config(state="normal")
+    #         self.regend_num.set(self.selected_regend.get())
+    #     else:
+    #         self.regends_filter.config(state="disabled")
+    #         self.regend_num.set("0")
+    # --- ここまで ---
 
     def get_battle_data(self):
         self.from_date, self.to_date = DB_battle.chenge_date_from_datetime_to_unix(
