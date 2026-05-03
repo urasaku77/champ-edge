@@ -35,15 +35,9 @@ jobs:
             echo "Release v$ver already exists; skip create."
           fi
 
-  build:
+  build-windows:
     needs: prepare-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact_name: champedge_forwin.zip
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - name: Checkout source
@@ -54,8 +48,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
+      - name: Install dependencies
         shell: pwsh
         run: |
           $deps = Get-Content requirements.lock |
@@ -66,8 +59,7 @@ jobs:
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
 
-      - name: Create Windows zip
-        if: runner.os == 'Windows'
+      - name: Create zips
         shell: pwsh
         run: |
           python scripts/create_update_zip.py --full
@@ -75,7 +67,7 @@ jobs:
           Move-Item -Force dist/champedge_full.zip   champedge_forwin.zip
           Move-Item -Force dist/champedge_update.zip champedge_forwin_update.zip
 
-      - name: Upload artifact to release
+      - name: Upload to release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
