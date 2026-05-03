@@ -67,4 +67,5 @@ jobs:
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }} \
             --clobber
-          echo "=== done ==="
+          echo "=== release assets ==="
+          gh release view "v$ver" --repo ${{ github.repository }} --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
