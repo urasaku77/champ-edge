@@ -104,22 +104,34 @@ class Search:
                 try:
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located(
-                            (By.XPATH, "//div[@class='trainer-team is-flex']")
+                            (By.CLASS_NAME, "trainer-card")
                         )
                     )
                 except Exception:
                     continue
 
-                trainer_classes = driver.find_elements(
-                    By.XPATH, "//div[@class='trainer-team is-flex']"
+                # 「全件表示」ボタンがあればクリックして全件ロード
+                initial_count = len(driver.find_elements(By.CLASS_NAME, "trainer-card"))
+                show_all = driver.find_elements(
+                    By.XPATH, "//button[.//span[text()='全件表示']]"
                 )
+                if show_all:
+                    try:
+                        driver.execute_script("arguments[0].click();", show_all[0])
+                        WebDriverWait(driver, 10).until(
+                            lambda d, n=initial_count: len(d.find_elements(By.CLASS_NAME, "trainer-card")) > n
+                        )
+                    except Exception:
+                        pass
+
+                trainer_classes = driver.find_elements(By.CLASS_NAME, "trainer-card")
                 count = 0
                 for trainer in trainer_classes:
                     if count >= num:
                         break
 
                     icon_classes = trainer.find_elements(
-                        By.XPATH, ".//div[@class='team-pokemon']"
+                        By.CLASS_NAME, "trainer-card-team__pokemon"
                     )
                     icons = []
                     for icon_el in icon_classes:
@@ -132,11 +144,14 @@ class Search:
                         except Exception:
                             continue
 
-                    elements = trainer.find_elements(
-                        By.XPATH,
-                        ".//a[contains(@class,'link-team-article')]",
+                    article_divs = trainer.find_elements(
+                        By.CLASS_NAME, "trainer-card-team__article"
                     )
-                    article_url = elements[0].get_attribute("href") if elements else ""
+                    article_url = ""
+                    if article_divs:
+                        a_tags = article_divs[0].find_elements(By.TAG_NAME, "a")
+                        if a_tags:
+                            article_url = a_tags[0].get_attribute("href")
 
                     if article_url and article_url not in seen_urls and len(icons) == 6:
                         seen_urls.add(article_url)
