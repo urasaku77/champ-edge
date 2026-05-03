@@ -8,15 +8,10 @@ import os
 import zipfile
 
 # アップデートzipから除外するパス（_internal/ 以下の相対パスで指定）
-EXCLUDE_PREFIXES = [
-    "_internal/party",
-    "_internal/stats",
-]
+# battle.db のみ除外（対戦履歴はユーザーデータのため上書き不可）
+EXCLUDE_PREFIXES: list[str] = []
 EXCLUDE_EXACT = {
     "_internal/database/battle.db",
-    "_internal/recog/capture.json",
-    "_internal/recog/setting.json",
-    "_internal/recog/coordinate.json",
 }
 
 SRC_DIR = os.path.join("dist", "champedge")

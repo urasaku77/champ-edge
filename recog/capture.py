@@ -89,9 +89,7 @@ class Capture:
     # 選出画面検知
     def chose_pokemon(self):
         return self.is_exist_image(
-            "recog/recogImg/situation/sensyutu.jpg", 0.8, "sensyutu"
-        ) or self.is_exist_image(
-            "recog/recogImg/situation/sensyutu2.jpg", 0.8, "sensyutu"
+            "recog/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
         )
 
     # 選出画面解析
@@ -320,13 +318,15 @@ class Capture:
 
     # 自分の選出番号を取得
     def recognize_chosen_num(self, banme):
+        banme_num = banme + 1
+        paths = [f"recog\\recogImg\\sensyutu\\banme\\num{banme_num}.jpg"]
+        alt = f"recog\\recogImg\\sensyutu\\banme\\num{banme_num}a.jpg"
+        if os.path.exists(alt):
+            paths.append(alt)
         for num in range(6):
-            if self.is_exist_image(
-                "recog\\recogImg\\sensyutu\\banme\\banme" + str(banme + 1) + ".jpg",
-                0.85,
-                "banme" + str(num + 1),
-            ):
-                return num
+            for path in paths:
+                if self.is_exist_image(path, 0.85, "banme" + str(num + 1)):
+                    return num
         return -1
 
     # OBS表示用の自分選出画像作成
@@ -350,7 +350,7 @@ class Capture:
     def started_battle(self):
         self.get_screenshot()
         return self.is_exist_image(
-            "recog/recogImg/situation/aitewomiru.jpg", 0.8, "aitewomiru"
+            "recog/recogImg/situation/recogBattle.jpg", 0.8, "aitewomiru"
         )
 
     # テンプレートマッチング(最大のみ)

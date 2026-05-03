@@ -125,5 +125,6 @@ class Const(object):
         myPokemonY.append(myPokemonStartY + i * 60)
 
     @staticmethod
-    def createPass(str):
-        return "image/pokeicon/" + str + ".png"
+    def createPass(pid: str) -> str:
+        no, _, form = pid.partition("-")
+        return f"image/pokemon/{int(no):04d}-{form}.png"

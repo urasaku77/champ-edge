@@ -1,22 +1,23 @@
 import json
 import sys
-import time
 from functools import reduce
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 sys.path.append("../champ-edge")
 from pokedata.pokemon import Pokemon
 
-_BATTLE_SEASON_FILE = "stats/battle_season.txt"
+_SEASON_FILE = "stats/season.txt"
 _RANKING_JSON_FILE = "stats/ranking.json"
 _RANKING_TXT_FILE = "stats/ranking.txt"
 
 
-def _load_battle_seasons() -> list[str]:
-    with open(_BATTLE_SEASON_FILE, encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+def _load_season() -> str:
+    with open(_SEASON_FILE, encoding="utf-8") as f:
+        return f.read().strip()
 
 
 def get_similar_party(pids: list[Pokemon]) -> list:
@@ -62,10 +63,10 @@ def get_similar_party(pids: list[Pokemon]) -> list:
 
 class Search:
     def search_latest_party(self):
-        seasons = _load_battle_seasons()
-        if not seasons:
-            print("battle_season.txt が空です")
-            return
+        season = int(_load_season())
+        seasons = [str(season)]
+        if season > 1:
+            seasons.append(str(season - 1))
 
         with open(_RANKING_TXT_FILE, encoding="utf-8") as f:
             pids = [line.strip() for line in f if line.strip()]
@@ -94,11 +95,20 @@ class Search:
         results: list[dict] = []
         seen_urls: set[str] = set()
 
-        try:
-            for season in seasons:
+        for season in seasons:
+            try:
                 driver.get(
                     f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
                 )
+
+                try:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//div[@class='trainer-team is-flex']")
+                        )
+                    )
+                except Exception:
+                    continue
 
                 trainer_classes = driver.find_elements(
                     By.XPATH, "//div[@class='trainer-team is-flex']"
@@ -133,9 +143,8 @@ class Search:
                         results.append({"url": article_url, "icons": icons})
                         count += 1
 
-                time.sleep(0.5)
-        except Exception as e:
-            print(f"  取得失敗 {pid}: {e}")
+            except Exception as e:
+                print(f"  取得失敗 {pid} season={season}: {e}")
 
         return results
 

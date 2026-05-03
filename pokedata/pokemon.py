@@ -182,11 +182,8 @@ class Pokemon:
 
     @property
     def icon(self) -> str:
-        return (
-            "image/pokeicon/" + self.pid + ".png"
-            if self.__form != -1
-            else "image/pokeicon/" + str(self.__no) + "-0.png"
-        )
+        form = self.__form if self.__form != -1 else 0
+        return f"image/pokemon/{self.__no:04d}-{form}.png"
 
     @property
     def name(self) -> str:
