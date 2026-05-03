@@ -10,38 +10,17 @@ permissions:
   contents: write
 
 jobs:
-  prepare-release:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.VERSION }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: get_version
-        run: echo "VERSION=$(cat version.txt | tr -d '[:space:]')" >> $GITHUB_OUTPUT
-
-      - name: Create release if not exists
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ver="${{ steps.get_version.outputs.VERSION }}"
-          if ! gh release view "v$ver" --repo ${{ github.repository }} >/dev/null 2>&1; then
-            gh release create "v$ver" \
-              --repo ${{ github.repository }} \
-              --title "v$ver" \
-              --notes "バージョン $ver のリリース"
-          else
-            echo "Release v$ver already exists; skip create."
-          fi
-
-  build-windows:
-    needs: prepare-release
+  build-and-release:
     runs-on: windows-latest
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: echo "VERSION=$(cat version.txt | tr -d '[:space:]')" >> $GITHUB_OUTPUT
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -67,17 +46,25 @@ jobs:
           Move-Item -Force dist/champedge_full.zip   champedge_forwin.zip
           Move-Item -Force dist/champedge_update.zip champedge_forwin_update.zip
 
-      - name: Upload to release
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          ver="${{ needs.prepare-release.outputs.version }}"
+          ver="${{ steps.get_version.outputs.VERSION }}"
+          echo "Version: $ver"
+          if ! gh release view "v$ver" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            gh release create "v$ver" \
+              --repo ${{ github.repository }} \
+              --title "v$ver" \
+              --notes "バージョン $ver のリリース"
+          else
+            echo "Release v$ver already exists."
+          fi
           echo "=== zip files ==="
           ls -lh champedge_forwin.zip champedge_forwin_update.zip
           echo "=== uploading ==="
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }} \
             --clobber
-          echo "=== release assets after upload ==="
-          gh release view "v$ver" --repo ${{ github.repository }}
+          echo "=== done ==="
