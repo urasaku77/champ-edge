@@ -53,19 +53,18 @@ jobs:
         run: |
           ver="${{ steps.get_version.outputs.VERSION }}"
           echo "Version: $ver"
-          if ! gh release view "v$ver" --repo ${{ github.repository }} >/dev/null 2>&1; then
-            gh release create "v$ver" \
-              --repo ${{ github.repository }} \
-              --title "v$ver" \
-              --notes "バージョン $ver のリリース"
-          else
-            echo "Release v$ver already exists."
-          fi
+          echo "=== release state before ==="
+          gh release view "v$ver" --repo ${{ github.repository }} --json isDraft,tagName,assets 2>&1 || echo "(release not found)"
+          echo "=== delete and recreate release ==="
+          gh release delete "v$ver" --repo ${{ github.repository }} --yes 2>/dev/null || echo "(no existing release)"
+          gh release create "v$ver" \
+            --repo ${{ github.repository }} \
+            --title "v$ver" \
+            --notes "バージョン $ver のリリース"
           echo "=== zip files ==="
           ls -lh champedge_forwin.zip champedge_forwin_update.zip
           echo "=== uploading ==="
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
-            --repo ${{ github.repository }} \
-            --clobber
-          echo "=== release assets ==="
+            --repo ${{ github.repository }}
+          echo "=== release assets after upload ==="
           gh release view "v$ver" --repo ${{ github.repository }} --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
