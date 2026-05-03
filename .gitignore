@@ -5,9 +5,12 @@ dist/
 .venv
 *.pyc
 __pycache__/
+database/battle.db
 party/csv/*
 party/txt/*
 party/table/*
+party/setting.txt
 recog/outputImg/*
+recog/setting.json
 bat/
 image/readme/desktop.ini

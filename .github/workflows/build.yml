@@ -70,8 +70,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          python scripts/create_update_zip.py --full
           python scripts/create_update_zip.py
-          Move-Item -Force dist/champedge_update.zip ${{ matrix.artifact_name }}
+          Move-Item -Force dist/champedge_full.zip   champedge_forwin.zip
+          Move-Item -Force dist/champedge_update.zip champedge_forwin_update.zip
 
       - name: Upload artifact to release
         env:
@@ -79,6 +81,6 @@ jobs:
         shell: bash
         run: |
           ver="${{ needs.prepare-release.outputs.version }}"
-          gh release upload "v$ver" "${{ matrix.artifact_name }}" \
+          gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }} \
             --clobber
