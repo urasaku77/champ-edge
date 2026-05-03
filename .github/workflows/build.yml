@@ -1,8 +1,5 @@
 name: Build and Release
 
-# v* タグを push したとき、または手動で再実行したときに走る
-# 例: git tag v1.0.1 && git push origin v1.0.1
-# 既存リリースを更新したい場合は Actions タブから手動で workflow_dispatch
 on:
   push:
     tags:
@@ -10,9 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ──────────────────────────────────────────────────────────────────
-  # 1. リリースが存在しなければ先に作成する（matrix の race を回避）
-  # ──────────────────────────────────────────────────────────────────
   prepare-release:
     runs-on: ubuntu-latest
     outputs:
@@ -26,24 +20,18 @@ jobs:
 
       - name: Create release if not exists
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           ver="${{ steps.get_version.outputs.VERSION }}"
-          if ! gh release view "v$ver" --repo urasaku77/champ-edge-releases >/dev/null 2>&1; then
+          if ! gh release view "v$ver" --repo ${{ github.repository }} >/dev/null 2>&1; then
             gh release create "v$ver" \
-              --repo urasaku77/champ-edge-releases \
+              --repo ${{ github.repository }} \
               --title "v$ver" \
               --notes "バージョン $ver のリリース"
           else
             echo "Release v$ver already exists; skip create."
           fi
 
-  # ──────────────────────────────────────────────────────────────────
-  # 2. Windows ビルドして同じリリースに upload
-  #    macOS はローカルビルドに切り替えたため matrix から一旦コメントアウト。
-  #    Actions に戻したい場合は matrix.include の macos エントリと
-  #    "Install dependencies (macOS)" / "Create macOS zip" のコメントを外す。
-  # ──────────────────────────────────────────────────────────────────
   build:
     needs: prepare-release
     strategy:
@@ -52,8 +40,6 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: champedge_forwin.zip
-          # - os: macos-latest
-          #   artifact_name: champedge_formac.zip
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -65,29 +51,18 @@ jobs:
         with:
           python-version: '3.10'
 
-      # ── 依存パッケージインストール ──
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # requirements.lock から -e（ローカルパッケージ）とコメント行を除外
           $deps = Get-Content requirements.lock |
             Where-Object { $_ -notmatch "^-e\s" -and $_ -notmatch "^#" -and $_.Trim() -ne "" }
           $deps | Out-File -FilePath requirements_ci.txt -Encoding utf8
           pip install -r requirements_ci.txt
 
-      # - name: Install dependencies (macOS)
-      #   if: runner.os == 'macOS'
-      #   shell: bash
-      #   run: |
-      #     grep -v "^-e[[:space:]]" requirements.lock | grep -v "^#" | grep -v "^$" > requirements_ci.txt
-      #     pip install -r requirements_ci.txt
-
-      # ── PyInstaller ビルド ──
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
 
-      # ── 成果物作成（Windows: 既存スクリプトでユーザーデータ除外 zip） ──
       - name: Create Windows zip
         if: runner.os == 'Windows'
         shell: pwsh
@@ -95,24 +70,12 @@ jobs:
           python scripts/create_update_zip.py
           Move-Item -Force dist/champedge_update.zip ${{ matrix.artifact_name }}
 
-      # ── 成果物作成（macOS: dist/champedge を zip） ──
-      # - name: Create macOS zip
-      #   if: runner.os == 'macOS'
-      #   shell: bash
-      #   run: |
-      #     # dist/champedge/champedge に実行権限を確実に付与
-      #     chmod +x dist/champedge/champedge
-      #     cd dist
-      #     # ditto は macOS の標準で、シンボリックリンク・属性を保持
-      #     ditto -c -k --sequesterRsrc --keepParent champedge ../${{ matrix.artifact_name }}
-
-      # ── 既存リリースに upload (--clobber で上書き) ──
       - name: Upload artifact to release
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           ver="${{ needs.prepare-release.outputs.version }}"
           gh release upload "v$ver" "${{ matrix.artifact_name }}" \
-            --repo urasaku77/champ-edge-releases \
+            --repo ${{ github.repository }} \
             --clobber
