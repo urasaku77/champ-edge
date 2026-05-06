@@ -4,11 +4,15 @@
 --full : 新規インストール用（全ファイル含む）
 引数なし: アップデート用（ユーザーデータ除外）
 
-ユーザーデータ（上書き不可）:
-  _internal/database/battle.db
-  _internal/party/csv/
-  _internal/party/txt/
-  _internal/party/table/
+zip構造:
+  champedge.exe        ← exeファイル
+  _internal/           ← Pythonライブラリ群（PyInstallerが生成）
+  image/               ← ポケモン画像
+  database/            ← DBファイル
+  stats/               ← 統計データ
+  recog/               ← テンプレート画像・設定
+  party/               ← パーティ設定
+  version.txt
 """
 import os
 import sys
@@ -16,43 +20,94 @@ import zipfile
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-SRC_DIR = os.path.join("dist", "champedge")
+BUILD_DIR = os.path.join("dist", "champedge")
 
-# アップデート時に上書きしてはいけないユーザーデータ
-_EXCLUDE_EXACT = {
-    "_internal/database/battle.db",
-}
-_EXCLUDE_PREFIXES = [
-    "_internal/party/csv",
-    "_internal/party/txt",
-    "_internal/party/table",
+# exeと同階層に置く外部データファイル
+# (ソースパス, zip内パス)  ディレクトリ指定時は再帰的に追加
+_DATA_SOURCES = [
+    ("version.txt",             "version.txt"),
+    ("image",                   "image"),
+    ("database/pokemon.db",     "database/pokemon.db"),
+    ("database/battle.db",      "database/battle.db"),
+    ("stats/ranking.json",      "stats/ranking.json"),
+    ("stats/ranking.txt",       "stats/ranking.txt"),
+    ("stats/season.txt",        "stats/season.txt"),
+    ("stats/last_update.txt",   "stats/last_update.txt"),
+    ("stats/home_waza.csv",     "stats/home_waza.csv"),
+    ("stats/home_tokusei.csv",  "stats/home_tokusei.csv"),
+    ("stats/home_motimono.csv", "stats/home_motimono.csv"),
+    ("stats/home_seikaku.csv",  "stats/home_seikaku.csv"),
+    ("stats/home_doryoku.csv",  "stats/home_doryoku.csv"),
+    ("stats/home_terastal.csv", "stats/home_terastal.csv"),
+    ("recog/recogImg",          "recog/recogImg"),
+    ("recog/outputImg",         "recog/outputImg"),
+    ("recog/capture.json",      "recog/capture.json"),
+    ("recog/setting.json",      "recog/setting.json"),
+    ("recog/coordinate.json",   "recog/coordinate.json"),
+    ("party/csv",               "party/csv"),
+    ("party/txt",               "party/txt"),
+    ("party/table",             "party/table"),
+    ("party/setting.txt",       "party/setting.txt"),
 ]
 
+# アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
+_UPDATE_EXCLUDE = {
+    "database/battle.db",
+    "party/csv",
+    "party/txt",
+    "party/table",
+}
 
-def _should_exclude(arcname: str) -> bool:
-    path = arcname.replace("\\", "/")
-    if path in _EXCLUDE_EXACT:
-        return True
-    return any(path == p or path.startswith(p + "/") for p in _EXCLUDE_PREFIXES)
+
+def _excluded(arc: str, full: bool) -> bool:
+    if full:
+        return False
+    path = arc.replace("\\", "/")
+    return any(path == e or path.startswith(e + "/") for e in _UPDATE_EXCLUDE)
+
+
+def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:
+    if os.path.isfile(src):
+        if _excluded(arc_base, full):
+            print(f"  スキップ: {arc_base}")
+            return 0
+        zf.write(src, arc_base)
+        return 1
+    if os.path.isdir(src):
+        total = 0
+        for root, _, files in os.walk(src):
+            for file in files:
+                abs_path = os.path.join(root, file)
+                rel = os.path.relpath(abs_path, src).replace("\\", "/")
+                arc = f"{arc_base}/{rel}"
+                if _excluded(arc_base, full):
+                    print(f"  スキップ: {arc}")
+                    continue
+                zf.write(abs_path, arc)
+                total += 1
+        return total
+    print(f"  警告: 見つかりません: {src}")
+    return 0
 
 
 def make_zip(out_zip: str, full: bool):
-    if not os.path.isdir(SRC_DIR):
-        print(f"ERROR: {SRC_DIR} が見つかりません。先にビルドを実行してください。")
+    if not os.path.isdir(BUILD_DIR):
+        print(f"ERROR: {BUILD_DIR} が見つかりません。先にビルドを実行してください。")
         raise SystemExit(1)
 
     total = 0
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-        for root, _, files in os.walk(SRC_DIR):
+        # PyInstaller成果物（exe + _internal/）
+        for root, _, files in os.walk(BUILD_DIR):
             for file in files:
-                arcname = os.path.relpath(
-                    os.path.join(root, file), SRC_DIR
-                )
-                if not full and _should_exclude(arcname.replace("\\", "/")):
-                    print(f"  スキップ: {arcname}")
-                    continue
-                zf.write(os.path.join(root, file), arcname)
+                abs_path = os.path.join(root, file)
+                arc = os.path.relpath(abs_path, BUILD_DIR).replace("\\", "/")
+                zf.write(abs_path, arc)
                 total += 1
+
+        # 外部データファイル（exeと同階層）
+        for src, arc_base in _DATA_SOURCES:
+            total += _add_entry(zf, src, arc_base, full)
 
     size_mb = os.path.getsize(out_zip) / 1024 / 1024
     print(f"完了: {out_zip}  ({total} ファイル, {size_mb:.1f} MB)")

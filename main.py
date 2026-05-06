@@ -4,7 +4,8 @@ import sys
 # exeとして起動した場合、作業ディレクトリをバンドルフォルダ(_internal/)に設定する
 # PyInstaller 6.x では bundled files は sys._MEIPASS (_internal/) 以下に配置される
 if getattr(sys, 'frozen', False):
-    os.chdir(sys._MEIPASS)
+    # exeと同じフォルダをCWDにする（画像・設定ファイルを_internal/の外に置くため）
+    os.chdir(os.path.dirname(sys.executable))
 
 import tkinter
 from tkinter.ttk import Style
