@@ -1,12 +1,11 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'バージョン（例: 1.0.1）。空欄の場合はversion.txtを使用'
-        required: false
-        default: ''
+  push:
+    branches:
+      - main
+    paths:
+      - 'version.txt'
 
 permissions:
   contents: write
@@ -23,11 +22,7 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VER="${{ github.event.inputs.version }}"
-          else
-            VER="$(cat version.txt | tr -d '[:space:]')"
-          fi
+          VER="$(cat version.txt | tr -d '[:space:]')"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
           echo "Version: $VER"
 
