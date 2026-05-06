@@ -25,7 +25,7 @@ class WeatherFrame(ttk.LabelFrame):
         self._stage: Stage | None = None
         self._weather_combobox = MyCombobox(
             self,
-            width=const.char_width(default=10, mac=6),
+            width=const.char_width(default=8, mac=6),
             height=30,
             values=WEATHER_COMBOBOX_VALUES,
         )
@@ -56,7 +56,7 @@ class FieldFrame(ttk.LabelFrame):
         self._stage: Stage | None = None
         self._field_combobox = MyCombobox(
             self,
-            width=const.char_width(default=10, mac=6),
+            width=const.char_width(default=8, mac=6),
             height=30,
             values=FIELD_COMBOBOX_VALUES,
         )
@@ -301,11 +301,12 @@ class TimerFrame(ttk.LabelFrame):
         self.canvas_time.delete("min_text")  # 表示時間（分）を消去
         _y = int(self.canvas_time["height"]) // 2
         _font_size = const.char_width(default=36, mac=26)
+        _font_family = const.FONT_FAMILY if const.IS_MAC else "MSゴシック体"
         self.canvas_time.create_text(
             74,
             _y,
             text=str(self.left_min).zfill(2) + ":",
-            font=(const.FONT_FAMILY, _font_size, "bold"),
+            font=(_font_family, _font_size, "bold"),
             tag="min_text",
             anchor="e",
         )  # 分を表示
@@ -315,11 +316,12 @@ class TimerFrame(ttk.LabelFrame):
         self.canvas_time.delete("sec_text")  # 表示時間（秒）を消去
         _y = int(self.canvas_time["height"]) // 2
         _font_size = const.char_width(default=36, mac=26)
+        _font_family = const.FONT_FAMILY if const.IS_MAC else "MSゴシック体"
         self.canvas_time.create_text(
             76,
             _y,
             text=str(self.left_sec).zfill(2),
-            font=(const.FONT_FAMILY, _font_size, "bold"),
+            font=(_font_family, _font_size, "bold"),
             tag="sec_text",
             anchor="w",
         )  # 秒を表示
@@ -328,15 +330,15 @@ class TimerFrame(ttk.LabelFrame):
 # カウンターフレーム(1個)
 class CounterFrame(tkinter.Canvas):
     def __init__(self, master, **kwargs):
-        # Canvas は明示 width を指定しないと内部子要素より大きく取られる
-        # Mac で各カウンタが 165px と過大になる対策。
-        # grid_propagate(False) で children に合わせて拡大するのを止める。
-        if "width" not in kwargs:
-            kwargs["width"] = const.char_width(default=130, mac=80)
-        if "height" not in kwargs:
-            kwargs["height"] = const.char_width(default=130, mac=80)
+        if const.IS_MAC:
+            # Mac で各カウンタが 165px と過大になる対策
+            if "width" not in kwargs:
+                kwargs["width"] = 80
+            if "height" not in kwargs:
+                kwargs["height"] = 80
         super().__init__(master, **kwargs)
-        self.grid_propagate(False)
+        if const.IS_MAC:
+            self.grid_propagate(False)
 
         self.name_label = tkinter.Entry(self, width=const.char_width(default=7, mac=4))
         self.name_label.grid(column=0, row=0, columnspan=3)
@@ -378,18 +380,16 @@ class CounterFrame(tkinter.Canvas):
             )
             self.btn_count_reset.grid(column=2, row=2, sticky="ew")
         else:
-            _cbtn_w = 5
-            _cbtn_h = 2
             self.btn_count_down = tkinter.Button(
-                self, text="-", width=_cbtn_w, command=self.CountDown, height=_cbtn_h
+                self, text="  -  ", command=self.CountDown, height=2
             )
             self.btn_count_down.grid(column=0, row=2)
             self.btn_count_reset = tkinter.Button(
-                self, text="0", width=_cbtn_w, command=self.CountReset, height=_cbtn_h
+                self, text="0", command=self.CountReset, height=2
             )
             self.btn_count_reset.grid(column=1, row=2)
             self.btn_count_reset = tkinter.Button(
-                self, text="＋", width=_cbtn_w, command=self.CountUp, height=_cbtn_h
+                self, text="  ＋  ", command=self.CountUp, height=2
             )
             self.btn_count_reset.grid(column=2, row=2)
 

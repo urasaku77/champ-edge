@@ -328,11 +328,14 @@ class MainApp(ThemedTk):
         self.home_frame.grid_propagate(False)
 
         # ツールフレーム（タイマー・カウンター・ダブル・共通）
-        # 子は pack で管理しているので pack_propagate(False) が必要
-        _tool_h = 105 if _IS_MAC else _sy(250)
-        tool_frame = ttk.Frame(main_frame, padding=4, width=_sx(475), height=_tool_h)
-        tool_frame.grid(row=5, column=0, rowspan=3, columnspan=3, sticky=N + W + S)
-        tool_frame.pack_propagate(False)
+        if _IS_MAC:
+            tool_frame = ttk.Frame(main_frame, padding=4, width=_sx(475), height=105)
+            tool_frame.grid(row=5, column=0, rowspan=3, columnspan=3, sticky=N + W + S)
+            tool_frame.pack_propagate(False)
+        else:
+            tool_frame = ttk.Frame(main_frame, padding=4)
+            tool_frame.grid(row=5, column=0, rowspan=3, sticky=N + W + S)
+            tool_frame.grid_propagate(False)
 
         # タイマーフレーム
         self.timer_frame = TimerFrame(master=tool_frame, text="タイマー")
@@ -372,12 +375,15 @@ class MainApp(ThemedTk):
         self.field_frame.pack(fill="x", expand=0)
 
         # 比較ボタンフレーム（素早さ・重さ）
-        # common_frame の 3 段目に置くと Mac で潰れるので tool_frame 直下の独立列に
-        compare_frame = ttk.Frame(tool_frame)
-        compare_frame.pack(fill="both", expand=0, side="left")
+        _cmp_pad = 1 if _IS_MAC else 5
+        if _IS_MAC:
+            compare_frame = ttk.Frame(tool_frame)
+            compare_frame.pack(fill="both", expand=0, side="left")
+        else:
+            compare_frame = ttk.Frame(common_frame)
+            compare_frame.pack(fill="both", expand=0)
 
         # 素早さ比較ボタン
-        _cmp_pad = 1 if _IS_MAC else 5
         self.speed_button = CompareButton(
             master=compare_frame,
             text="S比較",
@@ -385,7 +391,10 @@ class MainApp(ThemedTk):
             padding=_cmp_pad,
             command=self.speed_comparing,
         )
-        self.speed_button.pack(fill="x", expand=0)
+        if _IS_MAC:
+            self.speed_button.pack(fill="x", expand=0)
+        else:
+            self.speed_button.pack(fill="both", expand=0, side="left")
 
         # 重さ比較ボタン
         self.weight_button = CompareButton(
@@ -395,7 +404,10 @@ class MainApp(ThemedTk):
             padding=_cmp_pad,
             command=self.weight_comparing,
         )
-        self.weight_button.pack(fill="x", expand=0)
+        if _IS_MAC:
+            self.weight_button.pack(fill="x", expand=0)
+        else:
+            self.weight_button.pack(fill="both", expand=0, side="left")
 
         # 対戦記録フレーム
         _record_h = 135 if _IS_MAC else _sy(157)
