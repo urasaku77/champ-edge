@@ -12,11 +12,17 @@ from pokedata.stats import Stats, StatsKey
 from pokedata.waza import Waza, WazaBase
 
 _terastal_enabled: bool = True
+_mega_enabled: bool = True
 
 
 def set_terastal_enabled(enabled: bool):
     global _terastal_enabled
     _terastal_enabled = enabled
+
+
+def set_mega_enabled(enabled: bool):
+    global _mega_enabled
+    _mega_enabled = enabled
 
 
 class Pokemon:
@@ -431,7 +437,7 @@ class Pokemon:
         # メガシンカ: DB の form 10-19 を動的にサイクル
         # 0 → 11 → 12 → 0  (フォーム数に応じて自動対応)
         mega_forms = DB_pokemon.get_mega_forms_by_no(self.__no)
-        if not mega_forms:
+        if not mega_forms or not _mega_enabled:
             return None
         if self.__form == 0:
             return f"{self.__no}-{mega_forms[0]}"

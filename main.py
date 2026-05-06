@@ -12,10 +12,11 @@ from tkinter.ttk import Style
 
 from component.app import MainApp
 from component.stage import Stage
-from pokedata.pokemon import set_terastal_enabled
+from pokedata.pokemon import set_mega_enabled, set_terastal_enabled
 from recog.recog import get_recog_value
 
 set_terastal_enabled(get_recog_value("terastal_enabled"))
+set_mega_enabled(get_recog_value("mega_enabled"))
 
 app = MainApp()
 stage = Stage(app)

@@ -108,6 +108,7 @@ class ModeSetting(tkinter.Toplevel):
                 "search_record_auto": False,
                 "panipani_auto": True,
                 "terastal_enabled": True,
+                "mega_enabled": True,
                 "tesseract_path": "",
             }
 
@@ -191,6 +192,16 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.terastal_enabled_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
 
+        # チェックボックス8
+        self.mega_enabled_var = tkinter.BooleanVar()
+        self.mega_enabled_var.set(self.initial_data.get("mega_enabled", True))
+        self.mega_enabled_checkbox = tkinter.Checkbutton(
+            self,
+            text="メガシンカ有効",
+            variable=self.mega_enabled_var,
+        )
+        self.mega_enabled_checkbox.grid(row=8, column=0, columnspan=2, pady=5)
+
         # Tesseractフォルダ
         tess_frame = ttk.Frame(self)
         tkinter.Label(tess_frame, text="Tesseractフォルダ:").pack(side="left", padx=5)
@@ -202,21 +213,21 @@ class ModeSetting(tkinter.Toplevel):
         MyButton(tess_frame, text="参照", command=self.browse_tesseract_path).pack(
             side="left", padx=5
         )
-        tess_frame.grid(row=8, column=0, columnspan=2, pady=5)
+        tess_frame.grid(row=9, column=0, columnspan=2, pady=5)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=9, column=0, pady=10)
+        self.submit_button.grid(row=10, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=9, column=1, pady=10)
+        self.cancel_button.grid(row=10, column=1, pady=10)
         caution = ttk.Label(
             self,
             text="※設定を反映するには、再起動が必要です。",
             foreground="red",
             padding=10,
         )
-        caution.grid(row=10, column=0, columnspan=2, pady=5)
+        caution.grid(row=11, column=0, columnspan=2, pady=5)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -243,6 +254,7 @@ class ModeSetting(tkinter.Toplevel):
             "search_record_auto": self.search_record_auto_var.get(),
             "panipani_auto": self.panipani_auto_var.get(),
             "terastal_enabled": self.terastal_enabled_var.get(),
+            "mega_enabled": self.mega_enabled_var.get(),
             "tesseract_path": self.tesseract_path_var.get(),
         }
 
@@ -271,6 +283,7 @@ def get_recog_value(key: str):
         "search_record_auto",
         "panipani_auto",
         "terastal_enabled",
+        "mega_enabled",
         "tesseract_path",
         "source_name",
         "host_name",
@@ -298,6 +311,7 @@ def get_recog_value(key: str):
             "search_record_auto": False,
             "panipani_auto": True,
             "terastal_enabled": True,
+            "mega_enabled": True,
             "tesseract_path": "",
             "source_name": "",
             "host_name": "",
