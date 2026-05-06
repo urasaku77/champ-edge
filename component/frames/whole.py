@@ -533,8 +533,9 @@ class RecordFrame(ttk.LabelFrame):
         super().__init__(master, **kwargs)
         self._stage: Stage | None = None
         self.result = -1
-        # entry / memo 列を expand させて右余白を埋める
-        self.columnconfigure(1, weight=1)
+        # entry / memo 列を expand させて右余白を埋める (Mac のみ)
+        if const.IS_MAC:
+            self.columnconfigure(1, weight=1)
 
         self.tn_lbl = MyLabel(self, text="TN")
         self.tn_lbl.grid(column=0, row=0)

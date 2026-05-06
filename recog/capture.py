@@ -92,8 +92,7 @@ class Capture:
                 self.party_recognized = True
                 result = (party, oppo_tn)
             banme_list = [
-                self.recognize_chosen_num(banme)
-                for banme in range(self.sensyutu_num)
+                self.recognize_chosen_num(banme) for banme in range(self.sensyutu_num)
             ]
             if self.is_panipani and banme_list != [-1] * self.sensyutu_num:
                 self.create_my_chosen_image(
@@ -185,19 +184,23 @@ class Capture:
 
     # OBS表示用の自分選出画像作成
     def create_my_chosen_image(self, sensyutuPoke, count):
-        img = Image.fromarray(cv2.cvtColor(self.myPartyImg, cv2.COLOR_BGR2RGB))
         if self.banme == count:
             return
         self.banme = count
+        full_img = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
+        c0 = self.coords.dicCoord["pokecrop1"]
+        crop_w = c0.right - c0.left
+        crop_h = c0.bottom - c0.top
+        dst = Image.new("RGB", (crop_w * count, crop_h))
         i = 0
-        dst = Image.new("RGB", (575 * (count) + 1, 106))
         for num in sensyutuPoke:
             if num == -1:
                 dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
                 return
-            outputImg = img.crop((0, 0 + 115 * num, 570, 105 + 115 * num))
-            dst.paste(outputImg, (0 + 570 * i, 0))
-            i = i + 1
+            c = self.coords.dicCoord[f"pokecrop{num + 1}"]
+            crop = full_img.crop((c.left, c.top, c.right, c.bottom))
+            dst.paste(crop, (crop_w * i, 0))
+            i += 1
         dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
 
     # テンプレートマッチング(最大のみ)
@@ -243,7 +246,7 @@ class Capture:
     # ポケモンの画像ファイル名からPIDを取得 (例: "image/pokemon/0003-11.png" → "3-11")
     def shape_poke_num(self, origin: str):
         try:
-            stem = Path(origin).stem        # "0003-11"
+            stem = Path(origin).stem  # "0003-11"
             no, sep, form = stem.partition("-")
             return f"{int(no)}-{form}" if sep else f"{int(no)}-0"
         except Exception:

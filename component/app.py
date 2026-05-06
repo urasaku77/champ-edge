@@ -418,13 +418,15 @@ class MainApp(ThemedTk):
         self.record_frame.grid_propagate(False)
 
         # 最終メニューフレーム
-        # 子は pack 管理なので pack_propagate(False)
-        # height は LabelFrame title + 内部ボタン (約 30+30) に合わせる
-        last_menu_frame = ttk.Frame(
-            master=main_frame, padding=2, width=_sx(475), height=50
-        )
-        last_menu_frame.grid(row=9, column=0, columnspan=3, sticky=N + W)
-        last_menu_frame.pack_propagate(False)
+        if _IS_MAC:
+            last_menu_frame = ttk.Frame(
+                master=main_frame, padding=2, width=_sx(475), height=50
+            )
+            last_menu_frame.grid(row=9, column=0, columnspan=3, sticky=N + W)
+            last_menu_frame.pack_propagate(False)
+        else:
+            last_menu_frame = ttk.Frame(master=main_frame, padding=4)
+            last_menu_frame.grid(row=9, column=0, columnspan=3, sticky=N + W)
 
         # 制御フレーム
         control_frame = ttk.LabelFrame(master=last_menu_frame, text="制御", padding=5)
