@@ -222,7 +222,7 @@ class Capture:
         ]
         self._write_sensyutu_big(set())
 
-    # selectedに含まれるインデックスを100%、それ以外を75%透明でBig画像を保存
+    # selectedに含まれるインデックスを100%、それ以外を70%透明でBig画像を保存
     def _write_sensyutu_big(self, selected: set):
         if not self.pokecrop_imgs:
             return
@@ -233,7 +233,7 @@ class Capture:
             img = crop.copy()
             if i not in selected:
                 r, g, b, _ = img.split()
-                alpha = Image.new("L", img.size, int(255 * 0.75))
+                alpha = Image.new("L", img.size, int(255 * 0.70))
                 img = Image.merge("RGBA", (r, g, b, alpha))
             dst.paste(img, (w * i, 0), img)
         # JPEGはアルファ非対応のため黒背景に合成して保存
