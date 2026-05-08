@@ -10,7 +10,7 @@ party/csv/*
 party/txt/*
 party/table/*
 party/setting.txt
-recog/outputImg/*
+image/outputImg/*
 recog/setting.json
 bat/
 image/readme/desktop.ini
