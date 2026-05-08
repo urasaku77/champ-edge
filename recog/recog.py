@@ -292,29 +292,30 @@ def get_recog_value(key: str):
     ]:
         raise ValueError("Invalid key provided for recognition settings.")
 
+    defaults = {
+        "rule": 1,
+        "active_chosen_auto": True,
+        "capture_monitor_auto": True,
+        "doryoku_reset_auto": True,
+        "similar_party_auto": False,
+        "search_record_auto": False,
+        "panipani_auto": True,
+        "terastal_enabled": True,
+        "mega_enabled": True,
+        "tesseract_path": "",
+        "source_name": "",
+        "host_name": "",
+        "port": "",
+        "password": "",
+    }
     try:
         if key in ["source_name", "host_name", "port", "password"]:
             with open("recog/capture.json", "r") as json_file:
                 capture_json = json.load(json_file)
-                return capture_json[key]
+                return capture_json.get(key, defaults[key])
         else:
             with open("recog/setting.json", "r") as json_file:
                 settings_json = json.load(json_file)
-                return settings_json[key]
+                return settings_json.get(key, defaults[key])
     except FileNotFoundError:
-        return {
-            "rule": 1,
-            "active_chosen_auto": True,
-            "capture_monitor_auto": True,
-            "doryoku_reset_auto": True,
-            "similar_party_auto": False,
-            "search_record_auto": False,
-            "panipani_auto": True,
-            "terastal_enabled": True,
-            "mega_enabled": True,
-            "tesseract_path": "",
-            "source_name": "",
-            "host_name": "",
-            "port": "",
-            "password": "",
-        }[key]
+        return defaults[key]
