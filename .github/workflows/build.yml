@@ -65,16 +65,23 @@ jobs:
         run: |
           ver="${{ steps.get_version.outputs.VERSION }}"
           echo "Version: $ver"
-          echo "=== release state before ==="
-          gh release view "v$ver" --repo ${{ github.repository }} --json isDraft,tagName,assets 2>&1 || echo "(release not found)"
+
+          # 前のタグを取得してコミット一覧を生成
+          prev_tag=$(git tag --sort=-version:refname | grep -v "^v$ver$" | head -1)
+          if [ -n "$prev_tag" ]; then
+            commit_log=$(git log "${prev_tag}..HEAD" --pretty=format:"- %s" --no-merges)
+            notes="## 変更点 (${prev_tag} → v${ver})"$'\n'"${commit_log}"
+          else
+            commit_log=$(git log --pretty=format:"- %s" --no-merges)
+            notes="## 変更点"$'\n'"${commit_log}"
+          fi
+
           echo "=== delete and recreate release ==="
           gh release delete "v$ver" --repo ${{ github.repository }} --yes 2>/dev/null || echo "(no existing release)"
           gh release create "v$ver" \
             --repo ${{ github.repository }} \
             --title "v$ver" \
-            --notes "バージョン $ver のリリース"
-          echo "=== zip files ==="
-          ls -lh champedge_forwin.zip champedge_forwin_update.zip
+            --notes "$notes"
           echo "=== uploading ==="
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }}
