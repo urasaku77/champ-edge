@@ -150,7 +150,7 @@ class Capture:
         pokemonlist: list[Pokemon] = [Pokemon()] * 6
 
         for coord in range(len(coordsList)):
-            oppo = self.is_exist_image_max(pokemonImages, 0.7, coordsList[coord])
+            oppo = self.is_exist_image_max(pokemonImages, 0.45, coordsList[coord])
             if oppo != "":
                 oppo_shaped = self.shape_poke_num(oppo)
                 oppo_pokemon = Pokemon.by_pid(oppo_shaped, True)
