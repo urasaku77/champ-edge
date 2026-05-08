@@ -70,7 +70,7 @@ class Pokemon:
                 s=db_data["S"],
             )
             self.__type.append(Types[db_data["type1"]])
-            if db_data["type2"] and len(db_data["type2"]) > 0:
+            if db_data["type2"] and db_data["type2"].strip():
                 self.__type.append(Types[db_data["type2"]])
             for key in ["ability1", "ability2", "ability3"]:
                 if db_data[key] and db_data[key].strip():
