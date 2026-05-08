@@ -1,5 +1,11 @@
 name: Build and Release
 
+run-name: >-
+  Build ${{
+    github.event.inputs.version != '' && format('v{0}', github.event.inputs.version) ||
+    'latest'
+  }}
+
 on:
   push:
     branches:
@@ -15,7 +21,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build-and-release:
@@ -27,15 +32,11 @@ jobs:
 
       - name: Get version
         id: get_version
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           VER="$(cat version.txt | tr -d '[:space:]')"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
           echo "Version: $VER"
-          gh api --method PATCH "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f name="Build v$VER"
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
