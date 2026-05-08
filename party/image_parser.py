@@ -334,11 +334,13 @@ def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.
     gap_rel      = int(np.argmin(mid_region)) + search_start
     x_mid        = x1_all + gap_rel
 
-    # Crop 6 cards
+    # Crop 6 cards (trim 4px top/bottom to remove bright border rows that
+    # become black bands in OCR preprocessing and displace text lines)
+    trim = 4
     card_crops: list[Image.Image] = []
     for y1, y2 in row_segments:
-        card_crops.append(img.crop((x1_all, y1, x_mid, y2)))
-        card_crops.append(img.crop((x_mid, y1, x2_all, y2)))
+        card_crops.append(img.crop((x1_all, y1 + trim, x_mid, y2 - trim)))
+        card_crops.append(img.crop((x_mid, y1 + trim, x2_all, y2 - trim)))
 
     return card_crops
 
