@@ -67,7 +67,7 @@ class Analytics(tkinter.Toplevel):
         self.from_month_var = tkinter.IntVar(self)
         self.from_month_var.set(int(search_date.month))
         self.from_date_var = tkinter.IntVar(self)
-        self.from_date_var.set(1)
+        self.from_date_var.set(13 if search_date.day > 13 else 1)
         from_month_menu = tkinter.OptionMenu(
             self, self.from_month_var, *Const.monthList
         )
@@ -94,7 +94,7 @@ class Analytics(tkinter.Toplevel):
         self.time9_bln = tkinter.BooleanVar()
         self.time9_bln.set(True)
         time9_check = tkinter.Checkbutton(
-            self, variable=self.time9_bln, text="初日を9時以降にする"
+            self, variable=self.time9_bln, text="初日を11時以降にする"
         )
         time9_check.place(x=Const.searchX + 400, y=Const.searchY)
 

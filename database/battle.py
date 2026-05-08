@@ -817,7 +817,7 @@ class DB_battle:
     ):
         if time9Bl:
             from_date = int(
-                datetime.datetime(fromYear, fromMonth, fromDate, 9, 0, 0).timestamp()
+                datetime.datetime(fromYear, fromMonth, fromDate, 11, 0, 0).timestamp()
             )
         else:
             from_date = int(
