@@ -34,7 +34,7 @@ class TestCapture:
         if self.img is None:
             raise FileNotFoundError(f"画像を読み込めません: {image_path}")
 
-        os.makedirs("recog/outputImg", exist_ok=True)
+        os.makedirs("image/outputImg", exist_ok=True)
 
         h, w = self.img.shape[:2]
         print(f"[画像情報] サイズ: {w}x{h}px")
@@ -119,8 +119,8 @@ class TestCapture:
         i = 0
         for num in sensyutu_poke:
             if num == -1:
-                dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
-                print("  保存: recog/outputImg/outputSensyutu.jpg (途中で -1 検出)")
+                dst.save("image/outputImg/outputSensyutu.jpg", quality=95)
+                print("  保存: image/outputImg/outputSensyutu.jpg (途中で -1 検出)")
                 return
             c = pokecrop_coords[num]
             crop = full_img.crop((c["left"], c["top"], c["right"], c["bottom"]))
@@ -130,8 +130,8 @@ class TestCapture:
             )
             i += 1
 
-        dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
-        print("  保存: recog/outputImg/outputSensyutu.jpg")
+        dst.save("image/outputImg/outputSensyutu.jpg", quality=95)
+        print("  保存: image/outputImg/outputSensyutu.jpg")
 
     def recognize_chosen_num(self, banme):
         banme_num = banme + 1
@@ -147,15 +147,15 @@ class TestCapture:
 
     def chose_pokemon(self):
         return self.is_exist_image(
-            "recog/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
+            "image/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
         )
 
     def recognize_rate(self):
-        return self.is_exist_image("recog/recogImg/situation/rate.jpg", 0.8, "rate")
+        return self.is_exist_image("image/recogImg/situation/rate.jpg", 0.8, "rate")
 
     def recognize_battle(self):
         return self.is_exist_image(
-            "recog/recogImg/situation/recogBattle.jpg", 0.8, "battle"
+            "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         )
 
     def recognize_oppo_party(self):
@@ -165,8 +165,8 @@ class TestCapture:
         from pokedata.pokemon import Pokemon
 
         if self.is_panipani:
-            self.save_screenshot("myPokemon", "recog/outputImg/myPokemon.jpg")
-            self.save_screenshot("opoPokemon", "recog/outputImg/opoPokemon.jpg")
+            self.save_screenshot("myPokemon", "image/outputImg/myPokemon.jpg")
+            self.save_screenshot("opoPokemon", "image/outputImg/opoPokemon.jpg")
             self.set_my_party_img()
 
         pokemon_images = _glob.glob("image/pokemon/*")

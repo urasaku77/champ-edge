@@ -79,7 +79,7 @@ class Capture:
     # 選出画面検知
     def chose_pokemon(self):
         return self.is_exist_image(
-            "recog/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
+            "image/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
         )
 
     # ①選出フェーズ: 相手パーティ解析＋選出番号取得、画面が消えたらrateへ移行
@@ -107,7 +107,7 @@ class Capture:
     # ②レートフェーズ: rate.jpgを検知してoporate1座標からOCRでレート取得、battleへ移行
     def recognize_rate(self):
         self.get_screenshot()
-        if self.is_exist_image("recog/recogImg/situation/rate.jpg", 0.8, "rate"):
+        if self.is_exist_image("image/recogImg/situation/rate.jpg", 0.8, "rate"):
             coord = self.coords.dicCoord["oporate1"]
             img = self.img[coord.top : coord.bottom, coord.left : coord.right]
             rate_str = self.ocr_full(img).strip()
@@ -123,7 +123,7 @@ class Capture:
     def recognize_battle(self):
         self.get_screenshot()
         if self.is_exist_image(
-            "recog/recogImg/situation/recogBattle.jpg", 0.8, "battle"
+            "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
             self.phase = "sensyutu"
             self.party_recognized = False
@@ -133,8 +133,8 @@ class Capture:
     # 相手パーティの解析
     def recognize_oppo_party(self):
         if self.is_panipani:
-            self.save_screenshot("myPokemon", "recog/outputImg/myPokemon.jpg")
-            self.save_screenshot("opoPokemon", "recog/outputImg/opoPokemon.jpg")
+            self.save_screenshot("myPokemon", "image/outputImg/myPokemon.jpg")
+            self.save_screenshot("opoPokemon", "image/outputImg/opoPokemon.jpg")
             self.set_my_party_img()
             self._save_pokecrop_base()
 
@@ -174,8 +174,8 @@ class Capture:
     # 自分の選出番号を取得
     def recognize_chosen_num(self, banme):
         banme_num = banme + 1
-        paths = [f"recog\\recogImg\\sensyutu\\banme\\num{banme_num}.jpg"]
-        alt = f"recog\\recogImg\\sensyutu\\banme\\num{banme_num}a.jpg"
+        paths = [f"image\\recogImg\\sensyutu\\banme\\num{banme_num}.jpg"]
+        alt = f"image\\recogImg\\sensyutu\\banme\\num{banme_num}a.jpg"
         if os.path.exists(alt):
             paths.append(alt)
         for num in range(6):
@@ -198,14 +198,14 @@ class Capture:
         i = 0
         for num in sensyutuPoke:
             if num == -1:
-                dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
+                dst.save("image/outputImg/outputSensyutu.jpg", quality=95)
                 self._write_sensyutu_big(selected)
                 return
             c = self.coords.dicCoord[f"pokecrop{num + 1}"]
             crop = full_img.crop((c.left, c.top, c.right, c.bottom))
             dst.paste(crop, (crop_w * i, 0))
             i += 1
-        dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
+        dst.save("image/outputImg/outputSensyutu.jpg", quality=95)
         self._write_sensyutu_big(selected)
 
     # pokecrop1~6をクロップして保存、全て30%透明のBig画像を作成
@@ -239,7 +239,7 @@ class Capture:
         # JPEGはアルファ非対応のため黒背景に合成して保存
         bg = Image.new("RGB", dst.size, (0, 0, 0))
         bg.paste(dst, mask=dst.split()[3])
-        bg.save("recog/outputImg/outputSensyutuBig.jpg", quality=95)
+        bg.save("image/outputImg/outputSensyutuBig.jpg", quality=95)
 
     # テンプレートマッチング(最大のみ)
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
