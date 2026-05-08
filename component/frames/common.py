@@ -108,7 +108,12 @@ class PartyFrame(ttk.LabelFrame):
         self._stage.set_info(self._player)
 
     def on_push_edit_button(self):
-        self._stage.edit_party(self._player)
+        try:
+            self._stage.edit_party(self._player)
+        except Exception:
+            import traceback
+            from tkinter import messagebox
+            messagebox.showerror("エラー", f"パーティ編集画面を開けませんでした:\n{traceback.format_exc()}")
 
     def on_push_load_button(self):
         self._stage.load_party(self._player)

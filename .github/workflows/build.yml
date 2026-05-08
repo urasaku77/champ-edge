@@ -13,8 +13,6 @@ on:
         required: false
         default: ''
 
-run-name: "Build v${{ inputs.version || github.event.head_commit.message }}"
-
 permissions:
   contents: write
 
@@ -28,11 +26,15 @@ jobs:
 
       - name: Get version
         id: get_version
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           VER="$(cat version.txt | tr -d '[:space:]')"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
           echo "Version: $VER"
+          gh api --method PATCH /repos/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+            -f name="Build v$VER"
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5

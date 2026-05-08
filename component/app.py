@@ -975,7 +975,7 @@ class MainApp(ThemedTk):
 
     def _launch_updater(self, bat_path: str):
         os.startfile(bat_path)
-        self.destroy()
+        os._exit(0)
 
     # フォーム選択画面
     def form_select(self, no: int):
