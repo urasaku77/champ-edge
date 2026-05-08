@@ -27,6 +27,7 @@ class Capture:
         self.sensyutu_num = 3 if get_recog_value("rule") == 1 else 4
         self.is_panipani = get_recog_value("panipani_auto")
         self.party_recognized = False
+        self.pokecrop_imgs: list[Image.Image] = []
 
     # Websocket接続
     def connect_websocket(self):
@@ -135,6 +136,7 @@ class Capture:
             self.save_screenshot("myPokemon", "recog/outputImg/myPokemon.jpg")
             self.save_screenshot("opoPokemon", "recog/outputImg/opoPokemon.jpg")
             self.set_my_party_img()
+            self._save_pokecrop_base()
 
         pokemonImages = glob.glob("image/pokemon/*")
         coordsList = [
@@ -192,16 +194,49 @@ class Capture:
         crop_w = c0.right - c0.left
         crop_h = c0.bottom - c0.top
         dst = Image.new("RGB", (crop_w * count, crop_h))
+        selected = {num for num in sensyutuPoke if num != -1}
         i = 0
         for num in sensyutuPoke:
             if num == -1:
                 dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
+                self._write_sensyutu_big(selected)
                 return
             c = self.coords.dicCoord[f"pokecrop{num + 1}"]
             crop = full_img.crop((c.left, c.top, c.right, c.bottom))
             dst.paste(crop, (crop_w * i, 0))
             i += 1
         dst.save("recog/outputImg/outputSensyutu.jpg", quality=95)
+        self._write_sensyutu_big(selected)
+
+    # pokecrop1~6をクロップして保存、全て30%透明のBig画像を作成
+    def _save_pokecrop_base(self):
+        full = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)).convert("RGBA")
+        self.pokecrop_imgs = [
+            full.crop((
+                self.coords.dicCoord[f"pokecrop{i}"].left,
+                self.coords.dicCoord[f"pokecrop{i}"].top,
+                self.coords.dicCoord[f"pokecrop{i}"].right,
+                self.coords.dicCoord[f"pokecrop{i}"].bottom,
+            ))
+            for i in range(1, 7)
+        ]
+        self._write_sensyutu_big(set())
+
+    # selectedに含まれるインデックスを100%、それ以外を30%透明でBig画像を保存
+    def _write_sensyutu_big(self, selected: set):
+        if not self.pokecrop_imgs:
+            return
+        w = self.pokecrop_imgs[0].width
+        h = self.pokecrop_imgs[0].height
+        dst = Image.new("RGBA", (w * 6, h), (0, 0, 0, 0))
+        for i, crop in enumerate(self.pokecrop_imgs):
+            img = crop.copy()
+            if i not in selected:
+                r, g, b, _ = img.split()
+                alpha = Image.new("L", img.size, int(255 * 0.3))
+                img = Image.merge("RGBA", (r, g, b, alpha))
+            dst.paste(img, (w * i, 0), img)
+        dst.save("recog/outputImg/outputSensyutuBig.png")
 
     # テンプレートマッチング(最大のみ)
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
