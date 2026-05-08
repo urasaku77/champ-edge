@@ -70,10 +70,10 @@ class Pokemon:
                 s=db_data["S"],
             )
             self.__type.append(Types[db_data["type1"]])
-            if len(db_data["type2"]) > 0:
+            if db_data["type2"] and len(db_data["type2"]) > 0:
                 self.__type.append(Types[db_data["type2"]])
             for key in ["ability1", "ability2", "ability3"]:
-                if len(db_data[key]) > 0:
+                if db_data[key] and db_data[key].strip():
                     self.__abilities.append(db_data[key])
             self.set_ability_from_home()
             self.__ability: str = self.__abilities[0]
