@@ -67,13 +67,13 @@ jobs:
           echo "Version: $ver"
 
           # 前のタグを取得してコミット一覧を生成
-          prev_tag=$(git tag --sort=-version:refname | grep -v "^v$ver$" | head -1)
+          prev_tag=$(git tag --sort=-version:refname | { grep -v "^v$ver$" || true; } | head -1)
           if [ -n "$prev_tag" ]; then
-            commit_log=$(git log "${prev_tag}..HEAD" --pretty=format:"- %s" --no-merges)
-            notes="## 変更点 (${prev_tag} → v${ver})"$'\n'"${commit_log}"
+            commit_log=$(git log "${prev_tag}..HEAD" --pretty=format:"- %s" --no-merges || true)
+            notes="$(printf '## 変更点 (%s -> v%s)\n%s' "$prev_tag" "$ver" "$commit_log")"
           else
-            commit_log=$(git log --pretty=format:"- %s" --no-merges)
-            notes="## 変更点"$'\n'"${commit_log}"
+            commit_log=$(git log --pretty=format:"- %s" --no-merges || true)
+            notes="$(printf '## 変更点\n%s' "$commit_log")"
           fi
 
           echo "=== delete and recreate release ==="
