@@ -33,7 +33,7 @@ jobs:
           VER="$(cat version.txt | tr -d '[:space:]')"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
           echo "Version: $VER"
-          gh api --method PATCH /repos/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+          gh api --method PATCH "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             -f name="Build v$VER"
 
       - name: Set up Python 3.10
