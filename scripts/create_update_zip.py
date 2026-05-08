@@ -39,8 +39,6 @@ _DATA_SOURCES = [
     ("stats/home_seikaku.csv",  "stats/home_seikaku.csv"),
     ("stats/home_doryoku.csv",  "stats/home_doryoku.csv"),
     ("stats/home_terastal.csv", "stats/home_terastal.csv"),
-    ("image/recogImg",           "image/recogImg"),
-    ("image/outputImg",          "image/outputImg"),
     ("recog/capture.json",      "recog/capture.json"),
     ("recog/setting.json",      "recog/setting.json"),
     ("recog/coordinate.json",   "recog/coordinate.json"),
