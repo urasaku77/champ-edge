@@ -233,7 +233,7 @@ class Capture:
             img = crop.copy()
             if i not in selected:
                 r, g, b, _ = img.split()
-                alpha = Image.new("L", img.size, int(255 * 0.3))
+                alpha = Image.new("L", img.size, int(255 * 0.75))
                 img = Image.merge("RGBA", (r, g, b, alpha))
             dst.paste(img, (w * i, 0), img)
         dst.save("recog/outputImg/outputSensyutuBig.png")
