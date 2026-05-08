@@ -54,6 +54,10 @@ _UPDATE_EXCLUDE = {
     "party/csv",
     "party/txt",
     "party/table",
+    "party/setting.txt",
+    "recog/capture.json",
+    "recog/setting.json",
+    "image/outputImg",
 }
 
 
