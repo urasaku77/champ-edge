@@ -222,7 +222,7 @@ class Capture:
         ]
         self._write_sensyutu_big(set())
 
-    # selectedに含まれるインデックスを100%、それ以外を30%透明でBig画像を保存
+    # selectedに含まれるインデックスを100%、それ以外を75%透明でBig画像を保存
     def _write_sensyutu_big(self, selected: set):
         if not self.pokecrop_imgs:
             return
@@ -236,7 +236,10 @@ class Capture:
                 alpha = Image.new("L", img.size, int(255 * 0.75))
                 img = Image.merge("RGBA", (r, g, b, alpha))
             dst.paste(img, (w * i, 0), img)
-        dst.save("recog/outputImg/outputSensyutuBig.png")
+        # JPEGはアルファ非対応のため黒背景に合成して保存
+        bg = Image.new("RGB", dst.size, (0, 0, 0))
+        bg.paste(dst, mask=dst.split()[3])
+        bg.save("recog/outputImg/outputSensyutuBig.jpg", quality=95)
 
     # テンプレートマッチング(最大のみ)
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
