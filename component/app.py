@@ -926,10 +926,17 @@ class MainApp(ThemedTk):
         zip_path = os.path.join(app_dir, "_champedge_update.zip")
         bat_path = os.path.join(app_dir, "_update.bat")
 
-        messagebox.showinfo(
-            "アップデート",
-            "ダウンロードを開始します\n完了後アプリが自動で再起動します",
+        progress_win = tkinter.Toplevel(self)
+        progress_win.title("アップデート")
+        progress_win.resizable(False, False)
+        progress_win.grab_set()
+        progress_label = tkinter.Label(
+            progress_win, text="ダウンロード中... 0.0 MB", padx=30, pady=20
         )
+        progress_label.pack()
+
+        def _update_label(text: str):
+            progress_label.config(text=text)
 
         def _run():
             try:
@@ -942,21 +949,30 @@ class MainApp(ThemedTk):
                         "Accept": "application/octet-stream",
                     },
                 )
+                downloaded = 0
                 with urllib.request.urlopen(req) as resp:
+                    total = int(resp.headers.get("Content-Length", 0))
                     with open(zip_path, "wb") as f:
                         while chunk := resp.read(65536):
                             f.write(chunk)
+                            downloaded += len(chunk)
+                            mb = downloaded / 1024 / 1024
+                            if total:
+                                total_mb = total / 1024 / 1024
+                                self.after(0, lambda m=mb, t=total_mb: _update_label(f"ダウンロード中... {m:.1f} / {t:.1f} MB"))
+                            else:
+                                self.after(0, lambda m=mb: _update_label(f"ダウンロード中... {m:.1f} MB"))
 
                 bat = (
                     "@echo off\n"
                     'cd /d "%~dp0"\n'
-                    "timeout /t 5 /nobreak > nul\n"
+                    "timeout /t 2 /nobreak > nul\n"
                     "powershell -Command "
                     "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
                     "-DestinationPath '.' -Force\"\n"
                     "del _champedge_update.zip\n"
-                    'del "%~f0"\n'
                     "start champedge.exe\n"
+                    'del "%~f0"\n'
                 )
                 with open(bat_path, "w", encoding="ascii") as f:
                     f.write(bat)
@@ -966,8 +982,9 @@ class MainApp(ThemedTk):
                 err = str(e)
                 self.after(
                     0,
-                    lambda: messagebox.showerror(
-                        "アップデート", f"ダウンロードエラー\n{err}"
+                    lambda: (
+                        progress_win.destroy(),
+                        messagebox.showerror("アップデート", f"ダウンロードエラー\n{err}"),
                     ),
                 )
 
