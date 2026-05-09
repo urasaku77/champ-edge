@@ -82,7 +82,7 @@ def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:
                 abs_path = os.path.join(root, file)
                 rel = os.path.relpath(abs_path, src).replace("\\", "/")
                 arc = f"{arc_base}/{rel}"
-                if _excluded(arc_base, full):
+                if _excluded(arc, full):
                     print(f"  スキップ: {arc}")
                     continue
                 zf.write(abs_path, arc)
