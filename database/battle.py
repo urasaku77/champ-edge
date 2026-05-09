@@ -814,6 +814,7 @@ class DB_battle:
         toMonth: int,
         toDate: int,
         time9Bl: bool,
+        time23Bl: bool = False,
     ):
         if time9Bl:
             from_date = int(
@@ -823,9 +824,14 @@ class DB_battle:
             from_date = int(
                 datetime.datetime(fromYear, fromMonth, fromDate).timestamp()
             )
-        to_date = int(
-            datetime.datetime(toYear, toMonth, toDate, 23, 59, 59).timestamp()
-        )
+        if time23Bl:
+            to_date = int(
+                datetime.datetime(toYear, toMonth, toDate, 10, 59, 59).timestamp()
+            )
+        else:
+            to_date = int(
+                datetime.datetime(toYear, toMonth, toDate, 23, 59, 59).timestamp()
+            )
         return from_date, to_date
 
     @staticmethod

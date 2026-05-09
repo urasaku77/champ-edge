@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 import tkinter
 
@@ -54,49 +55,90 @@ class Analytics(tkinter.Toplevel):
         self.focus_set()
         self.geometry("1280x720")
 
+    def _load_seasons(self) -> list:
+        try:
+            with open("recog/season.json", "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _on_season_select(self, name: str):
+        is_custom = name == "カスタム"
+        state = "normal" if is_custom else "disabled"
+        for menu in [
+            self.from_year_menu, self.from_month_menu, self.from_date_menu,
+            self.to_year_menu, self.to_month_menu, self.to_date_menu,
+        ]:
+            menu.config(state=state)
+        if not is_custom:
+            season = next((s for s in self._seasons if s["name"] == name), None)
+            if season is None:
+                return
+            self.from_year_var.set(season["from_year"])
+            self.from_month_var.set(season["from_month"])
+            self.from_date_var.set(season["from_date"])
+            self.to_year_var.set(season["to_year"])
+            self.to_month_var.set(season["to_month"])
+            self.to_date_var.set(season["to_date"])
+
     def display_gui(self, search_date: datetime.datetime):
-        kikan_label = tkinter.Label(self, text="期間")
-        kikan_label.place(x=Const.searchX, y=Const.searchY - Const.searchDY)
+        self._seasons = self._load_seasons()
+        season_names = ["カスタム"] + [s["name"] for s in self._seasons]
+        season_label = tkinter.Label(self, text="シーズン")
+        season_label.place(x=Const.searchX, y=Const.searchY - Const.searchDY)
+        self.season_var = tkinter.StringVar(self, value="カスタム")
+        season_menu = tkinter.OptionMenu(
+            self, self.season_var, *season_names, command=self._on_season_select
+        )
+        season_menu.place(x=Const.searchX, y=Const.searchY)
+
+        self.time9_bln = tkinter.BooleanVar()
+        self.time9_bln.set(True)
+        time9_check = tkinter.Checkbutton(
+            self, variable=self.time9_bln, text="開始日を11時以降にする"
+        )
+        time9_check.place(x=Const.searchX + 120, y=Const.searchY - Const.searchDY)
+
+        self.time23_bln = tkinter.BooleanVar()
+        self.time23_bln.set(True)
+        time23_check = tkinter.Checkbutton(
+            self, variable=self.time23_bln, text="終了日を11時までにする"
+        )
+        time23_check.place(x=Const.searchX + 320, y=Const.searchY - Const.searchDY)
+
         rank_label = tkinter.Label(self, text="パーティ絞り込み")
         rank_label.place(x=Const.searchX, y=Const.searchY + Const.searchDY * 2)
 
         self.from_year_var = tkinter.IntVar(self)
         self.from_year_var.set(int(search_date.year))
-        from_year_menu = tkinter.OptionMenu(self, self.from_year_var, *Const.yearList)
-        from_year_menu.place(x=Const.searchX, y=Const.searchY)
+        self.from_year_menu = tkinter.OptionMenu(self, self.from_year_var, *Const.yearList)
+        self.from_year_menu.place(x=Const.searchX + 120, y=Const.searchY)
         self.from_month_var = tkinter.IntVar(self)
         self.from_month_var.set(int(search_date.month))
         self.from_date_var = tkinter.IntVar(self)
         self.from_date_var.set(13 if search_date.day > 13 else 1)
-        from_month_menu = tkinter.OptionMenu(
+        self.from_month_menu = tkinter.OptionMenu(
             self, self.from_month_var, *Const.monthList
         )
-        from_month_menu.place(x=Const.searchX + 70, y=Const.searchY)
-        from_date_menu = tkinter.OptionMenu(self, self.from_date_var, *Const.dateList)
-        from_date_menu.place(x=Const.searchX + 120, y=Const.searchY)
+        self.from_month_menu.place(x=Const.searchX + 190, y=Const.searchY)
+        self.from_date_menu = tkinter.OptionMenu(self, self.from_date_var, *Const.dateList)
+        self.from_date_menu.place(x=Const.searchX + 240, y=Const.searchY)
 
         mack_label = tkinter.Label(self, text=" ~ ", font=Const.titleFont)
-        mack_label.place(x=Const.searchX + 170, y=Const.searchY)
+        mack_label.place(x=Const.searchX + 290, y=Const.searchY)
 
         self.to_year_var = tkinter.IntVar(self)
         self.to_year_var.set(int(search_date.year))
-        to_year_menu = tkinter.OptionMenu(self, self.to_year_var, *Const.yearList)
-        to_year_menu.place(x=Const.searchX + 200, y=Const.searchY)
+        self.to_year_menu = tkinter.OptionMenu(self, self.to_year_var, *Const.yearList)
+        self.to_year_menu.place(x=Const.searchX + 320, y=Const.searchY)
         self.to_month_var = tkinter.IntVar(self)
         self.to_month_var.set(int(search_date.month))
         self.to_date_var = tkinter.IntVar(self)
         self.to_date_var.set(int(search_date.day))
-        to_month_menu = tkinter.OptionMenu(self, self.to_month_var, *Const.monthList)
-        to_month_menu.place(x=Const.searchX + 270, y=Const.searchY)
-        to_date_menu = tkinter.OptionMenu(self, self.to_date_var, *Const.dateList)
-        to_date_menu.place(x=Const.searchX + 330, y=Const.searchY)
-
-        self.time9_bln = tkinter.BooleanVar()
-        self.time9_bln.set(True)
-        time9_check = tkinter.Checkbutton(
-            self, variable=self.time9_bln, text="初日を11時以降にする"
-        )
-        time9_check.place(x=Const.searchX + 400, y=Const.searchY)
+        self.to_month_menu = tkinter.OptionMenu(self, self.to_month_var, *Const.monthList)
+        self.to_month_menu.place(x=Const.searchX + 390, y=Const.searchY)
+        self.to_date_menu = tkinter.OptionMenu(self, self.to_date_var, *Const.dateList)
+        self.to_date_menu.place(x=Const.searchX + 450, y=Const.searchY)
 
         num_label = tkinter.Label(self, text="番号")
         num_label.place(x=Const.searchX, y=Const.searchY + Const.searchDY * 3)
@@ -178,11 +220,11 @@ class Analytics(tkinter.Toplevel):
         rb_single = tkinter.Radiobutton(
             self, text="シングル", variable=self.rule, value=1
         )
-        rb_single.place(x=Const.searchX + 400, y=Const.searchY + Const.searchDY * 2.7)
+        rb_single.place(x=Const.searchX + 120, y=Const.searchY + Const.searchDY * 2)
         rb_double = tkinter.Radiobutton(
             self, text="ダブル", variable=self.rule, value=2
         )
-        rb_double.place(x=Const.searchX + 470, y=Const.searchY + Const.searchDY * 2.7)
+        rb_double.place(x=Const.searchX + 190, y=Const.searchY + Const.searchDY * 2)
         search_button = tkinter.Button(
             self,
             text="検索",
@@ -234,6 +276,10 @@ class Analytics(tkinter.Toplevel):
         )
         self.sub_title_label.place(x=Const.myPartyStartX, y=Const.myPartyStartY - 30)
 
+        if self._seasons:
+            self.season_var.set(self._seasons[0]["name"])
+            self._on_season_select(self._seasons[0]["name"])
+
     # --- 伝説絞り込み機能（未使用） ---
     # def set_regend(self, *args):
     #     if self.regend_filter_bln.get():
@@ -253,6 +299,7 @@ class Analytics(tkinter.Toplevel):
             self.to_month_var.get(),
             self.to_date_var.get(),
             self.time9_bln.get(),
+            self.time23_bln.get(),
         )
         self.delete_result_page()
         self.sort_condition_var.set(0)
