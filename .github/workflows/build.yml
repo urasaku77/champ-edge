@@ -3,17 +3,11 @@ name: Build and Release
 run-name: Build v${{ github.event.inputs.version }}
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'version.txt'
   workflow_dispatch:
     inputs:
       version:
         description: 'ビルドするバージョン (例: 1.0.1)'
-        required: false
-        default: ''
+        required: true
 
 permissions:
   contents: write

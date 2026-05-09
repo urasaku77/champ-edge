@@ -1,0 +1,23 @@
+name: Trigger Build on Version Change
+
+on:
+  push:
+    branches: [main]
+    paths: ['version.txt']
+
+permissions:
+  actions: write
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version and dispatch build
+        run: |
+          VERSION=$(cat version.txt | tr -d '[:space:]')
+          echo "Dispatching build for v$VERSION"
+          gh workflow run build.yml --ref main --field version=$VERSION
+        env:
+          GH_TOKEN: ${{ github.token }}
