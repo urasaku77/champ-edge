@@ -82,7 +82,7 @@ class Capture:
             "image/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
         )
 
-    # ①選出フェーズ: 相手パーティ解析＋選出番号取得、画面が消えたらrateへ移行
+    # ①選出フェーズ: 相手パーティ解析＋選出番号取得、対戦準備中画面を検知したらrateへ移行
     def recognize_sensyutu(self):
         self.get_screenshot()
         if self.chose_pokemon():
@@ -101,7 +101,10 @@ class Capture:
                 )
             return result if result is not None else banme_list
         else:
-            self.phase = "rate"
+            if self.is_exist_image(
+                "image/recogImg/situation/recogSensyutu.jpg", 0.55, "sensyutu_end"
+            ):
+                self.phase = "rate"
             return None
 
     # ②レートフェーズ: rate.jpgを検知してoporate1座標からOCRでレート取得、battleへ移行
@@ -129,6 +132,16 @@ class Capture:
             self.party_recognized = False
             return True
         return False
+
+    # 選出取得（手動キャプチャ用）
+    def recognize_chosen_capture(self):
+        try:
+            self.get_screenshot()
+            oppo_tn = self.recognize_oppo_tn()
+            party = self.recognize_oppo_party()
+            return (party, oppo_tn)
+        except Exception:
+            return None
 
     # 相手パーティの解析
     def recognize_oppo_party(self):
@@ -210,14 +223,18 @@ class Capture:
 
     # pokecrop1~6をクロップして保存、全て30%透明のBig画像を作成
     def _save_pokecrop_base(self):
-        full = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)).convert("RGBA")
+        full = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)).convert(
+            "RGBA"
+        )
         self.pokecrop_imgs = [
-            full.crop((
-                self.coords.dicCoord[f"pokecrop{i}"].left,
-                self.coords.dicCoord[f"pokecrop{i}"].top,
-                self.coords.dicCoord[f"pokecrop{i}"].right,
-                self.coords.dicCoord[f"pokecrop{i}"].bottom,
-            ))
+            full.crop(
+                (
+                    self.coords.dicCoord[f"pokecrop{i}"].left,
+                    self.coords.dicCoord[f"pokecrop{i}"].top,
+                    self.coords.dicCoord[f"pokecrop{i}"].right,
+                    self.coords.dicCoord[f"pokecrop{i}"].bottom,
+                )
+            )
             for i in range(1, 7)
         ]
         self._write_sensyutu_big(set())
@@ -244,20 +261,44 @@ class Capture:
     # テンプレートマッチング(最大のみ)
     _clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
+    @staticmethod
+    def _load_pokemon_template(image_path: str) -> np.ndarray | None:
+        """アルファ付きPNGの透明部分を本体平均輝度で埋めてグレースケール化する。
+        透明ピクセルをゼロ平均引き後に0にすることで、本体形状のみで相関を取れる。"""
+        raw = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if raw is None:
+            return None
+        if raw.ndim == 3 and raw.shape[2] == 4:
+            alpha = raw[:, :, 3]
+            gray = cv2.cvtColor(raw[:, :, :3], cv2.COLOR_BGR2GRAY)
+            body_mask = alpha >= 10
+            if body_mask.any():
+                body_mean = int(gray[body_mask].mean())
+                gray[~body_mask] = body_mean
+            return gray
+        if raw.ndim == 3:
+            return cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
+        return raw
+
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
         coord = self.coords.dicCoord[coord_name]
         img1 = self.img[coord.top : coord.bottom, coord.left : coord.right]
-        gray = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
+        gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
         gray_clahe = self._clahe.apply(gray)
         max_val_list: list[float] = []
         for image in temp_imgge_name:
             try:
-                temp = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+                temp = self._load_pokemon_template(image)
+                if temp is None:
+                    max_val_list.append(0.0)
+                    continue
                 temp = cv2.resize(temp, None, None, 1.06, 1.06)
                 match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, _ = cv2.minMaxLoc(match)
                 temp_clahe = self._clahe.apply(temp)
-                match_c = cv2.matchTemplate(gray_clahe, temp_clahe, cv2.TM_CCOEFF_NORMED)
+                match_c = cv2.matchTemplate(
+                    gray_clahe, temp_clahe, cv2.TM_CCOEFF_NORMED
+                )
                 _, max_val_c, _, _ = cv2.minMaxLoc(match_c)
                 max_val_list.append(max(max_val, max_val_c))
             except Exception:
@@ -278,8 +319,8 @@ class Capture:
             print(temp_imgge_name + "が見つかりません")
             return False
 
-        gray = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
-        temp = cv2.cvtColor(temp, cv2.COLOR_RGB2GRAY)
+        gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        temp = cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY)
 
         match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
         loc = np.where(match >= accuracy)

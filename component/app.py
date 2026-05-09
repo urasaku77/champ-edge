@@ -693,6 +693,8 @@ class MainApp(ThemedTk):
         if self.monitor:
             self.stop_image_recognize()
         else:
+            self.capture.phase = "sensyutu"
+            self.capture.party_recognized = False
             self.party_frames[0].on_push_load_button()
             self.after(2000, self.loop_image_recognize)
 
@@ -899,7 +901,11 @@ class MainApp(ThemedTk):
             messagebox.showinfo("アップデート確認", f"最新バージョンです（v{current}）")
             return
 
-        assets = [a for a in data.get("assets", []) if a["name"] == "champedge_forwin_update.zip"]
+        assets = [
+            a
+            for a in data.get("assets", [])
+            if a["name"] == "champedge_forwin_update.zip"
+        ]
         if not assets:
             messagebox.showerror(
                 "アップデート確認", "ダウンロードファイルが見つかりませんでした"
@@ -931,8 +937,12 @@ class MainApp(ThemedTk):
         progress_win.resizable(False, False)
         progress_win.grab_set()
         progress_label = tkinter.Label(
-            progress_win, text="ダウンロード中... 0.0 MB", padx=30, pady=20,
-            wraplength=320, justify="center",
+            progress_win,
+            text="ダウンロード中... 0.0 MB",
+            padx=30,
+            pady=20,
+            wraplength=320,
+            justify="center",
         )
         progress_label.pack()
 
@@ -960,9 +970,19 @@ class MainApp(ThemedTk):
                             mb = downloaded / 1024 / 1024
                             if total:
                                 total_mb = total / 1024 / 1024
-                                self.after(0, lambda m=mb, t=total_mb: _update_label(f"ダウンロード中... {m:.1f} / {t:.1f} MB"))
+                                self.after(
+                                    0,
+                                    lambda m=mb, t=total_mb: _update_label(
+                                        f"ダウンロード中... {m:.1f} / {t:.1f} MB"
+                                    ),
+                                )
                             else:
-                                self.after(0, lambda m=mb: _update_label(f"ダウンロード中... {m:.1f} MB"))
+                                self.after(
+                                    0,
+                                    lambda m=mb: _update_label(
+                                        f"ダウンロード中... {m:.1f} MB"
+                                    ),
+                                )
 
                 bat = (
                     "@echo off\n"
@@ -978,12 +998,15 @@ class MainApp(ThemedTk):
                 with open(bat_path, "w", encoding="ascii") as f:
                     f.write(bat)
 
-                self.after(0, lambda: _update_label(
-                    "ダウンロード完了！\n\n"
-                    "インストール中です...\n"
-                    "コマンドウィンドウが閉じたら\n"
-                    "手動でアプリを起動してください。"
-                ))
+                self.after(
+                    0,
+                    lambda: _update_label(
+                        "ダウンロード完了！\n\n"
+                        "インストール中です...\n"
+                        "コマンドウィンドウが閉じたら\n"
+                        "手動でアプリを起動してください。"
+                    ),
+                )
                 self.after(4000, lambda: self._launch_updater(bat_path))
             except Exception as e:
                 err = str(e)
@@ -991,7 +1014,9 @@ class MainApp(ThemedTk):
                     0,
                     lambda: (
                         progress_win.destroy(),
-                        messagebox.showerror("アップデート", f"ダウンロードエラー\n{err}"),
+                        messagebox.showerror(
+                            "アップデート", f"ダウンロードエラー\n{err}"
+                        ),
                     ),
                 )
 
@@ -999,6 +1024,7 @@ class MainApp(ThemedTk):
 
     def _launch_updater(self, bat_path: str):
         import subprocess
+
         subprocess.Popen(
             ["cmd.exe", "/c", bat_path],
             creationflags=subprocess.CREATE_NEW_CONSOLE,
