@@ -268,6 +268,18 @@
   - image\outputImgに画像が出力されるので、OBSに配置する
     - 詳細は本家参照
 
+## アップデート
+
+- メニュー「アップデート確認」を押すと GitHub Releases から最新バージョンを確認する
+  - 最新版がある場合はダイアログで確認後にダウンロードが始まる
+  - ダウンロード完了後に展開処理（コマンドウィンドウ）が自動で起動する
+  - コマンドウィンドウが閉じたら、手動でアプリを起動する
+- アップデートで保持されるユーザーデータ
+  - `database/battle.db`（対戦履歴）
+  - `party/csv/`, `party/txt/`, `party/table/`（パーティデータ）
+  - `party/setting.txt`（使用パーティ設定）
+  - `recog/capture.json`, `recog/setting.json`（OBS・アプリ設定）
+
 ## 配信モード
 
 - 最大化するとそれぞれの要素が両端に移動し、真ん中が透明化する
@@ -315,6 +327,47 @@ python main.py
 3. メニュー「バトルデータ」→「構築記事取得」を実行（ranking.json が更新される）
 
 > 構築記事取得には Chrome と ChromeDriver が必要。同日に2回以上の実行はブロックされる。
+
+## 開発者向け：Windows ビルド・リリース手順
+
+Windows 向けのビルドとリリースは GitHub Actions で自動化されている。
+
+### ワークフロー構成
+
+2つのワークフローが連携して動作する：
+
+1. **`trigger-build.yml`** — `version.txt` への push を検知して `build.yml` を呼び出す
+2. **`build.yml`** — PyInstaller でビルドし、GitHub Releases にアップロードする
+
+### リリース手順
+
+```bash
+# version.txt を更新して push するだけで自動ビルドが走る
+echo "0.0.6" > version.txt
+git add version.txt
+git commit -m "chore: バージョンを0.0.6に更新"
+git push origin main
+```
+
+Actions タブで `Trigger Release Build` → `Build v0.0.6` の順に実行される。
+
+### リリースアセット
+
+| ファイル名 | 用途 |
+| --- | --- |
+| `champedge_forwin.zip` | 新規インストール用（全ファイル含む） |
+| `champedge_forwin_update.zip` | アップデート用（ユーザーデータ除外） |
+
+### CI の依存ライブラリ
+
+CI では `requirements.lock`（バージョン固定済み）を使用する。
+ローカルで開発する場合は `requirements.txt` でよい。
+
+### 手動ビルドのみ実行したい場合
+
+GitHub Actions の `Build and Release` ワークフローを `workflow_dispatch` で手動起動し、バージョンを入力する。
+
+---
 
 ## 開発者向け：Mac ローカルビルド手順
 
