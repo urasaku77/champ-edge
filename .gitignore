@@ -6,6 +6,7 @@ dist/
 *.pyc
 __pycache__/
 database/battle.db
+stats/home_*.csv
 party/csv/*
 party/txt/*
 party/table/*
