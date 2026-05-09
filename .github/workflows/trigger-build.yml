@@ -8,6 +8,7 @@ on:
     paths: ['version.txt']
 
 permissions:
+  contents: read
   actions: write
 
 jobs:
