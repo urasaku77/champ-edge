@@ -29,6 +29,7 @@ class Pokemon:
     def __init__(self, db_data=None):
         self.__no: int = -1
         self.__form: int = -1
+        self.__base_form: int = -1
         self.__form_selected: bool = True
         self.__name: str = ""
         self.__lv: int = 50
@@ -58,6 +59,7 @@ class Pokemon:
         if db_data is not None:
             self.__no = db_data["no"]
             self.__form = db_data["form"]
+            self.__base_form = db_data["form"]
             self.__name = db_data["name"]
             self.__base_name: str = db_data["base_name"]
             self.__form_name: str = db_data["form_name"]
@@ -435,17 +437,17 @@ class Pokemon:
             return result
 
         # メガシンカ: DB の form 10-19 を動的にサイクル
-        # 0 → 11 → 12 → 0  (フォーム数に応じて自動対応)
+        # 通常フォーム(0, 5等) → 11 → 12 → 通常フォームに戻る
         mega_forms = DB_pokemon.get_mega_forms_by_no(self.__no)
         if not mega_forms or not _mega_enabled:
             return None
-        if self.__form == 0:
+        if self.__form not in mega_forms:
             return f"{self.__no}-{mega_forms[0]}"
         if self.__form in mega_forms:
             idx = mega_forms.index(self.__form)
             if idx + 1 < len(mega_forms):
                 return f"{self.__no}-{mega_forms[idx + 1]}"
-            return f"{self.__no}-0"
+            return f"{self.__no}-{self.__base_form}"
         return None
 
     @property
