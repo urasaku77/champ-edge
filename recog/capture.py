@@ -242,10 +242,13 @@ class Capture:
         bg.save("image/outputImg/outputSensyutuBig.jpg", quality=95)
 
     # テンプレートマッチング(最大のみ)
+    _clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
         coord = self.coords.dicCoord[coord_name]
         img1 = self.img[coord.top : coord.bottom, coord.left : coord.right]
         gray = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
+        gray_clahe = self._clahe.apply(gray)
         max_val_list: list[float] = []
         for image in temp_imgge_name:
             try:
@@ -253,7 +256,10 @@ class Capture:
                 temp = cv2.resize(temp, None, None, 1.06, 1.06)
                 match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, _ = cv2.minMaxLoc(match)
-                max_val_list.append(max_val)
+                temp_clahe = self._clahe.apply(temp)
+                match_c = cv2.matchTemplate(gray_clahe, temp_clahe, cv2.TM_CCOEFF_NORMED)
+                _, max_val_c, _, _ = cv2.minMaxLoc(match_c)
+                max_val_list.append(max(max_val, max_val_c))
             except Exception:
                 max_val_list.append(0.0)
 
