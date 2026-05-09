@@ -18,12 +18,21 @@ def get_blank_image(size: tuple[int, int]):
 
 
 def get_pokemon_icon(pid: str, size: tuple[int, int] = None):
+    import glob as _glob
+    import os as _os
     try:
         no, _, form = pid.partition("-")
-        filename = f"{int(no):04d}-{form}.png"
-        return _load_image("image/pokemon/" + filename, size)
+        no_int = int(no)
+        exact_path = f"image/pokemon/{no_int:04d}-{form}.png"
+        if _os.path.isfile(exact_path):
+            return _load_image(exact_path, size)
+        # Fallback: use first available form image for this Pokémon number
+        candidates = sorted(_glob.glob(f"image/pokemon/{no_int:04d}-*.png"))
+        if candidates:
+            return _load_image(candidates[0], size)
     except Exception:
-        return get_blank_image(size or (30, 30))
+        pass
+    return get_blank_image(size or (30, 30))
 
 
 def get_type_icon(t: Types, size: tuple[int, int] = (20, 20)):
