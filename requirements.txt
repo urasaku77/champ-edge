@@ -8,3 +8,4 @@ pyocr
 pytesseract
 selenium
 simpleobsws
+manga-ocr

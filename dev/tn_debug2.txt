@@ -1,0 +1,7 @@
+thr190 scale=3x PSM7: [ァャトいい ニヒナーー]
+thr190 scale=5x PSM7: [ォル*、 ニニナーニー]
+thr190 scale=8x PSM7: [ァルへ ニナーー]
+thr190 scale=5x padding PSM7: [4ムか=ニモナーニーキ]
+text_only 5x pad PSM7: [上 ーー]
+text_only blur 5x pad PSM7: [Aa 全  ーー 作   ーームー]
+done

@@ -1,0 +1,9 @@
+crop size: 275x40
+gray min=19 max=255 mean=78.7
+Otsu threshold: 74.0
+thr=130 PSM7=[ャト、 =に ーーニーピ] PSM13=[間]
+thr=150 PSM7=[ャfk ニヒ ナー ーニヒ] PSM13=[リリ]
+thr=170 PSM7=[ァrト ニヒナイーニー] PSM13=[リャ]
+thr=190 PSM7=[ァャトいい ニヒナーー] PSM13=[間]
+Otsu PSM7=[”。]
+done

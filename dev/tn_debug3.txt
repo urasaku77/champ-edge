@@ -1,0 +1,26 @@
+
+--- IMG_7612 ---
+  oem3 psm7: [4ムか=ニモナーニーキ]
+  oem1 psm7: [4ムか=ニモナーニーキ]
+  oem1 psm8: [間]
+  oem1 psm13: [間]
+
+--- IMG_7613 ---
+  oem3 psm7: [DVHII]
+  oem1 psm7: [DVHII]
+  oem1 psm8: [間]
+  oem1 psm13: [間]
+
+--- IMG_7614 ---
+  oem3 psm7: [1ム]
+  oem1 psm7: [1ム]
+  oem1 psm8: [間昌昌]
+  oem1 psm13: [間昌昌]
+
+--- IMG_7622 ---
+  oem3 psm7: [本ごーー]
+  oem1 psm7: [本ごーー]
+  oem1 psm8: [ューラテュー]
+  oem1 psm13: [ューラテュー]
+
+done

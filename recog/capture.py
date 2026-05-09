@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pyocr
+import pyocr.builders
 from PIL import Image
 
 from pokedata.exception import unrecognizable_pokemon
@@ -108,6 +109,7 @@ class Capture:
             return None
 
     # ②レートフェーズ: rate.jpgを検知してoporate1座標からOCRでレート取得、battleへ移行
+    # rate読み取り失敗時もrecogBattle.jpgを検知したらbattleへ移行
     def recognize_rate(self):
         self.get_screenshot()
         if self.is_exist_image("image/recogImg/situation/rate.jpg", 0.8, "rate"):
@@ -119,7 +121,11 @@ class Capture:
                 self.phase = "battle"
                 return rate
             except ValueError:
-                return None
+                pass
+        if self.is_exist_image(
+            "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
+        ):
+            self.phase = "battle"
         return None
 
     # ③バトルフェーズ: recogBattle.jpgをbattle座標から検知、タイマー起動トリガー
@@ -176,8 +182,8 @@ class Capture:
     def recognize_oppo_tn(self):
         coord = self.coords.dicCoord["opoTn"]
         img = self.img[coord.top : coord.bottom, coord.left : coord.right]
-        tn = self.ocr_full(img)
-        return tn.replace(" ", "")
+        tn = self.ocr_tn(img)
+        return tn.replace(" ", "").replace("\n", "")
 
     # OBS表示用の自分パーティ画像取得
     def set_my_party_img(self):
@@ -335,6 +341,51 @@ class Capture:
             no, sep, form = stem.partition("-")
             return f"{int(no)}-{form}" if sep else f"{int(no)}-0"
         except Exception:
+            return ""
+
+    @property
+    def _manga_ocr(self):
+        if not hasattr(self, "_mocr"):
+            from manga_ocr import MangaOcr
+            self._mocr = MangaOcr()
+        return self._mocr
+
+    _TRAINER_NAME = "トレーナー"
+
+    @staticmethod
+    def _is_korean(text: str) -> bool:
+        return any("가" <= ch <= "힣" or "ᄀ" <= ch <= "ᇿ" for ch in text)
+
+    @staticmethod
+    def _is_trainer_name(text: str) -> bool:
+        import difflib
+        return difflib.SequenceMatcher(None, text, "トレーナー").ratio() >= 0.65
+
+    # TN専用OCR: manga-ocrで認識 → 韓国語/トレーナー判定 → 英語フォールバック
+    def ocr_tn(self, base_img):
+        try:
+            pil = Image.fromarray(cv2.cvtColor(base_img, cv2.COLOR_BGR2RGB))
+            result = self._manga_ocr(pil).strip()
+            if result and result not in ("．．．", "..."):
+                if self._is_korean(result):
+                    return "韓国"
+                if self._is_trainer_name(result):
+                    return self._TRAINER_NAME
+                return result
+            # 英語TN向けTesseractフォールバック
+            if self.path_tesseract not in os.environ["PATH"].split(os.pathsep):
+                os.environ["PATH"] += os.pathsep + self.path_tesseract
+            tools = pyocr.get_available_tools()
+            tool = tools[0]
+            gray = cv2.cvtColor(base_img, cv2.COLOR_BGR2GRAY)
+            gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+            _, binary = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
+            binary = cv2.bitwise_not(binary)
+            padded = cv2.copyMakeBorder(binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+            builder = pyocr.builders.TextBuilder(tesseract_layout=7)
+            return tool.image_to_string(Image.fromarray(padded), lang="eng", builder=builder).strip()
+        except Exception as e:
+            print(e)
             return ""
 
     # 全体OCR
