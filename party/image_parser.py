@@ -400,6 +400,18 @@ def _parse_info_card(card: Image.Image) -> dict:
     item  = _closest_match(item_raw,  _item_names,    cutoff=0.40)
     moves = [_closest_match(m, _waza_names, cutoff=0.40) for m in moves_raw]
 
+    # 画像ファイルのないフォームは、実際に画像が存在するフォームの名前に差し替える
+    if name:
+        try:
+            from component.parts.images import resolve_pid_by_image
+            from database.pokemon import DB_pokemon
+            pid = DB_pokemon.get_pokemon_pid_by_name(name)
+            actual_pid = resolve_pid_by_image(pid)
+            if actual_pid != pid:
+                name = DB_pokemon.get_pokemon_name_by_pid(actual_pid)
+        except Exception:
+            pass
+
     return {"name": name, "ability": abil, "item": item, "moves": moves}
 
 
