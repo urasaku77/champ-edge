@@ -1,5 +1,7 @@
 name: Trigger Build on Version Change
 
+run-name: Trigger Release Build
+
 on:
   push:
     branches: [main]
