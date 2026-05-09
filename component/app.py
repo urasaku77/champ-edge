@@ -931,7 +931,8 @@ class MainApp(ThemedTk):
         progress_win.resizable(False, False)
         progress_win.grab_set()
         progress_label = tkinter.Label(
-            progress_win, text="ダウンロード中... 0.0 MB", padx=30, pady=20
+            progress_win, text="ダウンロード中... 0.0 MB", padx=30, pady=20,
+            wraplength=320, justify="center",
         )
         progress_label.pack()
 
@@ -977,7 +978,13 @@ class MainApp(ThemedTk):
                 with open(bat_path, "w", encoding="ascii") as f:
                     f.write(bat)
 
-                self.after(0, lambda: self._launch_updater(bat_path))
+                self.after(0, lambda: _update_label(
+                    "ダウンロード完了！\n\n"
+                    "インストール中です...\n"
+                    "コマンドウィンドウが閉じたら\n"
+                    "手動でアプリを起動してください。"
+                ))
+                self.after(4000, lambda: self._launch_updater(bat_path))
             except Exception as e:
                 err = str(e)
                 self.after(
