@@ -1,10 +1,6 @@
 name: Build and Release
 
-run-name: >-
-  ${{
-    github.event.inputs.version != '' && format('Build v{0}', github.event.inputs.version) ||
-    format('Build ({0})', github.event.head_commit.message)
-  }}
+run-name: Build v${{ github.event.inputs.version }}
 
 on:
   push:
