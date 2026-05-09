@@ -10,6 +10,7 @@ import os
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import jaconv
@@ -22,6 +23,7 @@ from recog.recog import get_recog_value
 
 try:
     import pytesseract
+
     _TESSERACT_IMPORTED = True
 except ImportError:
     _TESSERACT_IMPORTED = False
@@ -30,6 +32,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Tesseract setup
 # ---------------------------------------------------------------------------
+
 
 def _configure_tesseract() -> None:
     if not _TESSERACT_IMPORTED:
@@ -43,16 +46,16 @@ def _configure_tesseract() -> None:
 # Constants
 # ---------------------------------------------------------------------------
 
-_LEFT_STATS  = [StatsKey.H, StatsKey.A, StatsKey.B]
+_LEFT_STATS = [StatsKey.H, StatsKey.A, StatsKey.B]
 _RIGHT_STATS = [StatsKey.C, StatsKey.D, StatsKey.S]
-_EV_LABELS   = ["H", "A", "B", "C", "D", "S"]
-_EV_KEYS     = [StatsKey.H, StatsKey.A, StatsKey.B, StatsKey.C, StatsKey.D, StatsKey.S]
+_EV_LABELS = ["H", "A", "B", "C", "D", "S"]
+_EV_KEYS = [StatsKey.H, StatsKey.A, StatsKey.B, StatsKey.C, StatsKey.D, StatsKey.S]
 
 # Cached reference lists loaded lazily
 _pokemon_names: list[str] = []
-_waza_names:    list[str] = []
+_waza_names: list[str] = []
 _ability_names: list[str] = []
-_item_names:    list[str] = []
+_item_names: list[str] = []
 
 
 def _load_reference_lists() -> None:
@@ -63,8 +66,8 @@ def _load_reference_lists() -> None:
     from database.pokemon import DB_pokemon
 
     _pokemon_names = DB_pokemon.get_pokemon_namelist()
-    _waza_names    = list(DB_pokemon.get_waza_namedict().values())
-    _item_names    = list(ALL_ITEM_COMBOBOX_VALUES)
+    _waza_names = list(DB_pokemon.get_waza_namedict().values())
+    _item_names = list(ALL_ITEM_COMBOBOX_VALUES)
 
     conn = sqlite3.connect("database/pokemon.db")
     conn.row_factory = sqlite3.Row
@@ -81,8 +84,86 @@ def _load_reference_lists() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Pokemon icon template matching (nickname-resistant name detection)
+# ---------------------------------------------------------------------------
+
+
+def _path_to_pid(image_path: str) -> str:
+    """'image/pokemon/0003-11.png' → '3-11'"""
+    stem = Path(image_path).stem
+    no, sep, form = stem.partition("-")
+    return f"{int(no)}-{form}" if sep else f"{int(no)}-0"
+
+
+def _match_pokemon_by_icon(card: Image.Image, threshold: float = 0.40) -> str:
+    """Identify Pokemon from card image using template matching against icon library.
+
+    Compares the left portion of the card (where the sprite appears) against all
+    images in image/pokemon/ at multiple scales to handle varying screenshot
+    resolutions. Returns the matched Pokemon name, or '' if below threshold.
+    """
+    try:
+        import glob as _glob
+
+        import cv2
+    except ImportError:
+        return ""
+
+    pokemon_images = _glob.glob("image/pokemon/*")
+    if not pokemon_images:
+        return ""
+
+    w, h = card.size
+    # The sprite occupies the top-left, roughly filling the card height
+    region = np.array(card.crop((0, 0, min(h + 20, w), h)).convert("RGB"))
+    gray = cv2.cvtColor(region, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray_clahe = clahe.apply(gray)
+
+    best_val = 0.0
+    best_path = ""
+
+    for scale in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8):
+        for image_path in pokemon_images:
+            try:
+                temp = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+                if temp is None:
+                    continue
+                new_h = int(temp.shape[0] * scale)
+                new_w = int(temp.shape[1] * scale)
+                if new_h > gray.shape[0] or new_w > gray.shape[1]:
+                    continue
+                temp_s = cv2.resize(temp, (new_w, new_h))
+                match = cv2.matchTemplate(gray, temp_s, cv2.TM_CCOEFF_NORMED)
+                _, val, _, _ = cv2.minMaxLoc(match)
+                temp_s_clahe = clahe.apply(temp_s)
+                match_c = cv2.matchTemplate(
+                    gray_clahe, temp_s_clahe, cv2.TM_CCOEFF_NORMED
+                )
+                _, val_c, _, _ = cv2.minMaxLoc(match_c)
+                combined = max(val, val_c)
+                if combined > best_val:
+                    best_val = combined
+                    best_path = image_path
+            except Exception:
+                continue
+
+    if not best_path or best_val < threshold:
+        return ""
+
+    try:
+        from database.pokemon import DB_pokemon
+
+        pid = _path_to_pid(best_path)
+        return DB_pokemon.get_pokemon_name_by_pid(pid) or ""
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # Text normalization & fuzzy match
 # ---------------------------------------------------------------------------
+
 
 def _normalize(text: str) -> str:
     """Strip, convert half-width kana to full-width, remove spaces."""
@@ -102,7 +183,9 @@ def _closest_match(text: str, candidates: list[str], cutoff: float = 0.45) -> st
         return matches[0]
     # Lower-cutoff fallback for very short strings
     if len(text) <= 3:
-        best  = max(candidates, key=lambda c: difflib.SequenceMatcher(None, text, c).ratio())
+        best = max(
+            candidates, key=lambda c: difflib.SequenceMatcher(None, text, c).ratio()
+        )
         ratio = difflib.SequenceMatcher(None, text, best).ratio()
         if ratio >= 0.3:
             return best
@@ -112,6 +195,7 @@ def _closest_match(text: str, candidates: list[str], cutoff: float = 0.45) -> st
 # ---------------------------------------------------------------------------
 # Image preprocessing (white text on dark background)
 # ---------------------------------------------------------------------------
+
 
 def _preprocess_white_text(img: Image.Image, scale: int = 3) -> Image.Image:
     """Extract white/near-white text (R,G,B > 170) for name/ability/item/move OCR."""
@@ -131,16 +215,21 @@ def _preprocess_white_text(img: Image.Image, scale: int = 3) -> Image.Image:
 # OCR helpers
 # ---------------------------------------------------------------------------
 
+
 def _ocr_block(img: Image.Image) -> str:
     _configure_tesseract()
     prep = _preprocess_white_text(img)
-    return pytesseract.image_to_string(prep, lang="jpn", config="--psm 6 --oem 3").strip()
+    return pytesseract.image_to_string(
+        prep, lang="jpn", config="--psm 6 --oem 3"
+    ).strip()
 
 
 def _ocr_line(img: Image.Image) -> str:
     _configure_tesseract()
     prep = _preprocess_white_text(img)
-    return pytesseract.image_to_string(prep, lang="jpn", config="--psm 7 --oem 3").strip()
+    return pytesseract.image_to_string(
+        prep, lang="jpn", config="--psm 7 --oem 3"
+    ).strip()
 
 
 def _ocr_ev_row(img: Image.Image) -> str:
@@ -187,9 +276,9 @@ def _ocr_ev_row(img: Image.Image) -> str:
         return re.sub(r"[^\d]", " ", raw).strip()
 
     text170 = _run(170, cleanup=True)
-    ev170   = _parse_ev(text170)
+    ev170 = _parse_ev(text170)
     text190 = _run(190, cleanup=False)
-    ev190   = _parse_ev(text190)
+    ev190 = _parse_ev(text190)
 
     # Rule 1
     if ev170 == 0:
@@ -216,12 +305,7 @@ def _ocr_ev_row(img: Image.Image) -> str:
             return text190
 
     # Rule B
-    if (
-        len(str(ev170)) == 1
-        and len(str(ev190)) == 1
-        and ev190 != ev170
-        and ev190 > 0
-    ):
+    if len(str(ev170)) == 1 and len(str(ev190)) == 1 and ev190 != ev170 and ev190 > 0:
         return text190
 
     # Rule C: all thr=170 tokens are large (EV merged into stat or dim digit).
@@ -229,7 +313,7 @@ def _ocr_ev_row(img: Image.Image) -> str:
     nums170 = re.findall(r"\d+", text170)
     if ev170 > 0 and nums170 and all(int(n) > 32 for n in nums170):
         text150 = _run(150, cleanup=False)
-        ev150   = _parse_ev(text150)
+        ev150 = _parse_ev(text150)
         if ev150 > ev170:
             return text150
 
@@ -263,8 +347,8 @@ def _parse_ev(text: str) -> int:
             return v
     last = int(nums[-1])
     for digits in (2, 1):
-        ev_part  = last % (10 ** digits)
-        stat_part = last // (10 ** digits)
+        ev_part = last % (10**digits)
+        stat_part = last // (10**digits)
         if ev_part <= 32 and stat_part >= 40:
             return ev_part
     return 0
@@ -273,6 +357,7 @@ def _parse_ev(text: str) -> int:
 # ---------------------------------------------------------------------------
 # Card boundary detection
 # ---------------------------------------------------------------------------
+
 
 def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.Image]:
     """
@@ -289,9 +374,9 @@ def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.
     is_card = (b > 100) & (b > g + 20) & (r > 80) & (b < 250) & (g < 200)
 
     mid = w // 2
-    left_frac  = is_card[:, :mid].sum(axis=1) / (w // 2)
+    left_frac = is_card[:, :mid].sum(axis=1) / (w // 2)
     right_frac = is_card[:, mid:].sum(axis=1) / (w // 2)
-    col_frac   = is_card.sum(axis=0) / h
+    col_frac = is_card.sum(axis=0) / h
 
     # Rows where both columns have purple = actual card rows (not header)
     both_purple = (left_frac > 0.05) & (right_frac > 0.05)
@@ -329,10 +414,10 @@ def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.
     col_in_range = col_frac[x1_all:x2_all]
     # Search for gap in middle third
     search_start = len(col_in_range) // 3
-    search_end   = 2 * len(col_in_range) // 3
-    mid_region   = col_in_range[search_start:search_end]
-    gap_rel      = int(np.argmin(mid_region)) + search_start
-    x_mid        = x1_all + gap_rel
+    search_end = 2 * len(col_in_range) // 3
+    mid_region = col_in_range[search_start:search_end]
+    gap_rel = int(np.argmin(mid_region)) + search_start
+    x_mid = x1_all + gap_rel
 
     # Crop 6 cards (trim 4px top/bottom to remove bright border rows that
     # become black bands in OCR preprocessing and displace text lines)
@@ -349,6 +434,7 @@ def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.
 # Card parsing
 # ---------------------------------------------------------------------------
 
+
 def _parse_info_card(card: Image.Image) -> dict:
     """
     Parse one info card (能力タブ):
@@ -358,8 +444,8 @@ def _parse_info_card(card: Image.Image) -> dict:
     _load_reference_lists()
 
     w, h = card.size
-    left  = card.crop((0,     0, w // 2, h))
-    right = card.crop((w // 2, 0, w,     h))
+    left = card.crop((0, 0, w // 2, h))
+    right = card.crop((w // 2, 0, w, h))
 
     # OCR left half as a block → split into lines, take first 3.
     # Two noise filters:
@@ -368,17 +454,16 @@ def _parse_info_card(card: Image.Image) -> dict:
     #     katakana U+30A0-30FF): all Pokémon names, abilities, and items in
     #     SV contain kana, so lines without kana are UI-background OCR noise
     #     (e.g. "EPREEREEE昌還EEEE還還還" which has only ASCII/kanji).
-    raw_left  = _ocr_block(left)
+    raw_left = _ocr_block(left)
     left_lines = [
         ln
         for line in raw_left.splitlines()
-        if len((ln := line.strip())) > 2
-        and sum(1 for c in ln if "぀" <= c <= "ヿ") >= 2
+        if len((ln := line.strip())) > 2 and sum(1 for c in ln if "぀" <= c <= "ヿ") >= 2
     ]
 
-    name_raw  = left_lines[0] if len(left_lines) > 0 else ""
-    abil_raw  = left_lines[1] if len(left_lines) > 1 else ""
-    item_raw  = left_lines[2] if len(left_lines) > 2 else ""
+    name_raw = left_lines[0] if len(left_lines) > 0 else ""
+    abil_raw = left_lines[1] if len(left_lines) > 1 else ""
+    item_raw = left_lines[2] if len(left_lines) > 2 else ""
 
     # OCR the right half as a block (psm 6) using three skip amounts and
     # taking whichever produces the most lines.  Different type-icon colors
@@ -395,9 +480,9 @@ def _parse_info_card(card: Image.Image) -> dict:
             best_lines = lines
     moves_raw = (best_lines + [""] * 4)[:4]
 
-    name  = _closest_match(name_raw,  _pokemon_names, cutoff=0.40)
-    abil  = _closest_match(abil_raw,  _ability_names, cutoff=0.40)
-    item  = _closest_match(item_raw,  _item_names,    cutoff=0.40)
+    name = _closest_match(name_raw, _pokemon_names, cutoff=0.40)
+    abil = _closest_match(abil_raw, _ability_names, cutoff=0.40)
+    item = _closest_match(item_raw, _item_names, cutoff=0.40)
     moves = [_closest_match(m, _waza_names, cutoff=0.40) for m in moves_raw]
 
     # 画像ファイルのないフォームは、実際に画像が存在するフォームの名前に差し替える
@@ -405,6 +490,7 @@ def _parse_info_card(card: Image.Image) -> dict:
         try:
             from component.parts.images import resolve_pid_by_image
             from database.pokemon import DB_pokemon
+
             pid = DB_pokemon.get_pokemon_pid_by_name(name)
             actual_pid = resolve_pid_by_image(pid)
             if actual_pid != pid:
@@ -430,7 +516,7 @@ def _detect_arrow(row_img: Image.Image) -> Optional[str]:
     g = region[:, :, 1].astype(float)
     b = region[:, :, 2].astype(float)
 
-    up_px   = int(((r > 160) & (r > g + 45)).sum())
+    up_px = int(((r > 160) & (r > g + 45)).sum())
     down_px = int(((g > 200) & (b > 200) & (g > r + 30)).sum())
 
     if up_px > 5 and up_px > down_px:
@@ -458,21 +544,21 @@ def _parse_ev_card(card: Image.Image) -> dict:
     w, h = card.size
     stat_top = int(h * 0.27)
 
-    evs:        dict[StatsKey, int] = {}
-    up_counts:  dict[StatsKey, int] = {}
+    evs: dict[StatsKey, int] = {}
+    up_counts: dict[StatsKey, int] = {}
     down_counts: dict[StatsKey, int] = {}
 
     for half_x, stat_keys in [
-        (0,       _LEFT_STATS),
-        (w // 2,  _RIGHT_STATS),
+        (0, _LEFT_STATS),
+        (w // 2, _RIGHT_STATS),
     ]:
         half = card.crop((half_x, stat_top, half_x + w // 2, h))
         half_h = half.size[1]
-        row_h  = max(1, half_h // 3)
+        row_h = max(1, half_h // 3)
 
         for i, key in enumerate(stat_keys):
-            y0  = i * row_h
-            y1  = min((i + 1) * row_h, half_h)
+            y0 = i * row_h
+            y1 = min((i + 1) * row_h, half_h)
             row = half.crop((0, y0, half.size[0], y1))
 
             arr = np.array(row.convert("RGB"))
@@ -481,7 +567,7 @@ def _parse_ev_card(card: Image.Image) -> dict:
             r = region[:, :, 0].astype(float)
             g = region[:, :, 1].astype(float)
             b = region[:, :, 2].astype(float)
-            up_px   = int(((r > 160) & (r > g + 45)).sum())
+            up_px = int(((r > 160) & (r > g + 45)).sum())
             down_px = int(((g > 200) & (b > 200) & (g > r + 30)).sum())
             if up_px > 5:
                 up_counts[key] = up_px
@@ -494,11 +580,10 @@ def _parse_ev_card(card: Image.Image) -> dict:
     # Use the stat row with the MOST matching pixels as the canonical arrow.
     # This suppresses false positives (low pixel count) in favour of the row
     # that genuinely contains the pink ↑ or cyan ↓ arrow glyph.
-    up_key   = max(up_counts,   key=up_counts.get)   if up_counts   else None
+    up_key = max(up_counts, key=up_counts.get) if up_counts else None
     down_key = max(down_counts, key=down_counts.get) if down_counts else None
     nature = (
-        get_seikaku_from_arrows(up_key, down_key)
-        if up_key and down_key else "まじめ"
+        get_seikaku_from_arrows(up_key, down_key) if up_key and down_key else "まじめ"
     )
 
     return {"evs": evs, "nature": nature}
@@ -508,14 +593,15 @@ def _parse_ev_card(card: Image.Image) -> dict:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CardData:
-    name:   str       = ""
-    ability: str      = ""
-    item:   str       = ""
-    moves:  list[str] = field(default_factory=lambda: ["", "", "", ""])
-    nature: str       = "まじめ"
-    evs:    dict      = field(default_factory=dict)  # {StatsKey: int}
+    name: str = ""
+    ability: str = ""
+    item: str = ""
+    moves: list[str] = field(default_factory=lambda: ["", "", "", ""])
+    nature: str = "まじめ"
+    evs: dict = field(default_factory=dict)  # {StatsKey: int}
 
     def ev_str(self) -> str:
         result = ""
@@ -529,7 +615,10 @@ class CardData:
 def check_available() -> tuple[bool, str]:
     """Return (ok, reason). ok=True means Tesseract with 'jpn' is ready."""
     if not _TESSERACT_IMPORTED:
-        return False, "pytesseract がインストールされていません (pip install pytesseract)"
+        return (
+            False,
+            "pytesseract がインストールされていません (pip install pytesseract)",
+        )
     _configure_tesseract()
     cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
     try:
@@ -570,23 +659,30 @@ def parse_party_images(
     results: list[CardData] = []
     for i in range(count):
         if cards1 and cards2:
-            info    = _parse_info_card(cards1[i])
+            info = _parse_info_card(cards1[i])
             ev_data = _parse_ev_card(cards2[i])
         elif cards1:
-            info    = _parse_info_card(cards1[i])
+            info = _parse_info_card(cards1[i])
             ev_data = {"nature": "まじめ", "evs": {k: 0 for k in _EV_KEYS}}
         else:
             name_info = _parse_info_card(cards2[i])
-            info    = {"name": name_info["name"], "ability": "", "item": "", "moves": ["", "", "", ""]}
+            info = {
+                "name": name_info["name"],
+                "ability": "",
+                "item": "",
+                "moves": ["", "", "", ""],
+            }
             ev_data = _parse_ev_card(cards2[i])
 
-        results.append(CardData(
-            name    = info["name"],
-            ability = info["ability"],
-            item    = info["item"],
-            moves   = info["moves"],
-            nature  = ev_data["nature"],
-            evs     = ev_data["evs"],
-        ))
+        results.append(
+            CardData(
+                name=info["name"],
+                ability=info["ability"],
+                item=info["item"],
+                moves=info["moves"],
+                nature=ev_data["nature"],
+                evs=ev_data["evs"],
+            )
+        )
 
     return results
