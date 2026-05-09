@@ -899,7 +899,7 @@ class MainApp(ThemedTk):
             messagebox.showinfo("アップデート確認", f"最新バージョンです（v{current}）")
             return
 
-        assets = [a for a in data.get("assets", []) if a["name"].endswith(".zip")]
+        assets = [a for a in data.get("assets", []) if a["name"] == "champedge_forwin_update.zip"]
         if not assets:
             messagebox.showerror(
                 "アップデート確認", "ダウンロードファイルが見つかりませんでした"
