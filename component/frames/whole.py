@@ -581,9 +581,9 @@ class RecordFrame(ttk.LabelFrame):
         draw_btn = MyButton(
             self, width=_btn_w, text="引き分け", command=lambda: self.register(-1)
         )
-        draw_btn.grid(column=4, row=0, sticky=N + E + W + S)
+        draw_btn.grid(column=4, row=1, sticky=N + E + W + S)
         clear_btn = MyButton(self, width=_btn_w, text="クリア", command=self.clear)
-        clear_btn.grid(column=4, row=1, sticky=N + E + W + S)
+        clear_btn.grid(column=4, row=0, sticky=N + E + W + S)
 
     def set_stage(self, stage: Stage):
         self._stage = stage
