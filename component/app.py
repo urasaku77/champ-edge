@@ -971,7 +971,7 @@ class MainApp(ThemedTk):
                     "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
                     "-DestinationPath '.' -Force\"\n"
                     "del _champedge_update.zip\n"
-                    "start champedge.exe\n"
+                    'start "" "%~dp0champedge.exe"\n'
                     'del "%~f0"\n'
                 )
                 with open(bat_path, "w", encoding="ascii") as f:
@@ -991,7 +991,12 @@ class MainApp(ThemedTk):
         threading.Thread(target=_run, daemon=True).start()
 
     def _launch_updater(self, bat_path: str):
-        os.startfile(bat_path)
+        import subprocess
+        subprocess.Popen(
+            ["cmd.exe", "/c", bat_path],
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+            close_fds=True,
+        )
         os._exit(0)
 
     # フォーム選択画面
