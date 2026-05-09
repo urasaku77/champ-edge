@@ -1,4 +1,5 @@
 import csv
+import re
 
 from pokedata.exception import base_names
 
@@ -31,6 +32,17 @@ def get_home_data(name: str, file_path: str):
             if data[i][0] == name:
                 data_list.append([data[i][1], data[i][2]])
     return data_list
+
+
+_DORYOKU_NUM_RE = re.compile(r"[HABCDS](\d+)")
+
+
+def get_top_home_doryoku(name: str) -> str | None:
+    """HOME努力値データのうち、合計が66になる最上位のものを返す。なければNone。"""
+    for doryoku_text, _pct in get_home_data(name, "./stats/home_doryoku.csv"):
+        if sum(int(v) for v in _DORYOKU_NUM_RE.findall(doryoku_text)) == 66:
+            return doryoku_text
+    return None
 
 
 def get_default_data(name: str) -> list[str]:

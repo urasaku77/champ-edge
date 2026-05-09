@@ -1,7 +1,7 @@
 from component.app import MainApp
 from pokedata.calc import DamageCalc
 from pokedata.const import Ailments, Fields, Types, Walls, Weathers
-from pokedata.nature import get_default_doryoku
+from pokedata.loader import get_top_home_doryoku
 from pokedata.pokemon import Pokemon
 from pokedata.stats import Stats, StatsKey
 from pokedata.waza import WazaBase
@@ -95,10 +95,10 @@ class Stage:
             else:
                 pokemon.seikaku = seikaku
             if player == 1 and get_recog_value("doryoku_reset_auto"):
+                doryoku_text_from_home = get_top_home_doryoku(pokemon.name)
                 pokemon.doryoku.init_values(0)
-                pokemon.doryoku.set_values_from_stats(
-                    get_default_doryoku(seikaku, pokemon.syuzoku)
-                )
+                if doryoku_text_from_home is not None:
+                    pokemon.doryoku.set_values_from_string(doryoku_text_from_home)
             self._app.set_active_pokemon(player, pokemon)
         if doryoku_text is not None:
             new_doryoku = Stats()

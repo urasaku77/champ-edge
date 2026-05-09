@@ -559,7 +559,7 @@ class Pokemon:
     # デフォルトデータ設定
     def set_default_data(self):
         self.set_top_data_from_home()
-        self.set_default_doryoku_from_seikaku()
+        self.set_default_doryoku_from_home()
         self.set_ability_from_home()
         self.set_waza_from_home()
         if self.seikaku == "まじめ":
@@ -619,6 +619,13 @@ class Pokemon:
         self.terastype = (
             Types.get(teras_data[0][0]) if len(teras_data) != 0 else Types.なし
         )
+
+    def set_default_doryoku_from_home(self):
+        from pokedata.loader import get_top_home_doryoku
+        doryoku_text = get_top_home_doryoku(self.name)
+        if doryoku_text is not None:
+            self.__doryoku.init_values(0)
+            self.__doryoku.set_values_from_string(doryoku_text)
 
     def set_default_doryoku_from_seikaku(self):
         doryoku = get_default_doryoku(self.seikaku, self.syuzoku)
