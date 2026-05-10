@@ -788,7 +788,11 @@ class MainApp(ThemedTk):
         import ssl
         import urllib.request
         ctx = ssl._create_unverified_context()
-        req = urllib.request.Request(url, headers={"User-Agent": "champedge/1.0"})
+        headers = {
+            "User-Agent": "champedge/1.0",
+            "Authorization": f"token {self._RELEASE_TOKEN}",
+        }
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, context=ctx) as r:
             return r.read().decode("utf-8")
 
