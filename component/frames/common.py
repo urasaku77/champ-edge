@@ -339,6 +339,11 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._ability_value_combobox["state"] = "disable"
         self._ability_value_combobox.set("")
 
+    def update_ability_display(self):
+        ability = self._pokemon.ability
+        self._ability_combobox.set(ability)
+        self.set_ability_values(ability)
+
     def change_burned(self):
         self._stage.set_value_to_active_pokemon(
             player=self._player,

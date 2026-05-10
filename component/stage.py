@@ -274,6 +274,17 @@ class Stage:
                     i, self._app.active_poke_frames[i]._pokemon
                 )
 
+    def _reset_trace(self, pokemon1: Pokemon, pokemon2: Pokemon):
+        if pokemon1.base_ability == "トレース":
+            pokemon1.apply_trace("トレース")
+        if pokemon2.base_ability == "トレース":
+            pokemon2.apply_trace("トレース")
+
+    def _update_trace_display(self, pokemon1: Pokemon, pokemon2: Pokemon):
+        for i, poke in enumerate([pokemon1, pokemon2]):
+            if poke.base_ability == "トレース":
+                self._app.active_poke_frames[i].update_ability_display()
+
     # ダメージ計算
     def calc_damage(self):
         pokemon1 = self._app.active_poke_frames[0]._pokemon
@@ -281,25 +292,31 @@ class Stage:
         if pokemon1.is_empty or pokemon2.is_empty:
             return
         if get_recog_value("rule") == 2:
+            self._reset_trace(pokemon1, pokemon2)
             calc_result = DamageCalc.get_all_damages(
                 pokemon1, pokemon2, self._weather, self._field, self.double_params
             )
             self._app.set_calc_results(0, calc_result)
 
+            self._reset_trace(pokemon1, pokemon2)
             calc_result = DamageCalc.get_all_damages(
                 pokemon2, pokemon1, self._weather, self._field, self.double_params
             )
             self._app.set_calc_results(1, calc_result)
         else:
+            self._reset_trace(pokemon1, pokemon2)
             calc_result = DamageCalc.get_all_damages(
                 pokemon1, pokemon2, self._weather, self._field
             )
             self._app.set_calc_results(0, calc_result)
 
+            self._reset_trace(pokemon1, pokemon2)
             calc_result = DamageCalc.get_all_damages(
                 pokemon2, pokemon1, self._weather, self._field
             )
             self._app.set_calc_results(1, calc_result)
+
+        self._update_trace_display(pokemon1, pokemon2)
 
     # パーティ編集
     def edit_party(self, player: int):

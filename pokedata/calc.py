@@ -73,6 +73,15 @@ class DamageCalc:
         double_params: dict[str, bool] = None,
     ) -> list[DamageCalcResult]:
         result_all: list[DamageCalcResult] = []
+
+        # トレース特性の適用（ループ前に1度だけ）
+        if attacker.ability == "トレース":
+            if defender.ability not in DamageCalc.__un_trace_abillity:
+                attacker.apply_trace(defender.ability)
+        if defender.ability == "トレース":
+            if attacker.ability not in DamageCalc.__un_trace_abillity:
+                defender.apply_trace(attacker.ability)
+
         for wazabase in attacker.waza_list:
             if wazabase is None or wazabase.name == "":
                 result_all.append(
@@ -81,7 +90,15 @@ class DamageCalc:
                     )
                 )
                 continue
-            waza = Waza.ByWazaBase(wazabase)
+            try:
+                waza = Waza.ByWazaBase(wazabase)
+            except (IndexError, KeyError):
+                result_all.append(
+                    DamageCalcResult(
+                        attacker=attacker, defender=defender, waza=None, damages=[]
+                    )
+                )
+                continue
 
             if (
                 waza.name == "トリックフラワー"
@@ -130,13 +147,6 @@ class DamageCalc:
                 or waza.name == "マルチアタック"
             ):
                 waza.type = attacker.type[0]
-
-            if attacker.ability == "トレース":
-                if defender.ability not in DamageCalc.__un_trace_abillity:
-                    attacker.ability = defender.ability
-            if defender.ability == "トレース":
-                if attacker.ability not in DamageCalc.__un_trace_abillity:
-                    defender.ability = attacker.ability
 
             damages = DamageCalc.__get_damage(
                 attacker=attacker,

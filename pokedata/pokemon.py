@@ -46,6 +46,7 @@ class Pokemon:
         self.__battle_terastype: Types = Types.なし
         self.__abilities: list[str] = []
         self.__ability: str = ""
+        self.__base_ability: str = ""
         self.__ability_value: str = ""
         self.__ailment: Ailments = Ailments.なし
         self.__charging: bool = False
@@ -79,6 +80,7 @@ class Pokemon:
                     self.__abilities.append(db_data[key])
             self.set_ability_from_home()
             self.__ability: str = self.__abilities[0]
+            self.__base_ability: str = self.__abilities[0]
             self.__weight: float = db_data["weight"]
             self.__item: str = self.fixed_item(self.__name)
             self.__terastype: Types = self.fixed_terastype(self.__name)
@@ -313,8 +315,18 @@ class Pokemon:
     @ability.setter
     def ability(self, value) -> None:
         self.__ability = value
+        self.__base_ability = value
         self.set_default_ability_value()
         self.statechanged()
+
+    @property
+    def base_ability(self) -> str:
+        return self.__base_ability
+
+    def apply_trace(self, value: str) -> None:
+        """トレース特性によるコピー。base_abilityを変更しない。"""
+        self.__ability = value
+        self.set_default_ability_value()
 
     @property
     def ailment(self) -> Ailments:
@@ -579,6 +591,7 @@ class Pokemon:
             self.__seikaku = data[3]
             self.__item = data[4]
             self.__ability = data[5]
+            self.__base_ability = data[5]
             self.__terastype = Types[data[6]] if data[6] != "" else Types.なし
             self.__memo = data[7]
             if use_data:
