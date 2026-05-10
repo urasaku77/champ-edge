@@ -58,6 +58,7 @@ _ALWAYS_EXCLUDE = {
 # アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
 _UPDATE_EXCLUDE = {
     "database/battle.db",
+    "stats",
     "party/csv",
     "party/txt",
     "party/table",
