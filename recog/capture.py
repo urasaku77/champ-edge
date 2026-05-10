@@ -117,11 +117,13 @@ class Capture:
         if self.is_exist_image("image/recogImg/situation/rate.jpg", 0.8, "rate"):
             coord = self.coords.dicCoord["oporate1"]
             img = self.img[coord.top : coord.bottom, coord.left : coord.right]
-            rate_str = self.ocr_full(img).strip()
-            digits = re.sub(r"\D", "", rate_str)
-            if digits:
+            pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            rate_str = self._manga_ocr(pil).strip()
+            # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
+            m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
+            if m:
                 self.phase = "battle"
-                return int(digits)
+                return int(round(float(m.group())))
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
