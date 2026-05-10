@@ -1,13 +1,21 @@
 import csv
+import os
 import re
 
 from pokedata.exception import base_names
 
+_DEFAULT_PARTY_CSV = "default.csv"
+
 
 def get_party_csv() -> str:
-    with open("party/setting.txt", "r", encoding="utf-8") as txt:
-        file = txt.read()
-        txt.close()
+    try:
+        with open("party/setting.txt", "r", encoding="utf-8") as txt:
+            file = txt.read()
+    except FileNotFoundError:
+        file = _DEFAULT_PARTY_CSV
+        os.makedirs("party", exist_ok=True)
+        with open("party/setting.txt", "w", encoding="utf-8") as txt:
+            txt.write(file)
     return "party/csv/" + file
 
 
