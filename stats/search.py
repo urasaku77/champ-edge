@@ -62,7 +62,7 @@ def get_similar_party(pids: list[Pokemon]) -> list:
 
 
 class Search:
-    def search_latest_party(self):
+    def search_latest_party(self, progress_callback=None):
         season = int(_load_season())
         seasons = [str(season)]
         if season > 1:
@@ -76,11 +76,15 @@ class Search:
         driver = webdriver.Chrome(options=options)
 
         print(f"構築記事一覧取得処理開始（シーズン: {', '.join(seasons)}）")
+        if progress_callback:
+            progress_callback(f"取得開始（シーズン: {', '.join(seasons)}）")
         party_list = []
         try:
             for i, pid in enumerate(pids):
                 num = 200 if i < 30 else 50 if i < 100 else 10
                 print(f"{i+1}/{len(pids)}：{pid}")
+                if progress_callback:
+                    progress_callback(f"{i + 1} / {len(pids)}  {pid}")
                 parties = self._scrape_parties(driver, pid, seasons, num)
                 party_list.append({"pid": pid, "parties": parties})
         finally:

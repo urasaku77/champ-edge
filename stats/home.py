@@ -291,7 +291,9 @@ def scrape_one(pid: str, season: str) -> str | None:
     return name
 
 
-def main():
+def main(progress_callback=None):
+    if progress_callback:
+        progress_callback("ランキングリストを取得中...")
     print("ランキングリストを取得中...")
     pids, season = _fetch_ranking()
 
@@ -317,6 +319,8 @@ def main():
             name = scrape_one(pid, s)
         label = f"{name} ({pid})" if name else pid
         print(f"  [{i}/{len(pids)}] {label}")
+        if progress_callback:
+            progress_callback(f"{i} / {len(pids)}  {name or pid}")
         time.sleep(0.5)
 
     print("CSV 更新完了")

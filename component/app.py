@@ -789,15 +789,36 @@ class MainApp(ThemedTk):
         except FileNotFoundError:
             pass
 
+        progress_win = tkinter.Toplevel(self)
+        progress_win.title("HOME情報取得中...")
+        progress_win.resizable(False, False)
+        progress_win.grab_set()
+        progress_label = tkinter.Label(
+            progress_win,
+            text="準備中...",
+            padx=30,
+            pady=10,
+            width=36,
+            justify="center",
+        )
+        progress_label.pack()
+        bar = ttk.Progressbar(progress_win, length=300, mode="indeterminate")
+        bar.pack(padx=30, pady=(0, 20))
+        bar.start(15)
+
+        def _update(text: str):
+            self.after(0, lambda t=text: progress_label.config(text=t))
+
         def _run():
+            err_msg = None
             try:
                 from stats.home import main as home_main
-
-                home_main()
-                self.after(0, lambda: self._on_home_update_done(True, None, today))
+                home_main(progress_callback=_update)
             except Exception as e:
-                err = str(e)
-                self.after(0, lambda: self._on_home_update_done(False, err, today))
+                err_msg = str(e)
+            finally:
+                self.after(0, progress_win.destroy)
+            self.after(0, lambda e=err_msg: self._on_home_update_done(e is None, e, today))
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -829,15 +850,36 @@ class MainApp(ThemedTk):
         except FileNotFoundError:
             pass
 
+        progress_win = tkinter.Toplevel(self)
+        progress_win.title("構築記事取得中...")
+        progress_win.resizable(False, False)
+        progress_win.grab_set()
+        progress_label = tkinter.Label(
+            progress_win,
+            text="準備中...",
+            padx=30,
+            pady=10,
+            width=36,
+            justify="center",
+        )
+        progress_label.pack()
+        bar = ttk.Progressbar(progress_win, length=300, mode="indeterminate")
+        bar.pack(padx=30, pady=(0, 20))
+        bar.start(15)
+
+        def _update(text: str):
+            self.after(0, lambda t=text: progress_label.config(text=t))
+
         def _run():
+            err_msg = None
             try:
                 from stats.search import Search
-
-                Search().search_latest_party()
-                self.after(0, lambda: self._on_battle_update_done(True, None, today))
+                Search().search_latest_party(progress_callback=_update)
             except Exception as e:
-                err = str(e)
-                self.after(0, lambda: self._on_battle_update_done(False, err, today))
+                err_msg = str(e)
+            finally:
+                self.after(0, progress_win.destroy)
+            self.after(0, lambda e=err_msg: self._on_battle_update_done(e is None, e, today))
 
         threading.Thread(target=_run, daemon=True).start()
 
