@@ -325,14 +325,44 @@ class Stage:
 
     # パーティの読み込み
     def load_party(self, player: int, party: list[Pokemon] = None):
+        from tkinter import messagebox
+
         from pokedata.loader import get_party_data
 
         if party is None:
             party = []
         if len(party) == 0:
-            for _i, data in enumerate(get_party_data()):
-                pokemon: Pokemon = Pokemon.by_name(data[0])
-                pokemon.set_load_data(data, True)
+            try:
+                csv_data = get_party_data()
+            except FileNotFoundError as e:
+                messagebox.showerror("読み込みエラー", str(e))
+                return
+            except ValueError as e:
+                messagebox.showerror("読み込みエラー", str(e))
+                return
+            for _i, data in enumerate(csv_data):
+                if not data or len(data) < 8:
+                    messagebox.showerror(
+                        "読み込みエラー",
+                        f"CSVのカラムが不足しています（{_i + 2}行目）",
+                    )
+                    return
+                try:
+                    pokemon: Pokemon = Pokemon.by_name(data[0])
+                except (IndexError, KeyError):
+                    messagebox.showerror(
+                        "読み込みエラー",
+                        f"ポケモン名が正しくありません（{_i + 2}行目）: {data[0]}",
+                    )
+                    return
+                try:
+                    pokemon.set_load_data(data, True)
+                except (IndexError, KeyError):
+                    messagebox.showerror(
+                        "読み込みエラー",
+                        f"CSVの内容が正しくありません（{_i + 2}行目）",
+                    )
+                    return
                 party.append(pokemon)
         self._app.set_party(player=player, party=party)
 
