@@ -2,6 +2,8 @@ import asyncio
 import base64
 import glob
 import os
+import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
@@ -116,12 +118,10 @@ class Capture:
             coord = self.coords.dicCoord["oporate1"]
             img = self.img[coord.top : coord.bottom, coord.left : coord.right]
             rate_str = self.ocr_full(img).strip()
-            try:
-                rate = int(rate_str)
+            digits = re.sub(r"\D", "", rate_str)
+            if digits:
                 self.phase = "battle"
-                return rate
-            except ValueError:
-                pass
+                return int(digits)
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
@@ -166,16 +166,24 @@ class Capture:
             "opoPoke5",
             "opoPoke6",
         ]
-        pokemonlist: list[Pokemon] = [Pokemon()] * 6
 
-        for coord in range(len(coordsList)):
-            oppo = self.is_exist_image_max(pokemonImages, 0.45, coordsList[coord])
-            if oppo != "":
-                oppo_shaped = self.shape_poke_num(oppo)
-                oppo_pokemon = Pokemon.by_pid(oppo_shaped, True)
-                if oppo_pokemon.base_name in unrecognizable_pokemon:
-                    oppo_pokemon.form_selected = False
-                pokemonlist[coord] = oppo_pokemon
+        # 初回バトル時のみディスクから読み込んでキャッシュ、以降はメモリから参照
+        for img_path in pokemonImages:
+            self._get_pokemon_template_pair(img_path)
+
+        def recognize_one(coord_idx: int) -> Pokemon:
+            oppo = self.is_exist_image_max(pokemonImages, 0.45, coordsList[coord_idx])
+            if oppo == "":
+                return Pokemon()
+            oppo_shaped = self.shape_poke_num(oppo)
+            oppo_pokemon = Pokemon.by_pid(oppo_shaped, True)
+            if oppo_pokemon.base_name in unrecognizable_pokemon:
+                oppo_pokemon.form_selected = False
+            return oppo_pokemon
+
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            pokemonlist = list(executor.map(recognize_one, range(6)))
+
         return pokemonlist
 
     # 相手のTN解析
@@ -266,6 +274,8 @@ class Capture:
 
     # テンプレートマッチング(最大のみ)
     _clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # リサイズ+CLAHE済みテンプレートのクラスレベルキャッシュ（バトル間で再利用）
+    _pokemon_template_cache: dict[str, tuple[np.ndarray, np.ndarray] | None] = {}
 
     @staticmethod
     def _load_pokemon_template(image_path: str) -> np.ndarray | None:
@@ -286,6 +296,23 @@ class Capture:
             return cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
         return raw
 
+    @classmethod
+    def _get_pokemon_template_pair(
+        cls, image_path: str
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """リサイズ+CLAHE済みのテンプレートペアをキャッシュから返す。"""
+        if image_path not in cls._pokemon_template_cache:
+            raw = cls._load_pokemon_template(image_path)
+            if raw is None:
+                cls._pokemon_template_cache[image_path] = None
+            else:
+                resized = cv2.resize(raw, None, None, 1.06, 1.06)
+                cls._pokemon_template_cache[image_path] = (
+                    resized,
+                    cls._clahe.apply(resized),
+                )
+        return cls._pokemon_template_cache[image_path]
+
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
         coord = self.coords.dicCoord[coord_name]
         img1 = self.img[coord.top : coord.bottom, coord.left : coord.right]
@@ -294,14 +321,13 @@ class Capture:
         max_val_list: list[float] = []
         for image in temp_imgge_name:
             try:
-                temp = self._load_pokemon_template(image)
-                if temp is None:
+                pair = self._get_pokemon_template_pair(image)
+                if pair is None:
                     max_val_list.append(0.0)
                     continue
-                temp = cv2.resize(temp, None, None, 1.06, 1.06)
+                temp, temp_clahe = pair
                 match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, _ = cv2.minMaxLoc(match)
-                temp_clahe = self._clahe.apply(temp)
                 match_c = cv2.matchTemplate(
                     gray_clahe, temp_clahe, cv2.TM_CCOEFF_NORMED
                 )
@@ -347,6 +373,7 @@ class Capture:
     def _manga_ocr(self):
         if not hasattr(self, "_mocr"):
             from manga_ocr import MangaOcr
+
             self._mocr = MangaOcr()
         return self._mocr
 
@@ -359,6 +386,7 @@ class Capture:
     @staticmethod
     def _is_trainer_name(text: str) -> bool:
         import difflib
+
         return difflib.SequenceMatcher(None, text, "トレーナー").ratio() >= 0.65
 
     # TN専用OCR: manga-ocrで認識 → 韓国語/トレーナー判定 → 英語フォールバック
@@ -381,9 +409,13 @@ class Capture:
             gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
             _, binary = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
             binary = cv2.bitwise_not(binary)
-            padded = cv2.copyMakeBorder(binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+            padded = cv2.copyMakeBorder(
+                binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255
+            )
             builder = pyocr.builders.TextBuilder(tesseract_layout=7)
-            return tool.image_to_string(Image.fromarray(padded), lang="eng", builder=builder).strip()
+            return tool.image_to_string(
+                Image.fromarray(padded), lang="eng", builder=builder
+            ).strip()
         except Exception as e:
             print(e)
             return ""
@@ -395,12 +427,9 @@ class Capture:
                 os.environ["PATH"] += os.pathsep + self.path_tesseract
             tools = pyocr.get_available_tools()
             tool = tools[0]
-            img = cv2.cvtColor(base_img, cv2.COLOR_BGR2RGB)
-            threshold_value = 85
-            gray = img.copy()
-            img[gray < threshold_value] = 0
-            img[gray >= threshold_value] = 255
-            img = Image.fromarray(img)
+            gray = cv2.cvtColor(base_img, cv2.COLOR_BGR2GRAY)
+            _, binary = cv2.threshold(gray, 85, 255, cv2.THRESH_BINARY)
+            img = Image.fromarray(binary)
             txt = tool.image_to_string(img, lang="jpn")
             return txt
         except Exception as e:
