@@ -511,6 +511,56 @@ class MainApp(ThemedTk):
         self._stage = None
         self._after_id: int | None = None
 
+        self.after(1000, self._auto_check_update)
+
+    def _auto_check_update(self):
+        threading.Thread(target=self._auto_check_update_worker, daemon=True).start()
+
+    def _auto_check_update_worker(self):
+        import json as _json
+        import urllib.request
+
+        current = self._get_current_version()
+        api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
+        _headers = {
+            "User-Agent": "champedge-updater/1.0",
+            "Authorization": f"token {self._RELEASE_TOKEN}",
+        }
+
+        try:
+            req = urllib.request.Request(api_url, headers=_headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return
+
+        latest = data.get("tag_name", "").lstrip("v")
+        if not latest or self._parse_version(latest) <= self._parse_version(current):
+            return
+
+        assets = [
+            a
+            for a in data.get("assets", [])
+            if a["name"] == "champedge_forwin_update.zip"
+        ]
+        if not assets:
+            return
+
+        asset_id = assets[0]["id"]
+        self.after(
+            0,
+            lambda: self._prompt_auto_update(current, latest, asset_id),
+        )
+
+    def _prompt_auto_update(self, current: str, latest: str, asset_id: int):
+        if not messagebox.askyesno(
+            "アップデート確認",
+            f"新しいバージョンがあります\n\n現在: v{current}  →  最新: v{latest}\n\n"
+            "アップデートしますか？\n（パーティやDBのデータは保持されます）",
+        ):
+            return
+        self._apply_update(asset_id)
+
     # 各フレームにStageクラスを配置
     def set_stage(self, stage):
         self._stage = stage
