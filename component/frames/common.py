@@ -318,6 +318,7 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self.set_ability_values(poke.ability)
         self._ability_value_combobox.set(poke.ability_value)
         self._teras_button.set_type(poke.battle_terastype)
+        self._update_teras_state(poke.ability)
         self._wall_combobox.set(poke.wall.name)
         if poke.no in changeble_form_in_battle:
             self._form_button["state"] = tkinter.NORMAL
@@ -370,10 +371,23 @@ class ActivePokemonFrame(ttk.LabelFrame):
             player=self._player, item=self._item_combobox.get()
         )
 
+    def _update_teras_state(self, ability: str):
+        if ability in ("へんげんじざい", "リベロ"):
+            self._teras_button.config(
+                state=tkinter.NORMAL, command=self.on_push_terasbutton
+            )
+        else:
+            enabled = get_recog_value("terastal_enabled")
+            self._teras_button.config(
+                state=tkinter.NORMAL if enabled else tkinter.DISABLED,
+                command=self.on_push_terasbutton if enabled else (lambda: None),
+            )
+
     def on_select_ability(self, *_args):
         ability = self._ability_combobox.get()
         self._stage.set_value_to_active_pokemon(player=self._player, ability=ability)
         self.set_ability_values(ability)
+        self._update_teras_state(ability)
 
     def on_select_ability_value(self, *_args):
         self._stage.set_value_to_active_pokemon(
