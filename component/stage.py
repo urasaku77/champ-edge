@@ -269,6 +269,15 @@ class Stage:
                     self._app.active_poke_frames[1]._pokemon.wall,
                     self._app.active_poke_frames[0]._pokemon.wall,
                 )
+            elif wazabase.name == "きょけんとつげき":
+                self._app.active_poke_frames[player]._pokemon.kyoken_charge = (
+                    wazabase.value == "受×2"
+                )
+            elif wazabase.name == "オーラぐるま":
+                ability_value = (
+                    "はらぺこもよう" if wazabase.value == "はらぺこ" else "まんぷくもよう"
+                )
+                self._app.active_poke_frames[player]._pokemon.ability_value = ability_value
             for i in range(2):
                 self._app.set_active_pokemon(
                     i, self._app.active_poke_frames[i]._pokemon

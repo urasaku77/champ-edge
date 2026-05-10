@@ -148,14 +148,38 @@ class DamageCalc:
             ):
                 waza.type = attacker.type[0]
 
-            damages = DamageCalc.__get_damage(
-                attacker=attacker,
-                defender=defender,
-                waza=waza,
-                weather=weather,
-                field=field,
-                double_params=double_params,
-            )
+            if waza.name == "オーラぐるま":
+                if (
+                    attacker.ability == "はらぺこスイッチ"
+                    and attacker.ability_value == "はらぺこもよう"
+                ):
+                    waza.type = Types.あく
+
+            if waza.name == "シェルアームズ":
+                waza.category = 物理
+                phys = DamageCalc.__get_damage(
+                    attacker=attacker, defender=defender, waza=waza,
+                    weather=weather, field=field, double_params=double_params,
+                ) or []
+                waza.category = 特殊
+                spec = DamageCalc.__get_damage(
+                    attacker=attacker, defender=defender, waza=waza,
+                    weather=weather, field=field, double_params=double_params,
+                ) or []
+                if max(phys, default=0) >= max(spec, default=0):
+                    damages = phys if phys else None
+                    waza.category = 物理
+                else:
+                    damages = spec if spec else None
+            else:
+                damages = DamageCalc.__get_damage(
+                    attacker=attacker,
+                    defender=defender,
+                    waza=waza,
+                    weather=weather,
+                    field=field,
+                    double_params=double_params,
+                )
             result = DamageCalcResult(
                 attacker=attacker, defender=defender, waza=waza, damages=damages
             )
@@ -1020,6 +1044,10 @@ class DamageCalc:
         if double_params is not None and double_params["is_friend_guard"]:
             hosei[key] = 3072
         # endregion
+
+        # きょけんとつげき（受けダメージ2倍）
+        if defender.kyoken_charge:
+            hosei["きょけんとつげき"] = 8192
 
         # 最終補正値の計算
         hosei_total = Decimal("4096")
