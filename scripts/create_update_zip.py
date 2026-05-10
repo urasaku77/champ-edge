@@ -22,32 +22,17 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 BUILD_DIR = os.path.join("dist", "champedge")
 
-# exeと同階層に置く外部データファイル
-# (ソースパス, zip内パス)  ディレクトリ指定時は再帰的に追加
-_DATA_SOURCES = [
-    ("version.txt",             "version.txt"),
-    ("README.pdf",              "README.pdf"),
-    ("image",                   "image"),
-    ("database/pokemon.db",     "database/pokemon.db"),
-    ("database/battle.db",      "database/battle.db"),
-    ("stats/ranking.json",      "stats/ranking.json"),
-    ("stats/ranking.txt",       "stats/ranking.txt"),
-    ("stats/season.txt",        "stats/season.txt"),
-    ("stats/last_update.txt",   "stats/last_update.txt"),
-    ("stats/home_waza.csv",     "stats/home_waza.csv"),
-    ("stats/home_tokusei.csv",  "stats/home_tokusei.csv"),
-    ("stats/home_motimono.csv", "stats/home_motimono.csv"),
-    ("stats/home_seikaku.csv",  "stats/home_seikaku.csv"),
-    ("stats/home_doryoku.csv",  "stats/home_doryoku.csv"),
-    ("stats/home_terastal.csv", "stats/home_terastal.csv"),
-    ("recog/capture.json",      "recog/capture.json"),
-    ("recog/setting.json",      "recog/setting.json"),
-    ("recog/coordinate.json",   "recog/coordinate.json"),
-    ("recog/season.json",       "recog/season.json"),
-    ("party/csv",               "party/csv"),
-    ("party/txt",               "party/txt"),
-    ("party/table",             "party/table"),
-    ("party/setting.txt",       "party/setting.txt"),
+# スキャン対象のルート（ファイルまたはディレクトリ）
+# 各ディレクトリ内の新規ファイルは自動的にzipに含まれる
+# 含めたくないものは _UPDATE_EXCLUDE / _ALWAYS_EXCLUDE に追加する
+_DATA_ROOTS = [
+    "version.txt",
+    "README.pdf",
+    "image",
+    "database",
+    "stats",
+    "recog",
+    "party",
 ]
 
 # フルインストール・アップデート共通で除外するパス
@@ -98,8 +83,8 @@ def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:
                 zf.write(abs_path, arc)
                 total += 1
         return total
-    print(f"  警告: 見つかりません: {src}")
-    return 0
+    print(f"  エラー: 見つかりません: {src}")
+    raise FileNotFoundError(f"必要ファイルが見つかりません: {src}")
 
 
 def make_zip(out_zip: str, full: bool):
@@ -118,8 +103,8 @@ def make_zip(out_zip: str, full: bool):
                 total += 1
 
         # 外部データファイル（exeと同階層）
-        for src, arc_base in _DATA_SOURCES:
-            total += _add_entry(zf, src, arc_base, full)
+        for root in _DATA_ROOTS:
+            total += _add_entry(zf, root, root, full)
 
     size_mb = os.path.getsize(out_zip) / 1024 / 1024
     print(f"完了: {out_zip}  ({total} ファイル, {size_mb:.1f} MB)")
