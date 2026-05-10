@@ -243,6 +243,22 @@ class PartyEditor(tkinter.Toplevel):
             messagebox.showerror("解析エラー", str(e))
             return
 
+        # スプライト登録ダイアログ（HOMEテンプレートのブートストラップ＋名前確認）
+        if img1_path:
+            try:
+                from PIL import Image as _PILImage
+
+                from party.image_parser import _detect_cards
+                cards = _detect_cards(_PILImage.open(img1_path))
+                sprite_dialog = SpriteRegisterDialog(self, cards, data_list)
+                self.wait_window(sprite_dialog)
+                if sprite_dialog.result:
+                    for i, name in enumerate(sprite_dialog.result):
+                        if i < len(data_list) and name:
+                            data_list[i].name = name
+            except Exception:
+                pass
+
         # パーティ情報設定ダイアログ
         dialog = ImageImportSettingDialog(self)
         dialog.open(location=(self.winfo_x() + 50, self.winfo_y() + 50))
@@ -1240,3 +1256,83 @@ class ImageImportSettingDialog(tkinter.Toplevel):
 
     def open(self, location: tuple[int, int]):
         self.geometry("+{0}+{1}".format(location[0], location[1]))
+
+
+class SpriteRegisterDialog(tkinter.Toplevel):
+    """構築画像からHOMEスプライトを登録するダイアログ。
+
+    6枚のカード画像と OCR 検出名を表示し、ユーザーが正しいポケモン名を
+    確認・修正した上で登録できる。ニックネーム対策のスプライトライブラリを
+    この画面でブートストラップする。
+    """
+
+    def __init__(self, parent, cards, data_list):
+        super().__init__(parent)
+        self.title("ポケモン名確認・スプライト登録")
+        self.result: list[str] | None = None
+        self._cards = cards
+        self._data_list = data_list
+        self._vars: list[tkinter.StringVar] = []
+        self._photo_refs: list = []  # PhotoImage の参照を保持
+        self._build_ui()
+        self.grab_set()
+
+    def _build_ui(self):
+        from PIL import ImageTk
+
+        from party.image_parser import extract_home_sprite
+
+        pokemon_names = DB_pokemon.get_pokemon_namelist()
+
+        ttk.Label(
+            self,
+            text="ポケモン名を確認・修正して「登録」を押すとスプライトが保存されます",
+        ).pack(padx=10, pady=(8, 4))
+
+        grid = ttk.Frame(self)
+        grid.pack(padx=10, pady=4)
+
+        for i, (card, data) in enumerate(zip(self._cards, self._data_list, strict=False)):
+            row, col = divmod(i, 2)
+            cell = ttk.LabelFrame(grid, text=f"  {i + 1}  ")
+            cell.grid(row=row, column=col, padx=6, pady=5, sticky="nsew")
+
+            # スプライトサムネイル
+            sprite = extract_home_sprite(card).resize((64, 64))
+            photo = ImageTk.PhotoImage(sprite)
+            self._photo_refs.append(photo)
+            ttk.Label(cell, image=photo).grid(row=0, column=0, rowspan=2, padx=(6, 4), pady=4)
+
+            # OCR 検出名（参考表示）
+            hint = data.name if data.name else "（不明）"
+            ttk.Label(cell, text=f"OCR: {hint}", foreground="gray").grid(
+                row=0, column=1, sticky=W, padx=4
+            )
+
+            # ポケモン名コンボボックス
+            var = tkinter.StringVar(value=data.name or "")
+            self._vars.append(var)
+            cb = AutoCompleteCombobox(cell, textvariable=var, width=20)
+            cb.set_completion_list(pokemon_names)
+            cb.grid(row=1, column=1, padx=4, pady=(0, 6))
+
+        btn = ttk.Frame(self)
+        btn.pack(pady=8)
+        MyButton(btn, text="登録して続行", command=self._on_register).pack(side="left", padx=6)
+        MyButton(btn, text="スキップ", command=self.destroy).pack(side="left", padx=6)
+
+    def _on_register(self):
+        from party.image_parser import save_home_sprite
+
+        confirmed: list[str] = []
+        for card, var in zip(self._cards, self._vars, strict=False):
+            name = var.get().strip()
+            confirmed.append(name)
+            if name:
+                try:
+                    pid = DB_pokemon.get_pokemon_pid_by_name(name)
+                    save_home_sprite(card, pid, overwrite=False)
+                except Exception:
+                    pass
+        self.result = confirmed
+        self.destroy()
