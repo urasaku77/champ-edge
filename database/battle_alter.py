@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS battle_new (
     result INTEGER,
     favorite TEXT,
     opponent_tn TEXT,
-    opponent_rank TEXT,
+    opponent_rate TEXT,
     battle_memo TEXT,
     player_party_num INTEGER,
     player_party_subnum INTEGER,
@@ -46,7 +46,7 @@ cur.execute(
     """
 INSERT INTO battle_new (
     id, date, rule, result, favorite,
-    opponent_tn, opponent_rank, battle_memo,
+    opponent_tn, opponent_rate, battle_memo,
     player_party_num, player_party_subnum,
     player_pokemon1, player_pokemon2, player_pokemon3,
     player_pokemon4, player_pokemon5, player_pokemon6,
@@ -59,7 +59,7 @@ INSERT INTO battle_new (
 )
 SELECT
     id, date, 1, result, favorite,
-    opponent_tn, opponent_rank, battle_memo,
+    opponent_tn, opponent_rate, battle_memo,
     player_party_num, player_party_subnum,
     player_pokemon1, player_pokemon2, player_pokemon3,
     player_pokemon4, player_pokemon5, player_pokemon6,

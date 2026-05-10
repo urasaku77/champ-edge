@@ -18,7 +18,7 @@ class Battle:
     result: Optional[int]
     favorite: Optional[int]
     opponent_tn: Optional[str]
-    opponent_rank: Optional[int]
+    opponent_rate: Optional[int]
     battle_memo: Optional[str]
     player_party_num: Optional[int]
     player_party_subnum: Optional[int]

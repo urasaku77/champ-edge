@@ -543,7 +543,7 @@ class RecordFrame(ttk.LabelFrame):
         self.tn = ttk.Entry(self)
         self.tn.grid(column=1, row=0, sticky=N + E + W + S)
 
-        self.rank_lbl = MyLabel(self, text="ランク")
+        self.rank_lbl = MyLabel(self, text="レート")
         self.rank_lbl.grid(column=0, row=1)
         self.rank = ttk.Entry(self)
         self.rank.grid(column=1, row=1, sticky=N + E + W + S)

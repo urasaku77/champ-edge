@@ -257,7 +257,7 @@ class Record(tkinter.Toplevel):
         koumoku_label4.place(x=Const.opposensyutuX + 50, y=Const.koumokuY)
         koumoku_label5 = tkinter.Label(self, text="TN")
         koumoku_label5.place(x=Const.tnX, y=Const.koumokuY)
-        koumoku_label6 = tkinter.Label(self, text="相手の順位")
+        koumoku_label6 = tkinter.Label(self, text="相手のレート")
         koumoku_label6.place(x=Const.rankX, y=Const.koumokuY)
 
         paging_left_button = tkinter.Button(
@@ -381,9 +381,9 @@ class Record(tkinter.Toplevel):
                 font=Const.titleFont,
             )
             if battle_data[6] is not None and battle_data[6] != "":
-                rankTxt = str(battle_data[6]) + "位"
+                rankTxt = str(battle_data[6])
             else:
-                rankTxt = "-位"
+                rankTxt = "-"
             self.canvas.create_text(
                 Const.rankX + Const.rankDX,
                 Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 15),
@@ -539,7 +539,7 @@ class SearchRecord(tkinter.Frame):
         koumoku_label4.place(x=Const.opposensyutuX + 50, y=Const.searchY)
         koumoku_label5 = tkinter.Label(self, text="TN")
         koumoku_label5.place(x=Const.tnX, y=Const.searchY)
-        koumoku_label6 = tkinter.Label(self, text="相手の順位")
+        koumoku_label6 = tkinter.Label(self, text="相手のレート")
         koumoku_label6.place(x=Const.rankX, y=Const.searchY)
 
         paging_left_button = tkinter.Button(
@@ -635,9 +635,9 @@ class SearchRecord(tkinter.Frame):
                 font=Const.titleFont,
             )
             if battle_data[6] is not None and battle_data[6] != "":
-                rankTxt = str(battle_data[6]) + "位"
+                rankTxt = str(battle_data[6])
             else:
-                rankTxt = "-位"
+                rankTxt = "-"
             self.canvas.create_text(
                 Const.rankX + Const.rankDX,
                 Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 5),
