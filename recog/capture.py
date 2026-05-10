@@ -110,20 +110,19 @@ class Capture:
                 self.phase = "rate"
             return None
 
-    # ②レートフェーズ: rate.jpgを検知してoporate1座標からOCRでレート取得、battleへ移行
-    # rate読み取り失敗時もrecogBattle.jpgを検知したらbattleへ移行
+    # ②レートフェーズ: oporate1座標からOCRでレート取得を毎回試みる、battleへ移行
+    # rate.jpgテンプレート検出に頼らず常にOCRを実行（テンプレート不一致でスキップされる問題を回避）
     def recognize_rate(self):
         self.get_screenshot()
-        if self.is_exist_image("image/recogImg/situation/rate.jpg", 0.8, "rate"):
-            coord = self.coords.dicCoord["oporate1"]
-            img = self.img[coord.top : coord.bottom, coord.left : coord.right]
-            pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-            rate_str = self._manga_ocr(pil).strip()
-            # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
-            m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
-            if m:
-                self.phase = "battle"
-                return int(round(float(m.group())))
+        coord = self.coords.dicCoord["oporate1"]
+        img = self.img[coord.top : coord.bottom, coord.left : coord.right]
+        pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        rate_str = self._manga_ocr(pil).strip()
+        # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
+        m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
+        if m:
+            self.phase = "battle"
+            return int(round(float(m.group())))
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
