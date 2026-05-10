@@ -7,16 +7,16 @@ authors = [
 ]
 dependencies = [
     "jaconv",
+    "manga-ocr",
+    "natsort>=8.4.0",
+    "numpy",
     "opencv-python",
-    "pandas",
     "pillow",
     "pyocr",
+    "pytesseract>=0.3.13",
+    "selenium>=4.17.2",
     "simpleobsws",
     "ttkthemes",
-    "selenium>=4.17.2",
-    "pyinstaller>=6.7.0",
-    "natsort>=8.4.0",
-    "pytesseract>=0.3.13",
     ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -33,9 +33,12 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
+    "beautifulsoup4",
     "mypy>=1.15.0",
-    "ruff>=0.1.13",
     "pre-commit>=3.6.0",
+    "pyinstaller>=6.7.0",
+    "requests",
+    "ruff>=0.1.13",
 ]
 
 [tool.hatch.metadata]
