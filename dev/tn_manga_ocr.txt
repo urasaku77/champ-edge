@@ -1,13 +1,0 @@
-[transformers] `ViTImageProcessor` requires torchvision (not installed); falling back to `ViTImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `ViTImageProcessorPil` directly to silence this warning.
-[32m2026-05-09 18:18:33.135[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m16[0m - [1mLoading OCR model from kha-white/manga-ocr-base[0m
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-モデル読み込み中...
-Loading weights:   0%|          | 0/264 [00:00<?, ?it/s]Loading weights: 100%|##########| 264/264 [00:00<00:00, 37708.03it/s]
-[32m2026-05-09 18:19:16.796[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m28[0m - [1mUsing CPU[0m
-[32m2026-05-09 18:19:17.317[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m35[0m - [1mOCR ready[0m
-完了
-IMG_7612: [わまたま]
-IMG_7613: [．．．]
-IMG_7614: [．．．]
-IMG_7622: [あくまで、]
-done

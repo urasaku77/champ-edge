@@ -1,19 +1,0 @@
-[32m2026-05-09 18:35:01.519[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m16[0m - [1mLoading OCR model from kha-white/manga-ocr-base[0m
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-=== 判定ロジック確認 ===
-  [トレーナー] trainer=True(期待:True) korean=False(期待:False)
-  [トレナー] trainer=True(期待:True) korean=False(期待:False)
-  [トレーナ] trainer=True(期待:True) korean=False(期待:False)
-  [わまたま] trainer=False(期待:False) korean=False(期待:False)
-  [한국인] trainer=False(期待:False) korean=True(期待:True)
-  [김철수] trainer=False(期待:False) korean=True(期待:True)
-
-=== TN認識 ===
-Loading weights:   0%|          | 0/264 [00:00<?, ?it/s]Loading weights: 100%|##########| 264/264 [00:00<00:00, 36952.99it/s]
-[32m2026-05-09 18:35:04.425[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m28[0m - [1mUsing CPU[0m
-[32m2026-05-09 18:35:04.918[0m | [1mINFO    [0m | [36mmanga_ocr.ocr[0m:[36m__init__[0m:[36m35[0m - [1mOCR ready[0m
-IMG_7612: [わまたま]
-IMG_7613: [DVII]
-IMG_7614: [la]
-IMG_7622: [あくまで、]
-done
