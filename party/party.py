@@ -90,7 +90,9 @@ class PartyEditor(tkinter.Toplevel):
         self.pokemons = PokemonEditors(main_frame, text="パーティ編集", padding=5)
         self.pokemons.grid(row=1, column=0, columnspan=5, sticky=N + E + W + S)
 
-        self.select_csv(csv=self.using.using_var.get())
+        csv = self.using.using_var.get()
+        if csv:
+            self.select_csv(csv=csv)
 
     def save_csv(self):
         ret = messagebox.askyesno(
