@@ -68,8 +68,8 @@ jobs:
           ver="${{ steps.get_version.outputs.VERSION }}"
           echo "Version: $ver"
 
-          # 前のタグを取得してコミット一覧を生成
-          prev_tag=$(git tag --sort=-version:refname | { grep -v "^v$ver$" || true; } | head -1)
+          # 前のタグを取得してコミット一覧を生成（HEADから到達できる直近タグを使用）
+          prev_tag=$(git describe --tags --match "v*" --abbrev=0 HEAD^ 2>/dev/null || true)
           if [ -n "$prev_tag" ]; then
             commit_log=$(git log "${prev_tag}..HEAD" --pretty=format:"- %s" --no-merges || true)
             notes="$(printf '## 変更点 (%s -> v%s)\n%s' "$prev_tag" "$ver" "$commit_log")"
