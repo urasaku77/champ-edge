@@ -1,0 +1,40 @@
+name: README PDF更新
+
+on:
+  push:
+    branches: [main]
+    paths: ['README.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: md-to-pdf インストール
+        run: npm install -g md-to-pdf
+
+      - name: README PDF生成
+        run: |
+          md-to-pdf README.md || exit 1
+          ls -la README.pdf
+
+      - name: コミット・プッシュ
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Actions"
+          git add README.pdf
+          git diff --cached --quiet && echo "変更なし（スキップ）" && exit 0
+          git commit -m "docs: README.pdf更新 [skip ci]"
+          git push
