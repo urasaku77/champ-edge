@@ -928,6 +928,7 @@ def parse_party_images(
     img2_path: Optional[str],
     rows: int = 3,
     cols: int = 2,
+    progress_callback=None,
 ) -> list[CardData]:
     """
     Parse party screen screenshots and return up to 6 CardData objects.
@@ -967,15 +968,16 @@ def parse_party_images(
             }
             ev_data = _parse_ev_card(cards2[i])
 
-        results.append(
-            CardData(
-                name=info["name"],
-                ability=info["ability"],
-                item=info["item"],
-                moves=info["moves"],
-                nature=ev_data["nature"],
-                evs=ev_data["evs"],
-            )
+        card = CardData(
+            name=info["name"],
+            ability=info["ability"],
+            item=info["item"],
+            moves=info["moves"],
+            nature=ev_data["nature"],
+            evs=ev_data["evs"],
         )
+        results.append(card)
+        if progress_callback:
+            progress_callback(i, card.name)
 
     return results
