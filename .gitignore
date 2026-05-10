@@ -1,4 +1,6 @@
-.claude
+.claude/*
+!.claude/hooks/
+!.claude/settings.json
 .mypy_chache
 build/
 dist/
