@@ -1068,8 +1068,7 @@ class MainApp(ThemedTk):
                     lambda: _update_label(
                         "ダウンロード完了！\n\n"
                         "インストール中です...\n"
-                        "コマンドウィンドウが閉じたら\n"
-                        "手動でアプリを起動してください。"
+                        "完了後、自動でアプリが起動します。"
                     ),
                 )
                 self.after(4000, lambda: self._launch_updater(bat_path))
