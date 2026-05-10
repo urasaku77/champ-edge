@@ -9,9 +9,7 @@ database/battle.db
 party/csv/*
 party/txt/*
 party/table/*
-party/setting.txt
 image/outputImg/*
-recog/setting.json
 bat/
 logs/
 image/readme/desktop.ini

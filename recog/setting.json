@@ -7,5 +7,5 @@
   "search_record_auto": false,
   "panipani_auto": true,
   "terastal_enabled": false,
-  "tesseract_path": "E:\\Tesseract-OCR"
+  "tesseract_path": ""
 }
