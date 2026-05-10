@@ -93,6 +93,43 @@ class Battle:
 class DB_battle:
     __db = sqlite3.connect("database/battle.db", check_same_thread=False)
 
+    _init_sql = """
+        CREATE TABLE IF NOT EXISTS battle (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date INTEGER,
+            rule INTEGER,
+            result INTEGER,
+            favorite INTEGER,
+            opponent_tn TEXT,
+            opponent_rate TEXT,
+            battle_memo TEXT,
+            player_party_num TEXT,
+            player_party_subnum TEXT,
+            player_pokemon1 TEXT,
+            player_pokemon2 TEXT,
+            player_pokemon3 TEXT,
+            player_pokemon4 TEXT,
+            player_pokemon5 TEXT,
+            player_pokemon6 TEXT,
+            opponent_pokemon1 TEXT,
+            opponent_pokemon2 TEXT,
+            opponent_pokemon3 TEXT,
+            opponent_pokemon4 TEXT,
+            opponent_pokemon5 TEXT,
+            opponent_pokemon6 TEXT,
+            player_choice1 TEXT,
+            player_choice2 TEXT,
+            player_choice3 TEXT,
+            player_choice4 TEXT,
+            opponent_choice1 TEXT,
+            opponent_choice2 TEXT,
+            opponent_choice3 TEXT,
+            opponent_choice4 TEXT
+        )
+    """
+    __db.execute(_init_sql)
+    __db.commit()
+
     def register_battle(battle):
         cur = DB_battle.__db.cursor()
 

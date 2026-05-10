@@ -462,10 +462,12 @@ class UseParty(ttk.LabelFrame):
         self.using_var.set(self.using_party)
 
     def get_using_csv(self):
-        with open("party\\setting.txt", "r") as txt:
-            self.using_party = txt.read()
-            self.using_var.set(self.using_party)
-            txt.close()
+        try:
+            with open("party\\setting.txt", "r") as txt:
+                self.using_party = txt.read()
+                self.using_var.set(self.using_party)
+        except FileNotFoundError:
+            self.using_party = ""
 
     def change_csv(self, value: str = ""):
         if value == "":
