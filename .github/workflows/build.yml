@@ -1,13 +1,12 @@
 name: Build and Release
 
-run-name: Build v${{ github.event.inputs.version }}
+run-name: Build and Release
 
 on:
+  push:
+    branches: [main]
+    paths: ['version.txt']
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'ビルドするバージョン (例: 1.0.1)'
-        required: true
 
 permissions:
   contents: write
@@ -26,7 +25,7 @@ jobs:
         run: |
           VER="$(cat version.txt | tr -d '[:space:]')"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
-          echo "Version: $VER"
+          echo "## Build version: v$VER" >> $GITHUB_STEP_SUMMARY
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
