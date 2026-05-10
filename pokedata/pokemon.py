@@ -464,6 +464,10 @@ class Pokemon:
 
     @property
     def next_form_pid(self) -> Optional[str]:
+        # ジガルデのパーフェクトフォルムは元のフォーム（10%/50%）に戻る
+        if self.__no == 718 and self.__form == 2:
+            return f"718-{self.__base_form}"
+
         # バトル中フォルムチェンジ（メロエッタ・イルカマン・テラパゴス）
         result = get_next_form(self.pid)
         if result is not None:

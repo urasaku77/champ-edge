@@ -33,11 +33,14 @@ def get_home_data(name: str, file_path: str):
         if base_name in name:
             name = base_name
     data_list: list[list[str]] = []
-    with open(file_path, encoding="utf-8") as csv_file:
-        data = [x for x in csv.reader(csv_file)]
-        for i in range(len(data)):
-            if data[i][0] == name:
-                data_list.append([data[i][1], data[i][2]])
+    try:
+        with open(file_path, encoding="utf-8") as csv_file:
+            data = [x for x in csv.reader(csv_file)]
+            for i in range(len(data)):
+                if data[i][0] == name:
+                    data_list.append([data[i][1], data[i][2]])
+    except FileNotFoundError:
+        pass
     return data_list
 
 
