@@ -1,0 +1,75 @@
+name: バトルデータ更新（フォールバック）
+
+on:
+  schedule:
+    - cron: '0 20 * * *'  # JST 05:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 更新済みか確認
+        id: check
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          echo "today=$TODAY" >> $GITHUB_OUTPUT
+
+          HOME_DATE=$(cat stats/last_update.txt 2>/dev/null || echo "")
+          BATTLE_DATE=$(cat stats/last_update_battle.txt 2>/dev/null || echo "")
+
+          echo "home_done=$([ "$HOME_DATE"   = "$TODAY" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "battle_done=$([ "$BATTLE_DATE" = "$TODAY" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+          if [ "$HOME_DATE" = "$TODAY" ] && [ "$BATTLE_DATE" = "$TODAY" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "ローカルバッチで更新済みのためスキップ"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "home: $HOME_DATE / battle: $BATTLE_DATE → 更新が必要"
+          fi
+
+      - name: Python セットアップ
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: 依存関係インストール
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          grep -v "^-e\s" requirements.lock \
+            | grep -v "^#" \
+            | grep -v "^\s*$" \
+            | grep -iv "pywin32\|pypiwin32" \
+            > requirements_ci.txt
+          pip install -r requirements_ci.txt
+
+      - name: HOMEデータ更新
+        if: steps.check.outputs.skip == 'false' && steps.check.outputs.home_done == 'false'
+        run: |
+          python stats/home.py
+          echo "${{ steps.check.outputs.today }}" > stats/last_update.txt
+
+      - name: 構築記事データ更新
+        if: steps.check.outputs.skip == 'false' && steps.check.outputs.battle_done == 'false'
+        run: |
+          python stats/search.py
+          echo "${{ steps.check.outputs.today }}" > stats/last_update_battle.txt
+
+      - name: コミット・プッシュ
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Actions"
+          git add stats/
+          git diff --cached --quiet && echo "変更なし" && exit 0
+          git commit -m "data: バトルデータ更新 (${{ steps.check.outputs.today }}) [Actions fallback]"
+          git push

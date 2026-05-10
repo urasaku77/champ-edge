@@ -1,6 +1,5 @@
 import copy
 import dataclasses
-import datetime
 import os
 import sys
 import threading
@@ -773,33 +772,46 @@ class MainApp(ThemedTk):
     # HOME情報更新
     _LAST_UPDATE_FILE = "stats/last_update.txt"
     _LAST_BATTLE_UPDATE_FILE = "stats/last_update_battle.txt"
+    _STATS_BASE_URL = "https://raw.githubusercontent.com/urasaku77/champ-edge/main/stats"
+    _HOME_FILES = [
+        "home_waza.csv", "home_tokusei.csv", "home_motimono.csv",
+        "home_seikaku.csv", "home_doryoku.csv",
+    ]
+    _BATTLE_FILES = ["ranking.json", "ranking.txt", "season.txt"]
 
     # アップデート
     _RELEASES_REPO = "urasaku77/champ-edge"
     _RELEASE_TOKEN = "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"
     _VERSION_FILE = "version.txt"
 
+    def _fetch_text(self, url: str) -> str:
+        import ssl
+        import urllib.request
+        ctx = ssl._create_unverified_context()
+        req = urllib.request.Request(url, headers={"User-Agent": "champedge/1.0"})
+        with urllib.request.urlopen(req, context=ctx) as r:
+            return r.read().decode("utf-8")
+
+    def _download_stats_files(self, filenames: list[str], update_cb):
+        """GitHubからstatsファイルをダウンロードしてローカルに保存する"""
+        for i, name in enumerate(filenames, 1):
+            update_cb(f"{i} / {len(filenames)}  {name}")
+            content = self._fetch_text(f"{self._STATS_BASE_URL}/{name}")
+            with open(f"stats/{name}", "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+
     def update_home_data(self):
-        today = datetime.date.today().isoformat()
         try:
-            with open(self._LAST_UPDATE_FILE, encoding="utf-8") as f:
-                if f.read().strip() == today:
-                    messagebox.showinfo("HOME情報更新", "本日は取得済みです")
-                    return
+            local_date = open(self._LAST_UPDATE_FILE, encoding="utf-8").read().strip()
         except FileNotFoundError:
-            pass
+            local_date = ""
 
         progress_win = tkinter.Toplevel(self)
         progress_win.title("HOME情報取得中...")
         progress_win.resizable(False, False)
         progress_win.grab_set()
         progress_label = tkinter.Label(
-            progress_win,
-            text="準備中...",
-            padx=30,
-            pady=10,
-            width=36,
-            justify="center",
+            progress_win, text="準備中...", padx=30, pady=10, width=36, justify="center",
         )
         progress_label.pack()
         bar = ttk.Progressbar(progress_win, length=300, mode="indeterminate")
@@ -811,21 +823,29 @@ class MainApp(ThemedTk):
 
         def _run():
             err_msg = None
+            remote_date = None
             try:
-                from stats.home import main as home_main
-                home_main(progress_callback=_update)
+                remote_date = self._fetch_text(f"{self._STATS_BASE_URL}/last_update.txt").strip()
+                if remote_date == local_date:
+                    self.after(0, progress_win.destroy)
+                    self.after(0, lambda: messagebox.showinfo("HOME情報更新", "最新データです"))
+                    return
+                self._download_stats_files(self._HOME_FILES, _update)
             except Exception as e:
                 err_msg = str(e)
             finally:
                 self.after(0, progress_win.destroy)
-            self.after(0, lambda e=err_msg: self._on_home_update_done(e is None, e, today))
+            if err_msg is None:
+                self.after(0, lambda d=remote_date: self._on_home_update_done(True, None, d))
+            else:
+                self.after(0, lambda e=err_msg: self._on_home_update_done(False, e, None))
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _on_home_update_done(self, success: bool, error: str | None, today: str):
+    def _on_home_update_done(self, success: bool, error: str | None, remote_date: str | None):
         if success:
             with open(self._LAST_UPDATE_FILE, "w", encoding="utf-8") as f:
-                f.write(today)
+                f.write(remote_date)
             messagebox.showinfo("HOME情報更新", "更新が完了しました")
         else:
             messagebox.showerror(
@@ -841,26 +861,17 @@ class MainApp(ThemedTk):
             messagebox.showinfo("HOME情報更新日", "まだ更新されていません")
 
     def update_battle_data(self):
-        today = datetime.date.today().isoformat()
         try:
-            with open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8") as f:
-                if f.read().strip() == today:
-                    messagebox.showinfo("構築記事取得", "本日は取得済みです")
-                    return
+            local_date = open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8").read().strip()
         except FileNotFoundError:
-            pass
+            local_date = ""
 
         progress_win = tkinter.Toplevel(self)
         progress_win.title("構築記事取得中...")
         progress_win.resizable(False, False)
         progress_win.grab_set()
         progress_label = tkinter.Label(
-            progress_win,
-            text="準備中...",
-            padx=30,
-            pady=10,
-            width=36,
-            justify="center",
+            progress_win, text="準備中...", padx=30, pady=10, width=36, justify="center",
         )
         progress_label.pack()
         bar = ttk.Progressbar(progress_win, length=300, mode="indeterminate")
@@ -872,21 +883,29 @@ class MainApp(ThemedTk):
 
         def _run():
             err_msg = None
+            remote_date = None
             try:
-                from stats.search import Search
-                Search().search_latest_party(progress_callback=_update)
+                remote_date = self._fetch_text(f"{self._STATS_BASE_URL}/last_update_battle.txt").strip()
+                if remote_date == local_date:
+                    self.after(0, progress_win.destroy)
+                    self.after(0, lambda: messagebox.showinfo("構築記事取得", "最新データです"))
+                    return
+                self._download_stats_files(self._BATTLE_FILES, _update)
             except Exception as e:
                 err_msg = str(e)
             finally:
                 self.after(0, progress_win.destroy)
-            self.after(0, lambda e=err_msg: self._on_battle_update_done(e is None, e, today))
+            if err_msg is None:
+                self.after(0, lambda d=remote_date: self._on_battle_update_done(True, None, d))
+            else:
+                self.after(0, lambda e=err_msg: self._on_battle_update_done(False, e, None))
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _on_battle_update_done(self, success: bool, error: str | None, today: str):
+    def _on_battle_update_done(self, success: bool, error: str | None, remote_date: str | None):
         if success:
             with open(self._LAST_BATTLE_UPDATE_FILE, "w", encoding="utf-8") as f:
-                f.write(today)
+                f.write(remote_date)
             messagebox.showinfo("構築記事取得", "更新が完了しました")
         else:
             messagebox.showerror(
