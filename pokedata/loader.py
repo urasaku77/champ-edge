@@ -15,10 +15,17 @@ def get_party_data(file_path: str = "default") -> list[list[str]]:
     file = file_path
     if file_path == "default":
         file = get_party_csv()
-    with open(file, encoding="cp932") as pt_csv:
-        data = [x for x in csv.reader(pt_csv)]
-        data = data[1:7]
-        return data
+    try:
+        with open(file, encoding="cp932") as pt_csv:
+            data = [x for x in csv.reader(pt_csv)]
+            data = data[1:7]
+            return data
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"CSVファイルが見つかりません: {file}") from e
+    except (UnicodeDecodeError, UnicodeError) as e:
+        raise ValueError(f"CSVファイルのエンコードが正しくありません（cp932形式が必要）: {file}") from e
+    except csv.Error as e:
+        raise ValueError(f"CSVファイルの形式が正しくありません: {e}") from e
 
 
 def get_home_data(name: str, file_path: str):
