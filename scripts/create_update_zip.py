@@ -26,6 +26,7 @@ BUILD_DIR = os.path.join("dist", "champedge")
 # (ソースパス, zip内パス)  ディレクトリ指定時は再帰的に追加
 _DATA_SOURCES = [
     ("version.txt",             "version.txt"),
+    ("README.pdf",              "README.pdf"),
     ("image",                   "image"),
     ("database/pokemon.db",     "database/pokemon.db"),
     ("database/battle.db",      "database/battle.db"),
@@ -42,11 +43,17 @@ _DATA_SOURCES = [
     ("recog/capture.json",      "recog/capture.json"),
     ("recog/setting.json",      "recog/setting.json"),
     ("recog/coordinate.json",   "recog/coordinate.json"),
+    ("recog/season.json",       "recog/season.json"),
     ("party/csv",               "party/csv"),
     ("party/txt",               "party/txt"),
     ("party/table",             "party/table"),
     ("party/setting.txt",       "party/setting.txt"),
 ]
+
+# フルインストール・アップデート共通で除外するパス
+_ALWAYS_EXCLUDE = {
+    "image/readme",
+}
 
 # アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
 _UPDATE_EXCLUDE = {
@@ -62,9 +69,11 @@ _UPDATE_EXCLUDE = {
 
 
 def _excluded(arc: str, full: bool) -> bool:
+    path = arc.replace("\\", "/")
+    if any(path == e or path.startswith(e + "/") for e in _ALWAYS_EXCLUDE):
+        return True
     if full:
         return False
-    path = arc.replace("\\", "/")
     return any(path == e or path.startswith(e + "/") for e in _UPDATE_EXCLUDE)
 
 
