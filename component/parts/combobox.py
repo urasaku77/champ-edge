@@ -147,7 +147,6 @@ class ModifiedEntry(tk.Entry):
     # argsのnameと内包StringVarの_nameが一致したらイベントを発生させる。
     def var_changed(self, *args):
         if args[0] == self.value._name:
-            s = self.value.get()
             self.event_generate("<<TextModified>>")
 
     def select_all(self, event: Event, *args):
