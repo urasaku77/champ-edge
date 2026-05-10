@@ -465,7 +465,7 @@ class UseParty(ttk.LabelFrame):
 
     def get_using_csv(self):
         try:
-            with open("party\\setting.txt", "r") as txt:
+            with open("party\\setting.txt", "r", encoding="utf-8") as txt:
                 self.using_party = txt.read()
                 self.using_var.set(self.using_party)
         except FileNotFoundError:
@@ -480,7 +480,7 @@ class UseParty(ttk.LabelFrame):
                 initialdir=os.path.join(current_directory, "party", "csv"),
             ).split("party/csv/")[1]
 
-        with open("party\\setting.txt", "w") as txt:
+        with open("party\\setting.txt", "w", encoding="utf-8") as txt:
             txt.write(value)
             self.using_var.set(value)
             txt.close()

@@ -5,7 +5,7 @@ from pokedata.exception import base_names
 
 
 def get_party_csv() -> str:
-    with open("party/setting.txt", "r") as txt:
+    with open("party/setting.txt", "r", encoding="utf-8") as txt:
         file = txt.read()
         txt.close()
     return "party/csv/" + file
