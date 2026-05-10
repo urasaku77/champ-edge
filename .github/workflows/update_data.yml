@@ -19,7 +19,7 @@ jobs:
       - name: 更新済みか確認
         id: check
         run: |
-          TODAY=$(date +%Y-%m-%d)
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
           echo "today=$TODAY" >> $GITHUB_OUTPUT
 
           HOME_DATE=$(cat stats/last_update.txt 2>/dev/null || echo "")
