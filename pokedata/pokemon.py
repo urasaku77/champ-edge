@@ -42,13 +42,16 @@ class Pokemon:
         self.__seikaku: str = "まじめ"
         self.__item: str = "なし"
         self.__type: list[Types] = []
+        self.__base_type: list[Types] = []
         self.__terastype: Types = Types.なし
         self.__battle_terastype: Types = Types.なし
         self.__abilities: list[str] = []
         self.__ability: str = ""
+        self.__base_ability: str = ""
         self.__ability_value: str = ""
         self.__ailment: Ailments = Ailments.なし
         self.__charging: bool = False
+        self.__kyoken_charge: bool = False
         self.__wall: Walls = Walls.なし
         self.__waza_list: list[Optional[WazaBase]] = [None for _ in range(10)]
         self.__waza_rate_list: list[Optional[float]] = [0.0 for _ in range(10)]
@@ -74,11 +77,13 @@ class Pokemon:
             self.__type.append(Types[db_data["type1"]])
             if db_data["type2"] and db_data["type2"].strip():
                 self.__type.append(Types[db_data["type2"]])
+            self.__base_type = list(self.__type)
             for key in ["ability1", "ability2", "ability3"]:
                 if db_data[key] and db_data[key].strip():
                     self.__abilities.append(db_data[key])
             self.set_ability_from_home()
             self.__ability: str = self.__abilities[0]
+            self.__base_ability: str = self.__abilities[0]
             self.__weight: float = db_data["weight"]
             self.__item: str = self.fixed_item(self.__name)
             self.__terastype: Types = self.fixed_terastype(self.__name)
@@ -205,6 +210,15 @@ class Pokemon:
     def type(self) -> list[Types]:
         return self.__type
 
+    @type.setter
+    def type(self, value: list[Types]) -> None:
+        self.__type = value
+        self.statechanged()
+
+    def reset_battle_type(self) -> None:
+        self.__type = list(self.__base_type)
+        self.statechanged()
+
     @property
     def terastype(self) -> Types:
         if self.__name == "オーガポン":
@@ -313,8 +327,18 @@ class Pokemon:
     @ability.setter
     def ability(self, value) -> None:
         self.__ability = value
+        self.__base_ability = value
         self.set_default_ability_value()
         self.statechanged()
+
+    @property
+    def base_ability(self) -> str:
+        return self.__base_ability
+
+    def apply_trace(self, value: str) -> None:
+        """トレース特性によるコピー。base_abilityを変更しない。"""
+        self.__ability = value
+        self.set_default_ability_value()
 
     @property
     def ailment(self) -> Ailments:
@@ -332,6 +356,15 @@ class Pokemon:
     @charging.setter
     def charging(self, value: bool) -> None:
         self.__charging = value
+        self.statechanged()
+
+    @property
+    def kyoken_charge(self) -> bool:
+        return self.__kyoken_charge
+
+    @kyoken_charge.setter
+    def kyoken_charge(self, value: bool) -> None:
+        self.__kyoken_charge = value
         self.statechanged()
 
     @property
@@ -579,6 +612,7 @@ class Pokemon:
             self.__seikaku = data[3]
             self.__item = data[4]
             self.__ability = data[5]
+            self.__base_ability = data[5]
             self.__terastype = Types[data[6]] if data[6] != "" else Types.なし
             self.__memo = data[7]
             if use_data:
@@ -647,6 +681,21 @@ class Pokemon:
             or self.battle_terastype == Types.ステラ
             else [self.battle_terastype]
         )
+        # フライングプレス: かくとうタイプとひこうタイプ両方の相性を乗算
+        if waza.name == "フライングプレス":
+            fighting_value = Decimal(1.0)
+            for te in DB_pokemon.get_type_effective(Types.かくとう, types):
+                if (
+                    (ability == "しんがん" or ability == "きもったま")
+                    and te.df_type == Types.ゴースト
+                ):
+                    pass
+                else:
+                    fighting_value *= Decimal(te.value)
+            flying_value = Decimal(1.0)
+            for te in DB_pokemon.get_type_effective(Types.ひこう, types):
+                flying_value *= Decimal(te.value)
+            return float(fighting_value * flying_value)
         for type_effective in DB_pokemon.get_type_effective(waza.type, types):
             if waza.name == "フリーズドライ" and type_effective.df_type == Types.みず:
                 value = value * Decimal(2.0)
@@ -709,12 +758,21 @@ class Pokemon:
             self.__syuzoku.set_values_from_stats(next_form.syuzoku)
             self.__weight = next_form.__weight
             self.__type = list(next_form.type)
+            self.__base_type = list(self.__type)
             self.__abilities = list(next_form.abilities)
             self.__ability = next_form.ability
             self.statechanged()
 
     def on_stage(self):
         self.__rank = Stats(init_value=0)
+        self.__kyoken_charge = False
+        for waza in self.__waza_list:
+            if waza is None:
+                continue
+            if waza.name == "きょけんとつげき" and waza.value == "受×2":
+                waza.set_next_value()
+            elif waza.name == "オーラぐるま" and waza.value == "はらぺこ":
+                waza.set_next_value()
         self.set_default_ability_value()
 
     def set_default_ability_value(self):
