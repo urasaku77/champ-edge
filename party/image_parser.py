@@ -62,10 +62,24 @@ def _load_reference_lists() -> None:
     global _pokemon_names, _waza_names, _ability_names, _item_names
     if _pokemon_names:
         return
+    import glob as _g
+
     from component.parts.const import ALL_ITEM_COMBOBOX_VALUES
     from database.pokemon import DB_pokemon
 
-    _pokemon_names = DB_pokemon.get_pokemon_namelist()
+    # image/pokemon/ に画像が存在するポケモン名のみ（図鑑外・未実装ポケを除外）
+    seen: set[str] = set()
+    img_names: list[str] = []
+    for fp in sorted(_g.glob("image/pokemon/*.png")):
+        stem = Path(fp).stem
+        parts = stem.split("-")
+        if len(parts) == 2:
+            pid = f"{int(parts[0])}-{int(parts[1])}"
+            pname = DB_pokemon.get_pokemon_name_by_pid(pid)
+            if pname and pname not in seen:
+                img_names.append(pname)
+                seen.add(pname)
+    _pokemon_names = img_names
     _waza_names = list(DB_pokemon.get_waza_namedict().values())
     _item_names = list(ALL_ITEM_COMBOBOX_VALUES)
 
@@ -83,81 +97,359 @@ def _load_reference_lists() -> None:
     _ability_names = sorted(abilities)
 
 
+# Crop ratio relative to card height: captures the sprite area without name text
+_SPRITE_CW_RATIO = 0.55
+_SPRITE_CH_RATIO = 0.65
+
 # ---------------------------------------------------------------------------
-# Pokemon icon template matching (nickname-resistant name detection)
+# Multi-signal Pokemon identification
 # ---------------------------------------------------------------------------
 
+_RANKING_FILE = "stats/ranking.txt"
+_TYPE_ICON_DIR = "image/typeicon"
+# 名前行のタイプアイコン走査領域 (x1, y1, x2, y2) — スプライト右端から技アイコン手前まで
+_TYPE_ICON_SCAN = (200, 3, 450, 48)
 
-def _path_to_pid(image_path: str) -> str:
-    """'image/pokemon/0003-11.png' → '3-11'"""
-    stem = Path(image_path).stem
-    no, sep, form = stem.partition("-")
-    return f"{int(no)}-{form}" if sep else f"{int(no)}-0"
+_ranking_cache: list[str] = []
+_type_icon_tpl: dict[str, "np.ndarray"] = {}
+# スプライトテンプレートキャッシュ: pid → (gray, alpha_mask or None)
+_pokemon_sprite_cache: dict[str, tuple["np.ndarray", "np.ndarray | None"]] = {}
+# home_waza.csv のキャッシュ: {ポケモン名: {技名, ...}}
+_home_waza_cache: dict[str, set[str]] = {}
 
 
-def _match_pokemon_by_icon(card: Image.Image, threshold: float = 0.40) -> str:
-    """Identify Pokemon from card image using template matching against icon library.
-
-    Compares the left portion of the card (where the sprite appears) against all
-    images in image/pokemon/ at multiple scales to handle varying screenshot
-    resolutions. Returns the matched Pokemon name, or '' if below threshold.
-    """
+def _load_ranking() -> list[str]:
+    """stats/ranking.txt を読み込み 'no-form' 形式のPIDリストを返す。"""
+    global _ranking_cache
+    if _ranking_cache:
+        return _ranking_cache
     try:
-        import glob as _glob
+        with open(_RANKING_FILE, encoding="utf-8") as f:
+            pids: list[str] = []
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("-")
+                if len(parts) == 2:
+                    pids.append(f"{int(parts[0])}-{int(parts[1])}")
+        _ranking_cache = pids
+    except Exception:
+        pass
+    return _ranking_cache
+
+
+def _load_type_icon_templates() -> dict[str, "np.ndarray"]:
+    """image/typeicon/*.png をBGRで読み込んで返す（透明部分は白でコンポジット）。"""
+    global _type_icon_tpl
+    if _type_icon_tpl:
+        return _type_icon_tpl
+    try:
+        import glob as _g
 
         import cv2
-    except ImportError:
-        return ""
 
-    pokemon_images = _glob.glob("image/pokemon/*")
-    if not pokemon_images:
-        return ""
-
-    w, h = card.size
-    # The sprite occupies the top-left, roughly filling the card height
-    region = np.array(card.crop((0, 0, min(h + 20, w), h)).convert("RGB"))
-    gray = cv2.cvtColor(region, cv2.COLOR_RGB2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray_clahe = clahe.apply(gray)
-
-    best_val = 0.0
-    best_path = ""
-
-    for scale in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8):
-        for image_path in pokemon_images:
-            try:
-                temp = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-                if temp is None:
-                    continue
-                new_h = int(temp.shape[0] * scale)
-                new_w = int(temp.shape[1] * scale)
-                if new_h > gray.shape[0] or new_w > gray.shape[1]:
-                    continue
-                temp_s = cv2.resize(temp, (new_w, new_h))
-                match = cv2.matchTemplate(gray, temp_s, cv2.TM_CCOEFF_NORMED)
-                _, val, _, _ = cv2.minMaxLoc(match)
-                temp_s_clahe = clahe.apply(temp_s)
-                match_c = cv2.matchTemplate(
-                    gray_clahe, temp_s_clahe, cv2.TM_CCOEFF_NORMED
-                )
-                _, val_c, _, _ = cv2.minMaxLoc(match_c)
-                combined = max(val, val_c)
-                if combined > best_val:
-                    best_val = combined
-                    best_path = image_path
-            except Exception:
+        for path in _g.glob(f"{_TYPE_ICON_DIR}/*.png"):
+            name = os.path.splitext(os.path.basename(path))[0]
+            if name == "なし":
                 continue
+            raw = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+            if raw is None:
+                continue
+            if raw.ndim == 3 and raw.shape[2] == 4:
+                alpha = raw[:, :, 3:4].astype(np.float32) / 255.0
+                bgr = raw[:, :, :3].astype(np.float32)
+                white = np.ones_like(bgr) * 255.0
+                bgr = (bgr * alpha + white * (1.0 - alpha)).astype(np.uint8)
+            else:
+                bgr = raw[:, :, :3]
+            _type_icon_tpl[name] = bgr
+    except Exception:
+        pass
+    return _type_icon_tpl
 
-    if not best_path or best_val < threshold:
-        return ""
 
+_TYPE_ICON_SCALES = [0.4, 0.5, 0.6, 0.7, 0.8]
+_SPRITE_SCALES = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0]
+_TYPE_MATCH_THRESHOLD = 0.35
+_TYPE_TOP_N = 2
+
+
+def _detect_types_from_card(card: Image.Image) -> set[str]:
+    """タイプアイコン領域に全テンプレートをマッチングしてタイプを検出する。"""
+    try:
+        import cv2
+
+        templates = _load_type_icon_templates()
+        if not templates:
+            return set()
+
+        x1, y1, x2, y2 = _TYPE_ICON_SCAN
+        region = cv2.cvtColor(np.array(card.crop((x1, y1, x2, y2))), cv2.COLOR_RGB2BGR)
+        rh, rw = region.shape[:2]
+
+        scores: dict[str, float] = {}
+        for type_name, tpl in templates.items():
+            best = 0.0
+            for sc in _TYPE_ICON_SCALES:
+                th = max(1, int(tpl.shape[0] * sc))
+                tw = max(1, int(tpl.shape[1] * sc))
+                if th > rh or tw > rw:
+                    continue
+                t = cv2.resize(tpl, (tw, th))
+                res = cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED)
+                _, v, _, _ = cv2.minMaxLoc(res)
+                best = max(best, v)
+            scores[type_name] = best
+
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return {t for t, s in ranked[:_TYPE_TOP_N] if s >= _TYPE_MATCH_THRESHOLD}
+    except Exception:
+        return set()
+
+
+def _load_pokemon_sprite_templates() -> dict[str, tuple["np.ndarray", "np.ndarray | None"]]:
+    """image/pokemon/*.png のアルファチャンネル（シルエット）をテンプレートとしてキャッシュ。
+    カード上のポケモンは白シルエットとして表示されるため、アルファ形状と対応する。"""
+    global _pokemon_sprite_cache
+    if _pokemon_sprite_cache:
+        return _pokemon_sprite_cache
+    try:
+        import glob as _g
+
+        import cv2
+
+        for fp in _g.glob("image/pokemon/*.png"):
+            stem = Path(fp).stem
+            parts = stem.split("-")
+            if len(parts) != 2:
+                continue
+            pid = f"{int(parts[0])}-{int(parts[1])}"
+            raw = cv2.imdecode(np.fromfile(fp, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+            if raw is None:
+                continue
+            if raw.ndim == 3 and raw.shape[2] == 4:
+                # アルファ値をそのままシルエット強度として使用
+                sil = raw[:, :, 3]
+            else:
+                # アルファなし画像は輝度をシルエットとして使用
+                gray = cv2.cvtColor(raw[:, :, :3], cv2.COLOR_BGR2GRAY) if raw.ndim == 3 else raw
+                sil = gray
+            _pokemon_sprite_cache[pid] = (sil, None)
+    except Exception:
+        pass
+    return _pokemon_sprite_cache
+
+
+def _match_pokemon_sprite(card: Image.Image) -> list[tuple[float, str]]:
+    """スプライト領域に全 image/pokemon/ テンプレートをマッチングしてスコア順に返す。"""
+    try:
+        import cv2
+
+        w, h = card.size
+        cw = min(int(h * _SPRITE_CW_RATIO), w)
+        ch = min(int(h * _SPRITE_CH_RATIO), h)
+        region = cv2.cvtColor(np.array(card.crop((0, 0, cw, ch))), cv2.COLOR_RGB2GRAY)
+        rh, rw = region.shape
+
+        templates = _load_pokemon_sprite_templates()
+        results: list[tuple[float, str]] = []
+
+        for pid, (tpl_gray, _) in templates.items():
+            best = 0.0
+            for sc in _SPRITE_SCALES:
+                th = max(1, int(tpl_gray.shape[0] * sc))
+                tw = max(1, int(tpl_gray.shape[1] * sc))
+                if th > rh or tw > rw or th < 10 or tw < 10:
+                    continue
+                t = cv2.resize(tpl_gray, (tw, th))
+                res = cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED)
+                _, v, _, _ = cv2.minMaxLoc(res)
+                best = max(best, v)
+            if best > 0:
+                results.append((best, pid))
+
+        results.sort(reverse=True)
+        return results
+    except Exception:
+        return []
+
+
+def _ability_matches_pokemon(pokemon_name: str, abil_name: str) -> bool:
+    """OCR名とOCR特性が矛盾しないか確認する。特性不明またはDBに見つからない場合はTrueを返す。"""
+    if not abil_name:
+        return True
     try:
         from database.pokemon import DB_pokemon
 
-        pid = _path_to_pid(best_path)
-        return DB_pokemon.get_pokemon_name_by_pid(pid) or ""
+        pid = DB_pokemon.get_pokemon_pid_by_name(pokemon_name)
+        if not pid:
+            return True
+        parts = pid.split("-")
+        if len(parts) != 2:
+            return True
+        conn = sqlite3.connect("database/pokemon.db")
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT ability1, ability2, ability3 FROM pokemon_data WHERE no=?",
+            (int(parts[0]),),
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return True
+        return any(abil_name in (r["ability1"], r["ability2"], r["ability3"]) for r in rows)
     except Exception:
-        return ""
+        return True
+
+
+def _pids_with_ability(abil_name: str) -> set[str]:
+    """ability1/2/3 が abil_name に一致するポケモンの 'no-form' PIDセットを返す。"""
+    try:
+        conn = sqlite3.connect("database/pokemon.db")
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT no, form FROM pokemon_data "
+            "WHERE ability1=? OR ability2=? OR ability3=?",
+            (abil_name, abil_name, abil_name),
+        ).fetchall()
+        conn.close()
+        return {f"{r['no']}-{r['form']}" for r in rows}
+    except Exception:
+        return set()
+
+
+def _filter_by_types(pids: list[str], types: set[str]) -> list[str]:
+    """type1/type2 が全検出タイプを含むPIDのみ残す。"""
+    if not types:
+        return pids
+    try:
+        conn = sqlite3.connect("database/pokemon.db")
+        conn.row_factory = sqlite3.Row
+        result: list[str] = []
+        for pid in pids:
+            parts = pid.split("-")
+            if len(parts) != 2:
+                continue
+            row = conn.execute(
+                "SELECT type1, type2 FROM pokemon_data WHERE no=? AND form=?",
+                (int(parts[0]), int(parts[1])),
+            ).fetchone()
+            if not row:
+                continue
+            pokemon_types = {row["type1"], row["type2"]} - {""}
+            if types.issubset(pokemon_types):
+                result.append(pid)
+        conn.close()
+        return result
+    except Exception:
+        return pids
+
+
+def _load_home_waza() -> dict[str, set[str]]:
+    """stats/home_waza.csv を読み込み {ポケモン名: {技名, ...}} を返す。"""
+    global _home_waza_cache
+    if _home_waza_cache:
+        return _home_waza_cache
+    try:
+        import csv
+
+        result: dict[str, set[str]] = {}
+        with open("stats/home_waza.csv", encoding="utf-8") as f:
+            for row in csv.reader(f):
+                if len(row) >= 2:
+                    pname, wname = row[0].strip(), row[1].strip()
+                    if pname and wname:
+                        result.setdefault(pname, set()).add(wname)
+        _home_waza_cache = result
+    except Exception:
+        pass
+    return _home_waza_cache
+
+
+def _identify_pokemon(
+    card: Image.Image,
+    name_raw: str,
+    abil: str,
+    item: str,
+    moves: list[str],
+) -> str:
+    """①〜⑦のシグナルを順に適用してポケモン名を確定する。
+
+    ① image/pokemon/ テンプレートマッチ → スコア順候補リスト
+    ② ポケモン名OCR 完全一致 → 即確定
+    ③ 特性フィルタ
+    ④ タイプアイコン（テンプレートマッチ）
+       ①-④ で候補が1件 → 確定
+    ⑤ メガストーン → 即確定
+    ⑥ HOME技フィルタ
+    ⑦ HOMEランキング順で最終選択
+    """
+    from database.pokemon import DB_pokemon
+
+    _load_reference_lists()
+
+    # ① スプライトテンプレートマッチング → スコア順候補リスト
+    sprite_matches = _match_pokemon_sprite(card)
+    img_pids = set(_load_pokemon_sprite_templates().keys())
+    candidates: list[str] = [pid for _, pid in sprite_matches] if sprite_matches else list(img_pids)
+
+    # ② ポケモン名OCR（タイプアイコン等のノイズをカタカナ・漢字のみ抽出して除去）
+    # + 特性クロスバリデーション（ニックネーム衝突防止）
+    _name_norm = _normalize(name_raw)
+    name_clean = "".join(
+        ch for ch in _name_norm
+        if (0x30A0 <= ord(ch) <= 0x30FF and ord(ch) != 0x30FB)
+        or 0x4E00 <= ord(ch) <= 0x9FFF
+        or ch in "♂♀（）"
+    )
+    ocr_name = _closest_match(name_clean, _pokemon_names, cutoff=0.85) if name_clean else ""
+    if ocr_name and _ability_matches_pokemon(ocr_name, abil):
+        return ocr_name
+
+    # ③ 特性フィルタ（空になる場合は無視）
+    if abil:
+        abil_pids = _pids_with_ability(abil)
+        filtered = [p for p in candidates if p in abil_pids]
+        if filtered:
+            candidates = filtered
+
+    # ④ タイプアイコンフィルタ（空になる場合は無視）
+    detected_types = _detect_types_from_card(card)
+    if detected_types:
+        type_filtered = _filter_by_types(candidates, detected_types)
+        if type_filtered:
+            candidates = type_filtered
+
+    # ①-④ で1候補に絞れたら確定
+    if len(candidates) == 1:
+        return DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or ""
+
+    # ⑤ メガストーン → 直接特定
+    if item and "ナイト" in item:
+        stem = re.sub(r"ナイト[XYＸＹxy]?$", "", item).strip()
+        if stem:
+            mega_name = _closest_match(stem, _pokemon_names, cutoff=0.45)
+            if mega_name:
+                return mega_name
+
+    # ⑥ HOME技フィルタ（空になる場合は無視）
+    ocr_moves = {m for m in moves if m}
+    if ocr_moves:
+        home_waza = _load_home_waza()
+        move_filtered = [
+            pid for pid in candidates
+            if ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(pid) or "", set())
+        ]
+        if move_filtered:
+            candidates = move_filtered
+
+    # ⑦ HOMEランキング順で最終選択
+    ranking = _load_ranking()
+    if ranking:
+        ranking_idx = {pid: i for i, pid in enumerate(ranking)}
+        candidates.sort(key=lambda p: ranking_idx.get(p, len(ranking)))
+
+    return DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "" if candidates else ""
 
 
 # ---------------------------------------------------------------------------
@@ -480,10 +772,11 @@ def _parse_info_card(card: Image.Image) -> dict:
             best_lines = lines
     moves_raw = (best_lines + [""] * 4)[:4]
 
-    name = _closest_match(name_raw, _pokemon_names, cutoff=0.40)
     abil = _closest_match(abil_raw, _ability_names, cutoff=0.40)
     item = _closest_match(item_raw, _item_names, cutoff=0.40)
     moves = [_closest_match(m, _waza_names, cutoff=0.40) for m in moves_raw]
+
+    name = _identify_pokemon(card, name_raw, abil, item, moves)
 
     # 画像ファイルのないフォームは、実際に画像が存在するフォームの名前に差し替える
     if name:
