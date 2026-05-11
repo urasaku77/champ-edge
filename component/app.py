@@ -510,6 +510,7 @@ class MainApp(ThemedTk):
 
         self._stage = None
         self._after_id: int | None = None
+        self._party_progress_win: tkinter.Toplevel | None = None
 
         self.after(1000, self._auto_check_update)
 
@@ -750,12 +751,32 @@ class MainApp(ThemedTk):
 
     # 画像認識ループ開始
     def loop_image_recognize(self):
+        self.monitor = True
+        self.monitor_var.set("監視停止")
+        self.websocket_button["state"] = tkinter.DISABLED
+        self.shot_button["state"] = tkinter.DISABLED
+        threading.Thread(target=self._loop_recognize_worker, daemon=True).start()
+
+    def _loop_recognize_worker(self):
+        def _on_start(total: int):
+            self.after(0, lambda t=total: self._show_party_progress(t))
+
+        def _on_progress(current: int, total: int):
+            self.after(0, lambda c=current, t=total: self._update_party_progress(c, t))
+
+        self.capture.on_party_start_progress = _on_start
+        self.capture.on_party_progress = _on_progress
         result = self.capture.image_recognize()
+        self.after(0, self._close_party_progress)
+        self.after(0, lambda r=result: self._handle_loop_result(r))
+
+    def _handle_loop_result(self, result):
+        if not self.monitor:
+            return
         match result:
             case tuple():
                 self.party_frames[1].set_party_from_capture(result[0])
                 self.record_frame.tn.insert(0, result[1])
-
                 if get_recog_value("similar_party_auto"):
                     self.search_similar_party(isOpen=False)
                 if get_recog_value("search_record_auto"):
@@ -765,10 +786,8 @@ class MainApp(ThemedTk):
                     self.chosen_frames[0].set_chosen_from_capture(result)
             case bool():
                 if result:
-                    # タイマーをリセットしてスタート
                     self.timer_frame.reset_button_clicked()
                     self.timer_frame.start_button_clicked()
-                    # 選出一体目を自動登録
                     self.party_frames[0].set_first_chosen_to_active()
                     self.stop_image_recognize()
                     return
@@ -778,10 +797,41 @@ class MainApp(ThemedTk):
             case _:
                 pass
         self._after_id = self.after(1000, self.loop_image_recognize)
-        self.monitor = True
-        self.monitor_var.set("監視停止")
-        self.websocket_button["state"] = tkinter.DISABLED
-        self.shot_button["state"] = tkinter.DISABLED
+
+    def _show_party_progress(self, total: int):
+        if self._party_progress_win is not None:
+            return
+        self._party_progress_win = tkinter.Toplevel(self)
+        self._party_progress_win.title("パーティ認識中...")
+        self._party_progress_win.resizable(False, False)
+        self._party_progress_win.grab_set()
+        self._party_progress_label = tkinter.Label(
+            self._party_progress_win,
+            text=f"ポケモン認識中... 0 / {total}",
+            padx=30, pady=10, width=28, justify="center",
+        )
+        self._party_progress_label.pack()
+        self._party_progress_bar = ttk.Progressbar(
+            self._party_progress_win, length=280, mode="determinate", maximum=total,
+        )
+        self._party_progress_bar.pack(padx=30, pady=(0, 20))
+
+    def _update_party_progress(self, current: int, total: int):
+        if self._party_progress_win is None:
+            return
+        try:
+            self._party_progress_label.config(text=f"ポケモン認識中... {current} / {total}")
+            self._party_progress_bar["value"] = current
+        except Exception:
+            pass
+
+    def _close_party_progress(self):
+        if self._party_progress_win is not None:
+            try:
+                self._party_progress_win.destroy()
+            except Exception:
+                pass
+            self._party_progress_win = None
 
     # 画像認識ループ停止
     def stop_image_recognize(self):
@@ -794,10 +844,25 @@ class MainApp(ThemedTk):
 
     # 手動キャプチャ
     def manual_capture(self):
+        threading.Thread(target=self._manual_capture_worker, daemon=True).start()
+
+    def _manual_capture_worker(self):
+        def _on_start(total: int):
+            self.after(0, lambda t=total: self._show_party_progress(t))
+
+        def _on_progress(current: int, total: int):
+            self.after(0, lambda c=current, t=total: self._update_party_progress(c, t))
+
+        self.capture.on_party_start_progress = _on_start
+        self.capture.on_party_progress = _on_progress
         result = self.capture.recognize_chosen_capture()
+        self.after(0, self._close_party_progress)
         if result is not None:
-            self.party_frames[1].set_party_from_capture(result[0])
-            self.record_frame.tn.insert(0, result[1])
+            self.after(0, lambda r=result: self._on_manual_capture_result(r))
+
+    def _on_manual_capture_result(self, result):
+        self.party_frames[1].set_party_from_capture(result[0])
+        self.record_frame.tn.insert(0, result[1])
 
     # 類似パーティ検索
     def search_similar_party(self, isOpen: bool = True):

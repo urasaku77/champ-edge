@@ -3,6 +3,7 @@ import base64
 import glob
 import os
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -31,6 +32,8 @@ class Capture:
         self.is_panipani = get_recog_value("panipani_auto")
         self.party_recognized = False
         self.pokecrop_imgs: list[Image.Image] = []
+        self.on_party_start_progress = None  # callback(total: int)
+        self.on_party_progress = None  # callback(current: int, total: int)
 
     # Websocket接続
     def connect_websocket(self):
@@ -168,19 +171,30 @@ class Capture:
             "opoPoke6",
         ]
 
+        if self.on_party_start_progress:
+            self.on_party_start_progress(6)
+
         # 初回バトル時のみディスクから読み込んでキャッシュ、以降はメモリから参照
         for img_path in pokemonImages:
             self._get_pokemon_template_pair(img_path)
 
+        _completed = [0]
+        _lock = threading.Lock()
+
         def recognize_one(coord_idx: int) -> Pokemon:
             oppo = self.is_exist_image_max(pokemonImages, 0.45, coordsList[coord_idx])
             if oppo == "":
-                return Pokemon()
-            oppo_shaped = self.shape_poke_num(oppo)
-            oppo_pokemon = Pokemon.by_pid(oppo_shaped, True)
-            if oppo_pokemon.base_name in unrecognizable_pokemon:
-                oppo_pokemon.form_selected = False
-            return oppo_pokemon
+                pokemon = Pokemon()
+            else:
+                oppo_shaped = self.shape_poke_num(oppo)
+                pokemon = Pokemon.by_pid(oppo_shaped, True)
+                if pokemon.base_name in unrecognizable_pokemon:
+                    pokemon.form_selected = False
+            with _lock:
+                _completed[0] += 1
+                if self.on_party_progress:
+                    self.on_party_progress(_completed[0], 6)
+            return pokemon
 
         with ThreadPoolExecutor(max_workers=6) as executor:
             pokemonlist = list(executor.map(recognize_one, range(6)))
