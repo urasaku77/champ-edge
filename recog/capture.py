@@ -119,8 +119,12 @@ class Capture:
         self.get_screenshot()
         coord = self.coords.dicCoord["oporate1"]
         img = self.img[coord.top : coord.bottom, coord.left : coord.right]
-        pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        rate_str = self._manga_ocr(pil).strip()
+        try:
+            pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            rate_str = self._manga_ocr(pil).strip()
+        except Exception:
+            # manga_ocrが使えない場合（コンパイル版など）はTesseractにフォールバック
+            rate_str = self.ocr_full(img)
         # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
         m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
         if m:

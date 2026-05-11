@@ -775,7 +775,11 @@ class MainApp(ThemedTk):
 
         self.capture.on_party_start_progress = _on_start
         self.capture.on_party_progress = _on_progress
-        result = self.capture.image_recognize()
+        try:
+            result = self.capture.image_recognize()
+        except Exception as e:
+            print(f"画像認識エラー: {e}")
+            result = None
         self.after(0, self._close_party_progress)
         self.after(0, lambda r=result: self._handle_loop_result(r))
 
