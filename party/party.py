@@ -95,7 +95,7 @@ class PartyEditor(tkinter.Toplevel):
         self.using = UseParty(main_frame, text="使用パーティ", padding=5)
         self.using.grid(row=0, column=4, columnspan=1, sticky=N + E + S + W)
 
-        self.pokemons = PokemonEditors(main_frame, text="パーティ編集", padding=5)
+        self.pokemons = PokemonEditors(main_frame, padding=5)
         self.pokemons.grid(row=1, column=0, columnspan=5, sticky=N + E + W + S)
 
         csv = self.using.using_var.get()
@@ -494,7 +494,7 @@ class UseParty(ttk.LabelFrame):
             txt.close()
 
 
-class PokemonEditors(ttk.LabelFrame):
+class PokemonEditors(ttk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master=master, **kwargs)
         self.pokemon_panel_list: list[PokemonEditor] = []
