@@ -118,6 +118,20 @@ class DB_pokemon:
         )
 
     @staticmethod
+    def get_item_effect(item_name: str) -> str:
+        result = DB_pokemon.__select(
+            "SELECT effect FROM item_data WHERE item_name = ?", (item_name,)
+        )
+        return result[0]["effect"] if result and result[0]["effect"] else ""
+
+    @staticmethod
+    def get_ability_effect(ability_name: str) -> str:
+        result = DB_pokemon.__select(
+            "SELECT effect FROM ability_data WHERE ability_name = ?", (ability_name,)
+        )
+        return result[0]["effect"] if result and result[0]["effect"] else ""
+
+    @staticmethod
     def get_mega_forms_by_no(no: int) -> list[int]:
         """図鑑番号 no のメガシンカフォーム番号リスト (10-19) を昇順で返す"""
         return [

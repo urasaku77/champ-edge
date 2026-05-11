@@ -297,12 +297,14 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._item_combobox.set(ITEM_COMBOBOX_VALUES[0])
         self._item_combobox.bind("<<ComboboxSelected>>", self.on_select_item)
         self._item_combobox.bind("<Return>", self.on_select_item)
+        self._item_combobox.bind("<Button-3>", self._on_right_click_item)
         self._item_combobox.grid(column=2, row=2, sticky=W + E)
 
         self._ability_label = MyLabel(self, text="特性")
         self._ability_label.grid(column=1, row=3, padx=5, pady=5)
         self._ability_combobox = MyCombobox(self)
         self._ability_combobox.bind("<<ComboboxSelected>>", self.on_select_ability)
+        self._ability_combobox.bind("<Button-3>", self._on_right_click_ability)
         self._ability_combobox.grid(column=2, row=3, sticky=W + E)
 
         self._ability_value_combobox = MyCombobox(self, width=4, state="disable")
@@ -427,16 +429,11 @@ class ActivePokemonFrame(ttk.LabelFrame):
         )
 
     def _update_teras_state(self, ability: str):
-        if ability in ("へんげんじざい", "リベロ"):
-            self._teras_button.config(
-                state=tkinter.NORMAL, command=self.on_push_terasbutton
-            )
-        else:
-            enabled = get_recog_value("terastal_enabled")
-            self._teras_button.config(
-                state=tkinter.NORMAL if enabled else tkinter.DISABLED,
-                command=self.on_push_terasbutton if enabled else (lambda: None),
-            )
+        enabled = get_recog_value("terastal_enabled")
+        self._teras_button.config(
+            state=tkinter.NORMAL if enabled else tkinter.DISABLED,
+            command=self.on_push_terasbutton if enabled else (lambda: None),
+        )
 
     def on_select_ability(self, *_args):
         ability = self._ability_combobox.get()
@@ -469,6 +466,37 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._status_frame.update_pokemon(self._pokemon, False)
         self._stage.set_info(self._player)
         self._stage.calc_damage()
+
+    def _on_right_click_item(self, _event=None):
+        name = self._item_combobox.get()
+        if not name or name == "なし":
+            return
+        from database.pokemon import DB_pokemon
+        effect = DB_pokemon.get_item_effect(name)
+        self._show_effect_popup("持ち物詳細", name, effect)
+
+    def _on_right_click_ability(self, _event=None):
+        name = self._ability_combobox.get()
+        if not name:
+            return
+        from database.pokemon import DB_pokemon
+        effect = DB_pokemon.get_ability_effect(name)
+        self._show_effect_popup("特性詳細", name, effect)
+
+    def _show_effect_popup(self, title: str, name: str, effect: str):
+        import math
+        popup = tkinter.Toplevel(self)
+        popup.title(title)
+        width = 350
+        text = effect if effect else "効果情報なし"
+        height = 80 + math.ceil(len(text) * 7.5 / (width - 40)) * 20
+        popup.geometry(f"{width}x{max(120, height)}")
+        tkinter.Label(
+            popup, text=name, font=("Arial", 14, "bold"), anchor="center"
+        ).pack(side="top", pady=10)
+        tkinter.Label(
+            popup, text=text, anchor="w", justify="left", wraplength=width - 40
+        ).pack(fill="x", padx=10, pady=4)
 
     def all_check_reset(self):
         self.critical.set(False)
@@ -869,6 +897,8 @@ class InfoFrame(ttk.LabelFrame):
         self._player: int = player
         self._no: int = 0
         self._form: int = -1
+        self._stage: Stage | None = None
+        self._pokemon: Pokemon = Pokemon()
         self.syuzoku = {}
         global img
         img = [
@@ -896,10 +926,12 @@ class InfoFrame(ttk.LabelFrame):
         self.type1_img = img[self._player][0]
         self.type1_icon = ttk.Label(basic_info_flame, image=self.type1_img)
         self.type1_icon.grid(column=1, row=0, sticky="w")
+        self.type1_icon.bind("<Button-1>", lambda _e: self._on_click_type())
 
         self.type2_img = img[self._player][1]
         self.type2_icon = ttk.Label(basic_info_flame, image=self.type2_img)
         self.type2_icon.grid(column=2, row=0, sticky="w")
+        self.type2_icon.bind("<Button-1>", lambda _e: self._on_click_type())
 
         buttons = ttk.Frame(basic_info_flame)
         self.poketetsu_button = MyButton(
@@ -938,23 +970,45 @@ class InfoFrame(ttk.LabelFrame):
             self.syuzoku[statskey] = value
         status_flame.pack(side="top", anchor="w")
 
+    def set_stage(self, stage: Stage):
+        self._stage = stage
+
+    def _on_click_type(self):
+        if self._stage is None or self._pokemon.is_empty:
+            return
+        if self._pokemon.ability not in ("へんげんじざい", "リベロ"):
+            return
+        self._stage.select_battle_type(self._player)
+
     def set_info(self, pokemon: Pokemon):
+        self._pokemon = pokemon
         if pokemon.is_empty is False:
             self._no = pokemon.no
             self._form = pokemon.form
             self.name.set(pokemon.name)
+            is_protean = pokemon.ability in ("へんげんじざい", "リベロ")
+            cursor = "hand2" if is_protean else ""
+            self.type1_icon.configure(cursor=cursor)
+            self.type2_icon.configure(cursor=cursor)
+            if pokemon.battle_type is not None:
+                display_type1 = pokemon.battle_type[0]
+                display_type2 = None
+            else:
+                display_types = pokemon.type
+                display_type1 = display_types[0]
+                display_type2 = display_types[1] if len(display_types) > 1 else None
             img[self._player][0] = tkinter.PhotoImage(
-                file=pokemon.type[0].icon
+                file=display_type1.icon
             ).subsample(3, 3)
             self.type1_icon.configure(
-                image=img[self._player][0], text=pokemon.type[0].name, compound="left"
+                image=img[self._player][0], text=display_type1.name, compound="left"
             )
             img[self._player][1] = tkinter.PhotoImage(
-                file=pokemon.type[1].icon if len(pokemon.type) > 1 else Types.なし.icon
+                file=display_type2.icon if display_type2 else Types.なし.icon
             ).subsample(3, 3)
             self.type2_icon.configure(
                 image=img[self._player][1],
-                text=pokemon.type[1].name if len(pokemon.type) > 1 else "",
+                text=display_type2.name if display_type2 else "",
                 compound="left",
             )
             for _i, statskey in enumerate([x for x in StatsKey]):
