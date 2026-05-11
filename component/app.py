@@ -201,6 +201,15 @@ class MainApp(ThemedTk):
         self.websocket = False
         self.monitor = False
 
+        import glob
+        import threading
+
+        def _prewarm_pokemon_cache():
+            for path in glob.glob("image/pokemon/*"):
+                Capture._get_pokemon_template_pair(path)
+
+        threading.Thread(target=_prewarm_pokemon_cache, daemon=True).start()
+
         self.party_frames: list[PartyFrame] = []
         self.chosen_frames: list[ChosenFrame] = []
         self._info_frames: list[InfoFrame] = []
