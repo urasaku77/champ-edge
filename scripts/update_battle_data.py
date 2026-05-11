@@ -56,6 +56,7 @@ def git_push(today: str):
         print("変更なし、コミットスキップ")
         return
     _run_git(["commit", "-m", f"data: バトルデータ更新 ({today})"])
+    _run_git(["pull", "--rebase", "origin", "main"])
     _run_git(["push"])
     print("プッシュ完了")
 
