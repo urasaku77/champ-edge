@@ -9,6 +9,7 @@ import difflib
 import os
 import re
 import sqlite3
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -19,7 +20,7 @@ from PIL import Image
 
 from pokedata.nature import get_seikaku_from_arrows
 from pokedata.stats import StatsKey
-from recog.recog import get_recog_value
+from recog.recog import get_tesseract_path
 
 try:
     import pytesseract
@@ -37,9 +38,10 @@ except ImportError:
 def _configure_tesseract() -> None:
     if not _TESSERACT_IMPORTED:
         return
-    path = get_recog_value("tesseract_path")
+    path = get_tesseract_path()
     if path:
-        pytesseract.pytesseract.tesseract_cmd = os.path.join(path, "tesseract.exe")
+        exe = "tesseract.exe" if sys.platform == "win32" else "tesseract"
+        pytesseract.pytesseract.tesseract_cmd = os.path.join(path, exe)
 
 
 # ---------------------------------------------------------------------------

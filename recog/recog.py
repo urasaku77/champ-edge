@@ -1,5 +1,7 @@
 # キャプチャ設定画面
 import json
+import os
+import sys
 import tkinter
 from tkinter import filedialog, ttk
 
@@ -319,3 +321,15 @@ def get_recog_value(key: str):
                 return settings_json.get(key, defaults[key])
     except FileNotFoundError:
         return defaults[key]
+
+
+def get_tesseract_path() -> str:
+    """バンドル済みTesseract（PyInstaller exe）を優先し、なければ設定値を返す。"""
+    if getattr(sys, 'frozen', False):
+        bundled = os.path.join(sys._MEIPASS, 'tesseract')
+        if os.path.isdir(bundled):
+            tessdata = os.path.join(bundled, 'tessdata')
+            if os.path.isdir(tessdata):
+                os.environ.setdefault('TESSDATA_PREFIX', tessdata)
+            return bundled
+    return get_recog_value("tesseract_path")

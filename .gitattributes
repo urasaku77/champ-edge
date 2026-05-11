@@ -1,0 +1,6 @@
+# Tesseract OCR バイナリ (Git LFS)
+vendor/tesseract/windows/*.exe filter=lfs diff=lfs merge=lfs -text
+vendor/tesseract/windows/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/tesseract/mac/tesseract filter=lfs diff=lfs merge=lfs -text
+vendor/tesseract/mac/*.dylib filter=lfs diff=lfs merge=lfs -text
+vendor/tesseract/**/tessdata/*.traineddata filter=lfs diff=lfs merge=lfs -text

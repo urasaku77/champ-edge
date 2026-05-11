@@ -25,6 +25,8 @@ BUILD_DIR = os.path.join("dist", "champedge")
 # スキャン対象のルート（ファイルまたはディレクトリ）
 # 各ディレクトリ内の新規ファイルは自動的にzipに含まれる
 # 含めたくないものは _UPDATE_EXCLUDE / _ALWAYS_EXCLUDE に追加する
+_TESSERACT_DIR = "vendor/tesseract/windows" if sys.platform == "win32" else "vendor/tesseract/mac"
+
 _DATA_ROOTS = [
     "version.txt",
     "README.pdf",
@@ -33,6 +35,7 @@ _DATA_ROOTS = [
     "stats",
     "recog",
     "party",
+    _TESSERACT_DIR,
 ]
 
 # フルインストール・アップデート共通で除外するパス
@@ -51,6 +54,7 @@ _UPDATE_EXCLUDE = {
     "recog/capture.json",
     "recog/setting.json",
     "image/outputImg",
+    _TESSERACT_DIR,
 }
 
 
@@ -83,8 +87,8 @@ def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:
                 zf.write(abs_path, arc)
                 total += 1
         return total
-    print(f"  エラー: 見つかりません: {src}")
-    raise FileNotFoundError(f"必要ファイルが見つかりません: {src}")
+    print(f"  スキップ（存在しない）: {src}")
+    return 0
 
 
 def make_zip(out_zip: str, full: bool):

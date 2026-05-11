@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -57,6 +57,18 @@ jobs:
           fi
           ls -la README.pdf
 
+      - name: Download Tesseract OCR installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/UB-Mannheim/tesseract/releases/latest" `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "GitHub-Actions" }
+          $asset = $release.assets | Where-Object { $_.name -match "w64-setup.*\.exe$" } | Select-Object -First 1
+          New-Item -ItemType Directory -Force "vendor\tesseract\windows" | Out-Null
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "vendor\tesseract\windows\$($asset.name)"
+          Write-Output "Downloaded: $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB)"
+
       - name: Create zips
         shell: pwsh
         run: |
@@ -92,5 +104,69 @@ jobs:
           echo "=== uploading ==="
           gh release upload "v$ver" champedge_forwin.zip champedge_forwin_update.zip \
             --repo ${{ github.repository }}
-          echo "=== release assets after upload ==="
+
+  build-mac:
+    runs-on: macos-latest
+    needs: build-windows
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          VER="$(cat version.txt | tr -d '[:space:]')"
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          grep -v "^-e\|^#\|^$" requirements.lock > requirements_ci.txt
+          pip install -r requirements_ci.txt
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller champedge.spec --noconfirm
+
+      - name: Create Tesseract pkg installer
+        run: |
+          brew install tesseract tesseract-lang
+          TESS_VER=$(tesseract --version 2>&1 | head -1 | awk '{print $2}')
+          PKG_ROOT=$(mktemp -d)
+          mkdir -p "$PKG_ROOT/usr/local/bin"
+          mkdir -p "$PKG_ROOT/usr/local/share/tessdata"
+          cp "$(brew --prefix)/bin/tesseract" "$PKG_ROOT/usr/local/bin/"
+          TESSDATA_SRC="$(brew --prefix)/share/tessdata"
+          if [ -d "$TESSDATA_SRC" ]; then
+            cp "$TESSDATA_SRC/"*.traineddata "$PKG_ROOT/usr/local/share/tessdata/" 2>/dev/null || true
+          fi
+          mkdir -p vendor/tesseract/mac
+          pkgbuild \
+            --root "$PKG_ROOT" \
+            --identifier com.tesseract-ocr.tesseract \
+            --version "$TESS_VER" \
+            "vendor/tesseract/mac/tesseract-$TESS_VER.pkg"
+          echo "Created: vendor/tesseract/mac/tesseract-$TESS_VER.pkg"
+
+      - name: Create zips
+        run: |
+          python scripts/create_update_zip.py --full
+          python scripts/create_update_zip.py
+          mv dist/champedge_full.zip champedge_formac.zip
+          mv dist/champedge_update.zip champedge_formac_update.zip
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${{ steps.get_version.outputs.VERSION }}"
+          gh release upload "v$ver" champedge_formac.zip champedge_formac_update.zip \
+            --repo ${{ github.repository }}
+          echo "=== release assets ==="
           gh release view "v$ver" --repo ${{ github.repository }} --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
