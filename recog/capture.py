@@ -16,13 +16,13 @@ from pokedata.exception import unrecognizable_pokemon
 from pokedata.pokemon import Pokemon
 from recog.coodinate import ConfCoordinate
 from recog.obs import Obs
-from recog.recog import get_recog_value
+from recog.recog import get_recog_value, get_tesseract_path
 
 
 class Capture:
     def __init__(self):
         self.coords = ConfCoordinate()
-        self.path_tesseract = get_recog_value("tesseract_path")
+        self.path_tesseract = get_tesseract_path()
 
         # sensyutu(選出画面)→rate(レート確認)→battle(対戦開始待ち)
         self.phase = "sensyutu"
@@ -271,6 +271,7 @@ class Capture:
         # JPEGはアルファ非対応のため黒背景に合成して保存
         bg = Image.new("RGB", dst.size, (0, 0, 0))
         bg.paste(dst, mask=dst.split()[3])
+        os.makedirs("image/outputImg", exist_ok=True)
         bg.save("image/outputImg/outputSensyutuBig.jpg", quality=95)
 
     # テンプレートマッチング(最大のみ)
