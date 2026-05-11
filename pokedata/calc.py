@@ -979,6 +979,9 @@ class DamageCalc:
                 case "いろめがね":
                     if type_effective < 1.0:
                         hosei[key] = 8192
+                case "ふかしのこぶし" | "かんつうドリル":
+                    if attacker.ability_enable:
+                        hosei[key] = 1024
         # endregion
 
         # region 防御側の特性補正
