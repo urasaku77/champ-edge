@@ -61,7 +61,7 @@ class DB_pokemon:
     def get_pokemon_namelist(form: bool = False) -> list[str]:
         if form:
             if len(DB_pokemon.__pokemon_namelist_for_party) == 0:
-                sql = "SELECT name FROM pokemon_data WHERE name NOT LIKE 'メガ%'"
+                sql = "SELECT name FROM pokemon_data WHERE name NOT LIKE 'メガ%' OR name = 'メガニウム'"
                 for row in DB_pokemon.__select(sql):
                     DB_pokemon.__pokemon_namelist_for_party.append(row["name"])
                 for pokemon in remove_pokemon_name_from_party:
