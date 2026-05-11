@@ -12,6 +12,7 @@ from component.parts.label import MyLabel
 from database.pokemon import DB_pokemon
 from pokedata.const import Types
 from pokedata.pokemon import Pokemon
+from recog.recog import get_recog_value
 
 
 # パーティ入力ダイアログ
@@ -829,7 +830,8 @@ class BoxDialog(tkinter.Toplevel):
     def __init__(self):
         super().__init__()
         self.title("ボックス管理")
-        self.geometry("1650x900")
+        tera_enabled = get_recog_value("terastal_enabled")
+        self.geometry(f"{'1400' if tera_enabled else '1250'}x900")
 
         self.pokemon = Pokemon()
         self.file_path = "party\\csv\\box.csv"
@@ -908,22 +910,24 @@ class BoxDialog(tkinter.Toplevel):
     def set_pokemon_list(self):
         self.pokes_frame.destroy()
         self.pokes_frame = ttk.Frame(self, padding=10)
-        column_title = [
-            "名前",
-            "個体値",
-            "努力値",
-            "性格",
-            "持ち物",
-            "特性",
-            "テラス",
-        ]
+        tera_enabled = get_recog_value("terastal_enabled")
+
+        # CSV index 1 (個体値) は常に非表示、index 6 (テラス) はテラスタル無効時に非表示
+        skip_indices = {1} if tera_enabled else {1, 6}
+
+        column_title = ["名前", "努力値", "性格", "持ち物", "特性"]
+        if tera_enabled:
+            column_title.append("テラス")
 
         for i, value in enumerate(column_title):
             label = MyLabel(self.pokes_frame, text=value)
             label.grid(row=0, column=i + 1, padx=15, pady=10)
 
+        waza_col = len(column_title) + 1
+        memo_col = waza_col + 4
+
         label = MyLabel(self.pokes_frame, text="技")
-        label.grid(row=0, column=8, columnspan=4)
+        label.grid(row=0, column=waza_col, columnspan=4)
 
         for i, row in enumerate(
             self.box_data[
@@ -940,22 +944,24 @@ class BoxDialog(tkinter.Toplevel):
                 command=lambda idx=i: self.on_delete_pokemon(idx),
             )
             choose_button.grid(row=i + 1, column=0, padx=15, pady=10)
+            display_col = 1
             for j, value in enumerate(row):
-                if j != 7:
-                    label = MyLabel(self.pokes_frame, text=value)
-                    label.grid(
-                        row=i + 1,
-                        column=j + 1 if j < 7 else j,
-                        padx=15,
-                        pady=10,
-                    )
-                else:
+                if j in skip_indices:
+                    continue
+                elif j == 7:
                     memo_button = MyButton(
                         master=self.pokes_frame,
                         image=images.get_menu_icon("load"),
                         command=lambda memo=value: self.show_pokemon_memo(memo),
                     )
-                    memo_button.grid(row=i + 1, column=12, padx=15, pady=10)
+                    memo_button.grid(row=i + 1, column=memo_col, padx=15, pady=10)
+                elif j >= 8:
+                    label = MyLabel(self.pokes_frame, text=value)
+                    label.grid(row=i + 1, column=waza_col + (j - 8), padx=15, pady=10)
+                else:
+                    label = MyLabel(self.pokes_frame, text=value)
+                    label.grid(row=i + 1, column=display_col, padx=15, pady=10)
+                    display_col += 1
 
         self.pokes_frame.pack(fill="both", expand=True, side="top")
 
