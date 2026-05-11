@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import glob as _glob
+import os
+import subprocess as _sp
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -8,13 +11,39 @@ ttkthemes_datas = collect_data_files('ttkthemes')
 # Windows のみ favicon.ico を適用（macOS は ICNS が必要なので未指定）
 _icon = 'image/favicon.ico' if sys.platform == 'win32' else None
 
+# Tesseract バイナリをバンドル（コンパイル版で OCR フォールバックが動作するように）
+_tess_datas = []
+if sys.platform == 'win32':
+    _tess_dir = r'C:\Program Files\Tesseract-OCR'
+    if os.path.isdir(_tess_dir):
+        for _f in _glob.glob(os.path.join(_tess_dir, '*.exe')) + _glob.glob(os.path.join(_tess_dir, '*.dll')):
+            _tess_datas.append((_f, 'tesseract'))
+        _tessdata_dir = os.path.join(_tess_dir, 'tessdata')
+        for _lang in ['eng', 'osd', 'jpn']:
+            _td = os.path.join(_tessdata_dir, f'{_lang}.traineddata')
+            if os.path.isfile(_td):
+                _tess_datas.append((_td, 'tesseract/tessdata'))
+elif sys.platform == 'darwin':
+    try:
+        _brew = _sp.check_output(['brew', '--prefix'], text=True).strip()
+        _tess_exe = os.path.join(_brew, 'bin', 'tesseract')
+        if os.path.isfile(_tess_exe):
+            _tess_datas.append((_tess_exe, 'tesseract'))
+        _tessdata_dir = os.path.join(_brew, 'share', 'tessdata')
+        for _lang in ['eng', 'osd', 'jpn']:
+            _td = os.path.join(_tessdata_dir, f'{_lang}.traineddata')
+            if os.path.isfile(_td):
+                _tess_datas.append((_td, 'tesseract/tessdata'))
+    except Exception:
+        pass
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
         # ttkthemesのテーマファイルのみ（他のデータはexeと同階層に外出し）
-    ] + ttkthemes_datas,
+    ] + ttkthemes_datas + _tess_datas,
     hiddenimports=[
         # update_home_data() / update_battle_data() 内で動的にインポートされる
         'stats.home',

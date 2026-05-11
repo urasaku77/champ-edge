@@ -123,8 +123,19 @@ class Capture:
             pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             rate_str = self._manga_ocr(pil).strip()
         except Exception:
-            # manga_ocrが使えない場合（コンパイル版など）はTesseractにフォールバック
-            rate_str = self.ocr_full(img)
+            try:
+                # manga_ocrが使えない場合（コンパイル版など）はTesseractで数字を読む
+                if self.path_tesseract not in os.environ["PATH"].split(os.pathsep):
+                    os.environ["PATH"] += os.pathsep + self.path_tesseract
+                tools = pyocr.get_available_tools()
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                _, binary = cv2.threshold(gray, 85, 255, cv2.THRESH_BINARY)
+                builder = pyocr.builders.TextBuilder(tesseract_layout=7)
+                rate_str = tools[0].image_to_string(
+                    Image.fromarray(binary), lang="eng", builder=builder
+                )
+            except Exception:
+                rate_str = ""
         # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
         m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
         if m:
@@ -420,7 +431,10 @@ class Capture:
                 if self._is_trainer_name(result):
                     return self._TRAINER_NAME
                 return result
-            # 英語TN向けTesseractフォールバック
+        except Exception:
+            pass
+        # manga_ocrが使えない or 結果が空の場合は英語TN向けTesseractフォールバック
+        try:
             if self.path_tesseract not in os.environ["PATH"].split(os.pathsep):
                 os.environ["PATH"] += os.pathsep + self.path_tesseract
             tools = pyocr.get_available_tools()
