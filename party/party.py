@@ -44,36 +44,43 @@ class PartyEditor(tkinter.Toplevel):
 
         csv_button = ttk.Frame(main_frame)
         self.read_csv_button = MyButton(
-            csv_button, text="CSV読み込み", command=self.select_csv
+            csv_button, text="CSV読込", command=self.select_csv
         )
         self.read_csv_button.grid(row=0, column=0, padx=5, pady=5, sticky=N + S + W + E)
 
         self.write_csv_button = MyButton(
-            csv_button, text="CSV書き込み", command=self.save_csv
+            csv_button, text="CSV書込", command=self.save_csv
         )
         self.write_csv_button.grid(
             row=1, column=0, padx=5, pady=5, sticky=N + S + W + E
+        )
+
+        self.image_import_button = MyButton(
+            csv_button, text="構築画像読込", command=self.import_from_images
+        )
+        self.image_import_button.grid(
+            row=0, column=1, padx=5, pady=5, sticky=N + S + W + E
+        )
+
+        self.reorder_button = MyButton(
+            csv_button, text="並び替え", command=lambda: self.pokemons._open_reorder()
+        )
+        self.reorder_button.grid(
+            row=1, column=1, padx=5, pady=5, sticky=N + S + W + E
         )
 
         self.make_table_button = MyButton(
             csv_button, text="星取表作成", command=self.make_table
         )
         self.make_table_button.grid(
-            row=0, column=1, padx=5, pady=5, sticky=N + S + W + E
+            row=0, column=2, padx=5, pady=5, sticky=N + S + W + E
         )
 
         self.all_clear_button = MyButton(
             csv_button, text="全クリア", command=self.all_clear
         )
         self.all_clear_button.grid(
-            row=1, column=1, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        self.image_import_button = MyButton(
-            csv_button, text="画像読込", command=self.import_from_images
-        )
-        self.image_import_button.grid(
-            row=0, column=2, rowspan=2, padx=5, pady=5, sticky=N + S + W + E
+            row=1, column=2, padx=5, pady=5, sticky=N + S + W + E
         )
 
         csv_button.grid(
@@ -85,7 +92,7 @@ class PartyEditor(tkinter.Toplevel):
             sticky=N + S + W,
         )
 
-        self.using = UseParty(main_frame, text="使用するパーティ", padding=5)
+        self.using = UseParty(main_frame, text="使用パーティ", padding=5)
         self.using.grid(row=0, column=4, columnspan=1, sticky=N + E + S + W)
 
         self.pokemons = PokemonEditors(main_frame, text="パーティ編集", padding=5)
@@ -421,7 +428,7 @@ class PartySettings(ttk.Frame):
 
         self.is_use_var = tkinter.BooleanVar()
         self.is_use_check = tkinter.Checkbutton(
-            self.edit_frame, variable=self.is_use_var, text="使用するパーティに設定"
+            self.edit_frame, variable=self.is_use_var, text="使用パーティ"
         )
         self.is_use_check.grid(row=0, column=4, sticky=N + E + W + S, padx=3, pady=3)
 
@@ -434,7 +441,7 @@ class PartySettings(ttk.Frame):
 
         self.memo_label = ttk.Label(self.edit_frame, text="メモ")
         self.memo_label.grid(column=5, row=0, rowspan=2, sticky=N + E + W + S)
-        self.memo = ScrolledText(self.edit_frame, height=3, width=60, padx=3, pady=3)
+        self.memo = ScrolledText(self.edit_frame, height=3, width=40, padx=3, pady=3)
         self.memo.grid(column=6, row=0, columnspan=4, rowspan=2, sticky=N + E + W + S)
 
     def clear_setting(self):
@@ -453,7 +460,7 @@ class UseParty(ttk.LabelFrame):
 
         self.using_var = tkinter.StringVar()
         self.using_var.set("test.csv")
-        self.using_label = MyLabel(self, textvariable=self.using_var, width=15)
+        self.using_label = MyLabel(self, textvariable=self.using_var, width=30)
         self.using_label.grid(
             column=0, row=0, sticky=N + W + E + S
         )
@@ -493,51 +500,139 @@ class PokemonEditors(ttk.LabelFrame):
         self.pokemon_panel_list: list[PokemonEditor] = []
 
         for i in range(6):
-            self.change_widget = ttk.Frame(self)
-            self.up_button = ttk.Button(
-                self.change_widget,
-                command=lambda index=i: self.change_line(True, index),
-                text="↑",
-                width=3,
-            )
-            self.up_button.pack(side="left")
-            self.pokemon_label = ttk.Label(self.change_widget, text=str(i + 1) + "体目")
-            self.pokemon_label.pack(side="left")
-            self.down_button = ttk.Button(
-                self.change_widget,
-                command=lambda index=i: self.change_line(False, index),
-                text="↓",
-                width=3,
-            )
-            self.down_button.pack(side="left")
-            self.pokemon_panel = PokemonEditor(self, labelwidget=self.change_widget)
+            label_widget = ttk.Label(self, text=str(i + 1) + "体目")
+            pokemon_panel = PokemonEditor(self, labelwidget=label_widget)
             c = i if i < 3 else i - 3
             r = 0 if i < 3 else 1
-            self.pokemon_panel.grid(column=c, row=r, sticky=E, pady=3)
-            self.pokemon_panel_list.append(self.pokemon_panel)
+            pokemon_panel.grid(column=c, row=r, sticky=E, pady=3)
+            self.pokemon_panel_list.append(pokemon_panel)
 
-    def change_line(self, up: bool, num: int):
-        if up and num != 0:
-            pokemon1_row = self.pokemon_panel_list[num - 1].set_csv_row()
-            pokemon1: Pokemon = Pokemon.by_name(pokemon1_row[0], False)
-            pokemon1.set_load_data(pokemon1_row, True)
-            pokemon2_row = self.pokemon_panel_list[num].set_csv_row()
-            pokemon2: Pokemon = Pokemon.by_name(pokemon2_row[0], False)
-            pokemon2.set_load_data(pokemon2_row, True)
+    def _open_reorder(self):
+        dialog = PartyReorderDialog(self, self.pokemon_panel_list, self._apply_reorder)
+        dialog.open(location=(self.winfo_rootx(), self.winfo_rooty()))
+        self.wait_window(dialog)
 
-            self.pokemon_panel_list[num - 1].set_pokemon(pokemon2)
-            self.pokemon_panel_list[num].set_pokemon(pokemon1)
+    def _apply_reorder(self, new_order: list[int]):
+        rows = [panel.set_csv_row() for panel in self.pokemon_panel_list]
+        new_rows = [rows[i] for i in new_order]
+        for i, row in enumerate(new_rows):
+            if not row:
+                self.pokemon_panel_list[i].clear_pokemon()
+            else:
+                try:
+                    pokemon = Pokemon.by_name(row[0], False)
+                    pokemon.set_load_data(row, True)
+                    self.pokemon_panel_list[i].set_pokemon(pokemon)
+                    self.pokemon_panel_list[i].change_ev()
+                except Exception:
+                    self.pokemon_panel_list[i].clear_pokemon()
 
-        elif not up and num != 5:
-            pokemon1_row = self.pokemon_panel_list[num].set_csv_row()
-            pokemon1: Pokemon = Pokemon.by_name(pokemon1_row[0], False)
-            pokemon1.set_load_data(pokemon1_row, True)
-            pokemon2_row = self.pokemon_panel_list[num + 1].set_csv_row()
-            pokemon2: Pokemon = Pokemon.by_name(pokemon2_row[0], False)
-            pokemon2.set_load_data(pokemon2_row, True)
 
-            self.pokemon_panel_list[num].set_pokemon(pokemon2)
-            self.pokemon_panel_list[num + 1].set_pokemon(pokemon1)
+class PartyReorderDialog(tkinter.Toplevel):
+    _ITEM_H = 44
+    _ICON_SIZE = (30, 30)
+    _WIDTH = 260
+
+    def __init__(self, master, pokemon_panels: list, callback):
+        super().__init__(master)
+        self.title("並び替え")
+        self.resizable(False, False)
+        self._callback = callback
+        self._panels = pokemon_panels
+        self._order = list(range(len(pokemon_panels)))
+        self._drag_index: int | None = None
+        self._icons: list = []
+        self._load_icons()
+
+        main = ttk.Frame(self, padding=10)
+        main.pack()
+        ttk.Label(main, text="ドラッグして並び替え").pack(pady=(0, 6))
+
+        H = self._ITEM_H * len(pokemon_panels)
+        self._cv = tkinter.Canvas(
+            main, width=self._WIDTH, height=H, bg="#f5f5f5", highlightthickness=1
+        )
+        self._cv.pack()
+        self._cv.bind("<Button-1>", self._on_press)
+        self._cv.bind("<B1-Motion>", self._on_drag)
+        self._cv.bind("<ButtonRelease-1>", self._on_release)
+
+        btn_frame = ttk.Frame(main)
+        btn_frame.pack(pady=(8, 0))
+        MyButton(btn_frame, text="確定", command=self._confirm).pack(side="left", padx=4)
+        MyButton(btn_frame, text="キャンセル", command=self.destroy).pack(side="left", padx=4)
+
+        self._redraw()
+
+    def _load_icons(self):
+        for panel in self._panels:
+            pid = panel.pokemon.pid
+            self._icons.append(
+                images.get_pokemon_icon(pid, size=self._ICON_SIZE) if pid
+                else images.get_blank_image(self._ICON_SIZE)
+            )
+
+    def _get_name(self, panel_idx: int) -> str:
+        name = self._panels[panel_idx]._pokemon_name_var.get()
+        return name or "（空）"
+
+    def _draw_item(self, pos: int, panel_idx: int, y0: int, fill: str, outline: str, width: int = 1):
+        h = self._ITEM_H
+        w = self._WIDTH
+        self._cv.create_rectangle(4, y0 + 2, w - 4, y0 + h - 2, fill=fill, outline=outline, width=width)
+        self._cv.create_text(16, y0 + h // 2, text=str(pos + 1), anchor="w", font=("", 9, "bold"))
+        self._cv.create_image(32, y0 + h // 2, image=self._icons[panel_idx], anchor="w")
+        self._cv.create_text(68, y0 + h // 2, text=self._get_name(panel_idx), anchor="w")
+
+    def _redraw(self, ghost_idx: int | None = None, ghost_y: int | None = None):
+        cv = self._cv
+        cv.delete("all")
+        h = self._ITEM_H
+
+        for pos, panel_idx in enumerate(self._order):
+            y0 = pos * h
+            if pos == ghost_idx and ghost_y is not None:
+                cv.create_rectangle(
+                    4, y0 + 2, self._WIDTH - 4, y0 + h - 2,
+                    fill="#e0ecff", outline="#88aaee", dash=(4, 2),
+                )
+                continue
+            self._draw_item(pos, panel_idx, y0, "#ffffff", "#bbbbbb")
+
+        if ghost_idx is not None and ghost_y is not None:
+            panel_idx = self._order[ghost_idx]
+            y0 = ghost_y - h // 2
+            self._draw_item(ghost_idx, panel_idx, y0, "#b0d0ff", "#2266cc", width=2)
+
+    def _idx_at(self, y: int) -> int:
+        return max(0, min(len(self._order) - 1, int(y) // self._ITEM_H))
+
+    def _on_press(self, event):
+        self._drag_index = self._idx_at(event.y)
+
+    def _on_drag(self, event):
+        if self._drag_index is None:
+            return
+        new = self._idx_at(event.y)
+        if new != self._drag_index:
+            self._order[self._drag_index], self._order[new] = (
+                self._order[new],
+                self._order[self._drag_index],
+            )
+            self._drag_index = new
+        self._redraw(ghost_idx=self._drag_index, ghost_y=event.y)
+
+    def _on_release(self, event):
+        self._drag_index = None
+        self._redraw()
+
+    def _confirm(self):
+        self._callback(self._order)
+        self.destroy()
+
+    def open(self, location: tuple[int, int]):
+        self.grab_set()
+        self.geometry(f"+{location[0]}+{location[1]}")
 
 
 class PokemonEditor(ttk.LabelFrame):
@@ -550,7 +645,7 @@ class PokemonEditor(ttk.LabelFrame):
         self.waza_list: list[WazaNameCombobox] = []
 
         self._pokemon_icon = MyButton(
-            self, size=(60, 60), padding=0, command=self.edit_pokemon
+            self, size=(50, 50), padding=0, command=self.edit_pokemon
         )
         self._pokemon_icon.grid(column=0, row=0, rowspan=2, columnspan=2, sticky=N + S)
 
@@ -561,7 +656,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._clear_button = MyButton(
             self, image=images.get_menu_icon("trush"), command=self.clear_pokemon
         )
-        self._clear_button.grid(column=2, row=0)
+        self._clear_button.grid(column=0, row=4)
 
         self._teras_var = Types.なし
         _tera_enabled = get_recog_value("terastal_enabled")
@@ -571,11 +666,11 @@ class PokemonEditor(ttk.LabelFrame):
             command=self.on_push_terasbutton if _tera_enabled else None,
             state=tkinter.NORMAL if _tera_enabled else tkinter.DISABLED,
         )
-        self._teras_button.grid(column=0, row=3, columnspan=2, sticky=W + E + N + S)
+        self._teras_button.grid(column=3, row=1, sticky=W + E + N + S)
 
         self.img = [tkinter.PhotoImage(file=Types.なし.icon).subsample(3, 3)] * 2
         self.type_img = ttk.Frame(self)
-        self.type_img.grid(column=3, row=0)
+        self.type_img.grid(column=2, row=0, columnspan=2)
         self.type1_img = self.img[0]
         self.type1_icon = ttk.Label(self.type_img, image=self.type1_img)
         self.type1_icon.pack(side="left")
@@ -583,51 +678,49 @@ class PokemonEditor(ttk.LabelFrame):
         self.type2_icon = ttk.Label(self.type_img, image=self.type2_img)
         self.type2_icon.pack(side="left")
 
-        for i, text in enumerate(["性格", "持ち物", "特性"]):
+        for i, text in enumerate(["テラス", "持ち物", "特性"]):
             label = MyLabel(self, text=text)
-            label.grid(column=2, row=i + 1, padx=5, pady=5)
+            label.grid(column=2, row=i + 1, padx=2, pady=2)
 
         self._seikaku_button = MyButton(
-            self, text="まじめ", command=self.on_push_seikaku_button, width=24
+            self, text="まじめ", command=self.on_push_seikaku_button, width=6
         )
-        self._seikaku_button.grid(column=3, row=1, sticky=W + E + N + S)
+        self._seikaku_button.grid(column=0, row=3, columnspan=2, padx=4, pady=4, sticky=W + E + N + S)
 
-        self._item_combobox = MyCombobox(self, values=ALL_ITEM_COMBOBOX_VALUES)
+        self._item_combobox = MyCombobox(self, values=ALL_ITEM_COMBOBOX_VALUES, width=10)
         self._item_combobox.grid(column=3, row=2, sticky=W + E + N + S)
 
-        self._ability_combobox = MyCombobox(self, width=16)
+        self._ability_combobox = MyCombobox(self, width=9)
         self._ability_combobox.grid(column=3, row=3, sticky=W + E + N + S)
 
-        self._waza_label = MyLabel(self, text="わざ")
-        self._waza_label.grid(column=4, row=0, rowspan=4, padx=5, pady=5)
         for i in range(4):
-            cbx = WazaNameCombobox(self, width=16)
-            cbx.grid(column=5, row=i)
+            cbx = WazaNameCombobox(self, width=13)
+            cbx.grid(column=4, row=i)
             self.waza_list.append(cbx)
 
         for i, text in enumerate(["HP", "攻撃", "防御", "特攻", "特防", "素早さ"]):
             label = MyLabel(self, text=text)
-            label.grid(column=0, row=i + 5, padx=5, pady=5)
+            label.grid(column=0, row=i + 5, padx=2, pady=2)
         for i, text in enumerate(["種族値", "実数値"]):
             label = MyLabel(self, text=text)
-            label.grid(column=i + 1, row=4, padx=5, pady=5)
+            label.grid(column=i + 1, row=4, padx=2, pady=2)
         for i in range(6):
             value = tkinter.IntVar()
             value.set(0)
             label = MyLabel(self, textvariable=value)
-            label.grid(column=1, row=i + 5, padx=5, pady=5)
+            label.grid(column=1, row=i + 5, padx=2, pady=2)
             self.syuzoku_list.append(value)
         for i in range(6):
             value = tkinter.IntVar()
             value.set(0)
             label = MyLabel(self, textvariable=value)
-            label.grid(column=2, row=i + 5, padx=5, pady=5)
+            label.grid(column=2, row=i + 5, padx=2, pady=2)
             self.jissu_list.append(value)
 
         self._ev_total = tkinter.StringVar()
         self._ev_total.set("努力値（合計： 0 ）")
         self._ev_label = MyLabel(self, textvariable=self._ev_total)
-        self._ev_label.grid(column=3, row=4, padx=5, pady=5)
+        self._ev_label.grid(column=3, row=4, padx=2, pady=2)
 
         self._register_button = MyButton(
             self,
@@ -635,16 +728,16 @@ class PokemonEditor(ttk.LabelFrame):
             padding=0,
             command=self.register_pokemon_in_box,
         )
-        self._register_button.grid(column=4, row=4, columnspan=2, sticky=N + S + E)
+        self._register_button.grid(column=4, row=4, sticky=N + S + E)
 
         self._ev_frame = EvEditors(master=self, callback=self.change_ev)
         self._ev_frame.grid(
-            column=3, row=5, rowspan=6, padx=5, pady=5, sticky=N + W + E
+            column=3, row=5, rowspan=6, padx=2, pady=2, sticky=N + W + E
         )
 
-        self._memo_text = ScrolledText(self, height=6, width=20, wrap=tkinter.WORD)
+        self._memo_text = ScrolledText(self, height=3, width=16, wrap=tkinter.WORD)
         self._memo_text.grid(
-            column=4, row=5, columnspan=2, rowspan=6, padx=5, pady=5, sticky=N + S + E + W
+            column=4, row=5, rowspan=6, padx=2, pady=2, sticky=N + S + E + W
         )
 
     def edit_pokemon(self):
@@ -657,7 +750,7 @@ class PokemonEditor(ttk.LabelFrame):
 
     def set_pokemon(self, pokemon: Pokemon):
         self.pokemon = pokemon
-        self._pokemon_icon.set_pokemon_icon(pid=pokemon.pid, size=(60, 60))
+        self._pokemon_icon.set_pokemon_icon(pid=pokemon.pid, size=(50, 50))
         self._pokemon_name_var.set(pokemon.name)
         self._teras_var = pokemon.terastype
         self._teras_button.set_type(pokemon.terastype)
@@ -693,7 +786,7 @@ class PokemonEditor(ttk.LabelFrame):
         self.calc_status()
 
     def clear_pokemon(self):
-        self._pokemon_icon.set_image(images.get_blank_image(size=(60, 60)))
+        self._pokemon_icon.set_image(images.get_blank_image(size=(50, 50)))
         self._pokemon_name_var.set("")
         self._teras_var = Types.なし
         self._teras_button.set_type(Types.なし)
@@ -831,7 +924,7 @@ class EvEditors(ttk.Frame):
         for _i in range(6):
             self.ev_editor = EvEditor(self)
             self.ev_editor.setCallback(callback)
-            self.ev_editor.pack(pady=5)
+            self.ev_editor.pack(pady=2)
             self.ev_list.append(self.ev_editor)
 
     def init_all_value(self):
@@ -916,7 +1009,7 @@ class PokemonInputDialog(tkinter.Toplevel):
     ):
         super().__init__()
         self.title("ポケモン入力")
-        self.pokemon = Pokemon.by_name(base_pokemon_name, default=True)
+        self.pokemon = Pokemon.by_name(base_pokemon_name, default=True) if base_pokemon_name else Pokemon()
 
         notebook = ttk.Notebook(self)
 
@@ -998,7 +1091,7 @@ class PokemonFromHomeDialog(ttk.Frame):
 
     def on_input_name(self, *args):
         pokemon_name = self._name_input.get()
-        self.parent.pokemon = Pokemon.by_name(pokemon_name, default=True)
+        self.parent.pokemon = Pokemon.by_name(pokemon_name, default=True) if pokemon_name else Pokemon()
         self.parent.destroy()
 
     def on_choose_pokemons(self, pid: str):
@@ -1148,7 +1241,7 @@ class PokemonFromBoxDialog(ttk.Frame):
 
     def on_input_name(self, *args):
         pokemon_name = self._name_input.get()
-        self.parent.pokemon = Pokemon.by_name(pokemon_name, default=True)
+        self.parent.pokemon = Pokemon.by_name(pokemon_name, default=True) if pokemon_name else Pokemon()
         self.update_box_list()
         self.set_pokemon_list()
 
