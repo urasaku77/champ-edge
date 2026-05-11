@@ -1103,7 +1103,13 @@ class MainApp(ThemedTk):
                 bat = (
                     "@echo off\n"
                     'cd /d "%~dp0"\n'
-                    "timeout /t 2 /nobreak > nul\n"
+                    ":wait_loop\n"
+                    'tasklist /FI "IMAGENAME eq champedge.exe" 2>NUL | find /I "champedge.exe" >NUL\n'
+                    "if not errorlevel 1 (\n"
+                    "    timeout /t 1 /nobreak > nul\n"
+                    "    goto wait_loop\n"
+                    ")\n"
+                    "timeout /t 1 /nobreak > nul\n"
                     "powershell -Command "
                     "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
                     "-DestinationPath '.' -Force\"\n"
