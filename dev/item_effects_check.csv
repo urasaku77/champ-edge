@@ -1,0 +1,182 @@
+﻿item_id,item_name_db,api_id,matched,source,effect_ja,effect_en
+150,カゴのみ,127,OK,prose_en,ポケモンに持たせると眠りを回復する。,Held: Consumed when asleep to cure sleep.
+154,ヒメリのみ,131,OK,prose_en,ポケモンに持たせるとＰＰを１０だけ回復する。,Held: Consumed when a move runs out of PP to restore its PP by 10.
+157,ラムのみ,134,OK,prose_en,ポケモンに持たせるとすべての状態異常を回復する。,Held: Consumed to cure any status condition or confusion.
+158,オボンのみ,135,OK,prose_en,ポケモンに持たせるとＨＰを少しだけ回復する。,Held: Consumed at 1/2 max HP to recover 1/4 max HP.
+159,フィラのみ,136,OK,prose_en,ポケモンに持たせるとピンチのときＨＰを回復する。きらいな味だと混乱する。,Held: Consumed at 1/2 max HP to restore 1/8 max HP. Confuses Pokémon that dislike spicy flavor.
+160,ウイのみ,137,OK,prose_en,ポケモンに持たせるとピンチのときＨＰを回復する。きらいな味だと混乱する。,Held: Consumed at 1/2 max HP to restore 1/8 max HP. Confuses Pokémon that dislike dry flavor.
+161,マゴのみ,138,OK,prose_en,ポケモンに持たせるとピンチのときＨＰを回復する。きらいな味だと混乱する。,Held: Consumed at 1/2 max HP to restore 1/8 max HP. Confuses Pokémon that dislike sweet flavor.
+162,バンジのみ,139,OK,prose_en,ポケモンに持たせるとピンチのときＨＰを回復する。きらいな味だと混乱する。,Held: Consumed at 1/2 max HP to restore 1/8 max HP. Confuses Pokémon that dislike bitter flavor.
+163,イアのみ,140,OK,prose_en,ポケモンに持たせるとピンチのときＨＰを回復する。きらいな味だと混乱する。,Held: Consumed at 1/2 max HP to restore 1/8 max HP. Confuses Pokémon that dislike sour flavor.
+184,オッカのみ,161,OK,prose_en,ポケモンに持たせると効果バツグンのほのお技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Fire-type attack to halve the damage.
+185,イトケのみ,162,OK,prose_en,ポケモンに持たせると効果バツグンのみず技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Water-type attack to halve the damage.
+188,ヤチェのみ,165,OK,prose_en,ポケモンに持たせると効果バツグンのこおり技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Ice-type attack to halve the damage.
+189,ヨプのみ,166,OK,prose_en,ポケモンに持たせると効果バツグンのかくとう技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Fighting-type attack to halve the damage.
+191,シュカのみ,168,OK,prose_en,ポケモンに持たせると効果バツグンのじめん技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Ground-type attack to halve the damage.
+201,チイラのみ,178,OK,prose_en,ポケモンに持たせるとピンチのとき自分の攻撃があがる。,Held: Consumed at 1/4 max HP to boost Attack.
+203,カムラのみ,180,OK,prose_en,ポケモンに持たせるとピンチのとき自分の素早さがあがる。,Held: Consumed at 1/4 max HP to boost Speed.
+206,サンのみ,183,OK,prose_en,ポケモンに持たせるとピンチのとき攻撃が急所に当たりやすくなる。,Held: Consumed at 1/4 max HP to boost critical hit ratio by two stages.
+213,ひかりのこな,190,OK,prose_en,キラキラ光る粉。持たせると光が相手を惑わして技が命中しにくくなる。,Held: Increases the holder’s evasion by 1/9 (11 1/9%).
+214,しろいハーブ,191,OK,prose_en,持たせたポケモンの能力がさがったとき１度だけもとの状態に戻す。,Held: Resets all lowered stats to normal at end of turn. Consumed after use.
+217,せんせいのツメ,194,OK,prose_en,軽くて鋭いツメ。持たせると相手より先に行動できることがある。,Held: Holder has a 3/16 (18.75%) chance to move first.
+219,メンタルハーブ,196,OK,prose_en,持たせたポケモンが自由に技をだせなくなったときに１度だけ回復する。,"Held: Consumed to cure infatuation. Gen V: Also removes Taunt, Encore, Torment, Disable, and Cursed Body."
+220,こだわりハチマキ,197,OK,prose_en,ちょっとこだわったハチマキ。持たせると攻撃はあがるが同じ技しかだせなくなる。,"Held: Increases Attack by 50%, but restricts the holder to only one move."
+221,おうじゃのしるし,198,OK,prose_en,持たせると攻撃してダメージを与えたときに相手をひるませることがある。,Held: Damaging moves gain a 10% chance to make their target flinch. Traded on a Poliwhirl: Holder evolves into Politoed. Traded on a Slowpoke: Holder evolves into Slowking.
+222,ぎんのこな,199,OK,prose_en,銀色に輝く粉。持たせるとむしタイプの技の威力があがる。,Held: Bug-Type moves from holder do 20% more damage.
+230,きあいのハチマキ,207,OK,prose_en,持たせるとひんしになりそうな技を受けてもＨＰを１だけ残して耐えることがある。,Held: Holder has 10% chance to survive attacks or self-inflicted damage at 1 HP.
+232,ピントレンズ,209,OK,prose_en,弱点がみえるレンズ。持たせたポケモンの技が急所に当たりやすくなる。,Held: Raises the holder’s critical hit ratio by one stage.
+233,メタルコート,210,OK,prose_en,特殊な金属の膜。持たせるとはがねタイプの技の威力があがる。,Held: Steel-Type moves from holder do 20% more damage.
+234,たべのこし,211,OK,prose_en,持たせるとポケモンのＨＰが戦闘のあいだ少しずつ回復する。,Held: Restores 1/16 (6.25%) holder’s max HP at the end of each turn.
+236,でんきだま,213,OK,prose_en,ピカチュウに持たせると攻撃と特攻の威力があがる不思議な玉。,Doubles Pikachu’s Attack and Special Attack. Breed on Pikachu or Raichu: Pichu Egg will have Volt Tackle.
+238,かたいいし,215,OK,prose_en,絶対に割れない石。持たせるといわタイプの技の威力があがる。,Held: Rock-Type moves from holder do 20% more damage.
+240,くろいメガネ,217,OK,prose_en,怪しくみえるメガネ。持たせるとあくタイプの技の威力があがる。,Held: Dark-Type moves from holder do 20% more damage.
+241,くろおび,218,OK,prose_en,気がひきしまる帯。持たせるとかくとうタイプの技の威力があがる。,Held: Fighting-Type moves from holder do 20% more damage.
+242,じしゃく,219,OK,prose_en,強力な磁石。持たせるとでんきタイプの技の威力があがる。,Held: Electric-Type moves from holder do 20% more damage.
+243,しんぴのしずく,220,OK,prose_en,しずくの形の宝石。持たせるとみずタイプの技の威力があがる。,Held: Water-Type moves from holder do 20% more damage.
+244,するどいくちばし,221,OK,prose_en,長くとがったくちばし。持たせるとひこうタイプの技の威力があがる。,Held: Flying-Type moves from holder do 20% more damage.
+245,どくバリ,222,OK,prose_en,どくのあるちいさなハリ。持たせるとどくタイプの技の威力があがる。,Held: Poison-Type moves from holder do 20% more damage.
+246,とけないこおり,223,OK,prose_en,熱をよせつけない氷。持たせるとこおりタイプの技の威力があがる。,Held: Ice-Type moves from holder do 20% more damage.
+247,のろいのおふだ,224,OK,prose_en,怪しくて不気味なお札。持たせるとゴーストタイプの技の威力があがる。,Held: Ghost-Type moves from holder do 20% more damage.
+249,もくたん,226,OK,prose_en,ものを燃やす燃料。持たせるとほのおタイプの技の威力があがる。,Held: Fire-Type moves from holder do 20% more damage.
+251,シルクのスカーフ,228,OK,prose_en,はだざわりのよいスカーフ。持たせるとノーマルタイプの技の威力があがる。,Held: Normal-Type moves from holder do 20% more damage.
+265,こうかくレンズ,242,OK,prose_en,ものが大きくみえるレンズ。持たせると技の命中率が少しあがる。,Held: Provides a 1/10 (10%) boost in accuracy to the holder.
+266,ちからのハチマキ,243,OK,prose_en,ちからがわいてくるハチマキ。持たせると物理技の威力が少しあがる。,Held: Boosts the damage of physical moves used by the holder by 10%.
+267,ものしりメガネ,244,OK,prose_en,ぶあついレンズのついたメガネ。持たせると特殊技の威力が少しあがる。,Held: Boosts the damage of special moves used by the holder by 1/10 (10%).
+268,たつじんのおび,245,OK,prose_en,使いこまれた黒い帯。持たせると効果バツグンのとき技の威力が少しあがる。,Held: Holder’s Super Effective moves do 20% extra damage.
+269,ひかりのねんど,246,OK,prose_en,持たせたポケモンがひかりのかべやリフレクターを使ったときいつもよりも長く残る。,Held: Light Screen and Reflect used by the holder last 8 rounds instead of 5.
+270,いのちのたま,247,OK,prose_en,持たせると攻撃するたびにＨＰが少し減ってしまうが技の威力があがる。,"Held: Holder’s moves inflict 30% extra damage, but cost 10% max HP."
+271,パワフルハーブ,248,OK,prose_en,持たせたポケモンは１度だけ１ターン目にちからをためる技をすぐに使うことができる。,Held: Both turns of a two-turn charge move happen at once. Consumed upon use.
+272,どくどくだま,249,OK,prose_en,触ると毒をだす不思議な玉。持たせると戦闘中に猛毒の状態になる。,Held: Inflicts Toxic on the holder at the end of the turn. Activates after Poison damage would occur.
+273,かえんだま,250,OK,prose_en,触ると熱をだす不思議な玉。持たせると戦闘中にやけどの状態になる。,Held: Inflicts Burn on the holder at the end of the turn. Activates after Burn damage would occur.
+275,きあいのタスキ,252,OK,prose_en,持たせるとＨＰが満タンのときひんしになりそうな技を受けてもＨＰ１で１度だけ耐える。,"Held: Holder survives any single-hit attack at 1 HP if at max HP, then the item is consumed."
+277,メトロノーム,254,OK,prose_en,持たせると同じ技を連続で使ったとき威力があがる。やめると威力はもどる。,Held: Consectutive uses of the same attack have a cumulative damage boost of 10%. Maximum 100% boost.
+279,こうこうのしっぽ,256,OK,prose_en,とても重たいなにかのしっぽ。持たせるといつもより行動が遅くなる。,Held: Holder moves last in its priority bracket.
+281,くろいヘドロ,258,OK,prose_en,持たせるとどくタイプのポケモンは少しずつＨＰを回復する。それ以外はＨＰが減ってしまう。,Held: Poison-type holder recovers 1/16 (6.25%) max HP each turn. Non-Poison-Types take 1/8 (12.5%) max HP damage.
+282,つめたいいわ,259,OK,prose_en,持たせたポケモンがあられを使うといつもよりあられの時間が長くなる。,Held: Hail by the holder lasts 8 rounds instead of 5.
+283,さらさらいわ,260,OK,prose_en,持たせたポケモンがすなあらしを使うといつもよりすなあらしの時間が長くなる。,Held: Sandstorm by the holder lasts 8 rounds instead of 5.
+284,あついいわ,261,OK,prose_en,持たせたポケモンがにほんばれを使うといつもよりはれの時間が長くなる。,Held: Sunny Day by the holder lasts 8 rounds instead of 5.
+285,しめったいわ,262,OK,prose_en,持たせたポケモンがあまごいを使うといつもよりあめの時間が長くなる。,Held: Rain Dance by the holder lasts 8 rounds instead of 5.
+287,こだわりスカーフ,264,OK,prose_en,ちょっとこだわったスカーフ。持たせると素早さはあがるが同じ技しかだせなくなる。,"Held: Increases Speed by 50%, but restricts the holder to only one move."
+289,パワーリスト,266,OK,prose_en,持たせると素早さがさがるがふつうよりもポケモンの攻撃が高く育ちやすい。,"Held: Holder gains 4 Attack effort values, but has halved Speed in battle."
+290,パワーベルト,267,OK,prose_en,持たせると素早さがさがるがふつうよりもポケモンの防御が高く育ちやすい。,"Held: Holder gains 4 Defense effort values, but has halved Speed in battle."
+296,おおきなねっこ,273,OK,prose_en,持たせるとＨＰを吸いとる技でいつもよりおおく自分のＨＰを回復できる。,"Held: Increases HP recovered from draining moves, Ingrain, and Aqua Ring by 3/10 (30%)."
+297,こだわりメガネ,274,OK,prose_en,ちょっとこだわったメガネ。持たせると特攻はあがるが同じ技しかだせなくなる。,"Held: Increases Special Attack by 50%, but restricts the holder to only one move."
+326,するどいツメ,303,OK,prose_en,鋭くとがったツメ。持たせると技が急所に当たりやすくなる。,Held: Raises the holder’s critical hit ratio by one stage. Held by a Sneasel while levelling up at night: Holder evolves into Weavile.
+538,しんかのきせき,581,OK,prose_en,進化の不思議なかたまり。持たせると進化前ポケモンの防御と特防があがる。,"Held: Holder has 1.5× Defense and Special Defense, as long as it’s not fully evolved."
+540,ゴツゴツメット,583,OK,prose_en,ポケモンに持たせると打撃技を受けたとき相手にもダメージを与える。,"Held: When the holder is hit by a contact move, the attacking Pokémon takes 1/6 its max HP in damage."
+541,ふうせん,584,OK,prose_en,ポケモンに持たせるとポケモンが宙に浮く。攻撃を受けると割れてしまう。,"Held: Grants immunity to Ground-type moves, Spikes, and Toxic Spikes. Consumed when the holder takes damage from a move."
+542,レッドカード,585,OK,prose_en,不思議なちからのあるカード。持たせると技を使ってきた相手を退場させることができる。,"Held: When the holder takes damage from a move, the opponent switches out for another random party Pokémon. Consumed after use."
+544,しめつけバンド,587,OK,prose_en,締めつける技を補助するバンド。持たせると締めつける技の威力が強くなる。,Held: Doubles the per-turn damage of multi-turn trapping moves.
+547,だっしゅつボタン,590,OK,prose_en,持たせて技を受けると戦闘から脱出して手持ちと入れ替わることができる。,"Held: When the holder takes damage from a move, it switches out for a party Pokémon of the Trainer’s choice."
+564,ノーマルジュエル,669,OK,prose_en,ノーマルのタイプのジュエル。持たせると１度だけノーマルの技の威力が強まる。,"Held: When the holder uses a damaging Normal-type move, the move has 1.5× power and this item is consumed."
+639,じゃくてんほけん,682,OK,prose_en,弱点をつかれたとき攻撃と特攻がそれぞれぐーんとあがる。,"Held: When the holder is hit by a super effective move, its Attack and Special Attack raise by two stages."
+640,とつげきチョッキ,683,OK,prose_en,攻撃的になるチョッキ。持たせると特防があがるが変化技をだせなくなる。,Raises the holder’s Special Defense to 1.5×. Prevents the holder from selecting a status move.
+650,ぼうじんゴーグル,690,OK,prose_en,天候のダメージだけでなく粉をだす技の効果も防げるゴーグル。,Held: Prevents damage from powder moves and the damage from Hail and Sandstorm.
+686,ロゼルのみ,723,OK,prose_en,ポケモンに持たせると効果バツグンのフェアリー技を受けたとき威力が弱まる。,Held: Consumed when struck by a super-effective Fairy-type attack to halve the damage.
+879,グランドコート,896,OK,prose_en,持たせたポケモンが技や特性でフィールドを張ったときいつもよりも長く残る。,Held: Extends the holder’s Terrain effects to 8 turns.
+880,ぼうごパット,897,OK,prose_en,攻撃する相手にさわって受ける効果を受けないようにする。,Held: Prevents side effects of contact moves used on the holder.
+881,エレキシード,898,OK,prose_en,ポケモンに持たせるとエレキフィールドのときに使って防御があがる。,Held: Consumed on Electric Terrain and raises the holder’s Defense by one stage.
+882,サイコシード,899,OK,prose_en,ポケモンに持たせるとサイコフィールドのときに使って特防があがる。,Held: Consumed on Psychic Terrain and raises the holder’s Special Defense by one stage.
+884,グラスシード,901,OK,prose_en,ポケモンに持たせるとグラスフィールドのときに使って防御があがる。,Held: Consumed on Grassy Terrain and raises the holder’s Defense by one stage.
+1118,のどスプレー,1176,OK,flavor,音に関する技を使うと特攻が上がる。,
+1119,だっしゅつパック,1177,OK,flavor,持たせたポケモンの能力が下がると手持ちと入れ替わる。,
+1120,あつぞこブーツ,1178,OK,flavor,足場にしかけられた罠などの影響を受けなくなる。,
+1121,からぶりほけん,1179,OK,flavor,命中率によって技がはずれたとき素早さがぐーんと上がる。,
+1880,ブーストエナジー,1696,OK,flavor,,
+1882,クリアチャーム,1698,OK,flavor,,
+1883,ものまねハーブ,1699,OK,flavor,,
+1884,パンチグローブ,1700,OK,flavor,,
+1885,おんみつマント,1701,OK,flavor,,
+1886,いかさまダイス,1702,OK,flavor,,
+1887,フシギバナイト,698,OK,flavor,フシギバナに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1888,リザードナイトX,,NOT_FOUND,,,
+1889,リザードナイトY,,NOT_FOUND,,,
+1890,カメックスナイト,700,OK,flavor,カメックスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1891,スピアナイト,811,OK,flavor,スピアーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1892,ピジョットナイト,803,OK,flavor,ピジョットに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1893,フーディナイト,718,OK,flavor,フーディンに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1894,ヤドランナイト,801,OK,flavor,ヤドランに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1895,ゲンガナイト,695,OK,flavor,ゲンガーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1896,ガルーラナイト,714,OK,flavor,ガルーラに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1897,カイロスナイト,710,OK,flavor,カイロスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1898,ギャラドスナイト,715,OK,flavor,ギャラドスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1899,プテラナイト,711,OK,flavor,プテラに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1900,ミュウツナイトX,,NOT_FOUND,,,
+1901,ミュウツナイトY,,NOT_FOUND,,,
+1902,デンリュウナイト,697,OK,flavor,デンリュウに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1903,ハガネールナイト,802,OK,flavor,ハガネールに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1904,ハッサムナイト,709,OK,flavor,ハッサムに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1905,ヘラクロスナイト,719,OK,flavor,ヘラクロスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1906,ヘルガナイト,705,OK,flavor,ヘルガーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1907,バンギラスナイト,708,OK,flavor,バンギラスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1908,ジュカインナイト,794,OK,flavor,ジュカインに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1909,バシャーモナイト,703,OK,flavor,バシャーモに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1910,ラグラージナイト,793,OK,flavor,ラグラージに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1911,サーナイトナイト,696,OK,flavor,サーナイトに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1912,ヤミラミナイト,795,OK,flavor,ヤミラミに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1913,クチートナイト,720,OK,flavor,クチートに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1914,ボスゴドラナイト,706,OK,flavor,ボスゴドラに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1915,チャーレムナイト,704,OK,flavor,チャーレムに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1916,ライボルトナイト,721,OK,flavor,ライボルトに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1917,サメハダナイト,800,OK,flavor,サメハダーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1918,バクーダナイト,808,OK,flavor,バクーダに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1919,チルタリスナイト,796,OK,flavor,チルタリスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1920,ジュペッタナイト,707,OK,flavor,ジュペッタに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1921,アブソルナイト,716,OK,flavor,アブソルに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1922,ミミロップナイト,809,OK,flavor,ミミロップに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1923,オニゴーリナイト,804,OK,flavor,オニゴーリに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1924,ガブリアスナイト,722,OK,flavor,ガブリアスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1925,ルカリオナイト,712,OK,flavor,ルカリオに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1926,ユキノオナイト,713,OK,flavor,ユキノオーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1927,エルレイドナイト,797,OK,flavor,エルレイドに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1928,タブンネナイト,798,OK,flavor,タブンネに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1929,ボーマンダナイト,810,OK,flavor,ボーマンダに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1930,メタグロスナイト,799,OK,flavor,メタグロスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1931,ラティアスナイト,760,OK,flavor,ラティアスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1932,ラティオスナイト,761,OK,flavor,ラティオスに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1933,ディアンシナイト,805,OK,flavor,ディアンシーに持たせておくと戦いのときメガシンカができる不思議なメガストーンの一種。,
+1934,ゲッコウガナイト,,NOT_FOUND,,,
+1936,ピクシナイト,,NOT_FOUND,,,
+1937,ウツボットナイト,,NOT_FOUND,,,
+1938,スターミナイト,,NOT_FOUND,,,
+1939,カイリュナイト,,NOT_FOUND,,,
+1940,メガニウムナイト,,NOT_FOUND,,,
+1941,オーダイルナイト,,NOT_FOUND,,,
+1942,エアームドナイト,,NOT_FOUND,,,
+1943,チリーンナイト,,NOT_FOUND,,,
+1944,ムクホークナイト,,NOT_FOUND,,,
+1945,ユキメノコナイト,,NOT_FOUND,,,
+1946,ヒードラナイト,,NOT_FOUND,,,
+1947,ダークライナイト,,NOT_FOUND,,,
+1948,エンブオナイト,,NOT_FOUND,,,
+1949,ドリュウズナイト,,NOT_FOUND,,,
+1950,ペンドラナイト,,NOT_FOUND,,,
+1951,ズルズキナイト,,NOT_FOUND,,,
+1952,シビルドナイト,,NOT_FOUND,,,
+1953,シャンデラナイト,,NOT_FOUND,,,
+1954,ゴルーグナイト,,NOT_FOUND,,,
+1955,カエンジシナイト,,NOT_FOUND,,,
+1956,フラエッテナイト,,NOT_FOUND,,,
+1957,ニャオニクスナイト,,NOT_FOUND,,,
+1958,カラマネナイト,,NOT_FOUND,,,
+1959,ガメノデスナイト,,NOT_FOUND,,,
+1960,ドラミドナイト,,NOT_FOUND,,,
+1961,ルチャブルナイト,,NOT_FOUND,,,
+1962,ジガルデナイト,,NOT_FOUND,,,
+1963,ケケンカニナイト,,NOT_FOUND,,,
+1964,グソクムシャナイト,,NOT_FOUND,,,
+1965,ジジーロナイト,,NOT_FOUND,,,
+1966,マギアナイト,,NOT_FOUND,,,
+1967,ゼラオラナイト,,NOT_FOUND,,,
+1968,タイレーツナイト,,NOT_FOUND,,,
+1969,スコヴィラナイト,,NOT_FOUND,,,
+1970,キラフロルナイト,,NOT_FOUND,,,
+1971,シャリタツナイト,,NOT_FOUND,,,
+1972,セグレイブナイト,,NOT_FOUND,,,
+1973,ブリガロナイト,,NOT_FOUND,,,
+1974,マフォクシナイト,,NOT_FOUND,,,
+1975,アブソルナイトZ,,NOT_FOUND,,,
+1976,ガブリアスナイトZ,,NOT_FOUND,,,
+1977,ルカリオナイトZ,,NOT_FOUND,,,
+1978,ライチュウナイトX,,NOT_FOUND,,,
+1979,ライチュウナイトY,,NOT_FOUND,,,
