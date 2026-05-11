@@ -53,6 +53,7 @@ class Pokemon:
         self.__charging: bool = False
         self.__kyoken_charge: bool = False
         self.__wall: Walls = Walls.なし
+        self.__battle_type: list[Types] | None = None
         self.__waza_list: list[Optional[WazaBase]] = [None for _ in range(10)]
         self.__waza_rate_list: list[Optional[float]] = [0.0 for _ in range(10)]
         self.__weight: float = 0.0
@@ -265,6 +266,15 @@ class Pokemon:
                     else:
                         stats[k] = 0
                 self.rank = stats
+        self.statechanged()
+
+    @property
+    def battle_type(self) -> list[Types] | None:
+        return self.__battle_type
+
+    @battle_type.setter
+    def battle_type(self, value: list[Types] | None) -> None:
+        self.__battle_type = value
         self.statechanged()
 
     @property
@@ -679,12 +689,12 @@ class Pokemon:
         defender_terastype: Types = Types.なし,
     ) -> float:
         value = Decimal(1.0)
-        types: list[Types] = (
-            self.type
-            if self.battle_terastype == Types.なし
-            or self.battle_terastype == Types.ステラ
-            else [self.battle_terastype]
-        )
+        if self.__battle_type is not None:
+            types: list[Types] = self.__battle_type
+        elif self.battle_terastype != Types.なし and self.battle_terastype != Types.ステラ:
+            types = [self.battle_terastype]
+        else:
+            types = self.type
         if waza.name == "フライングプレス":
             fighting_value = Decimal(1.0)
             for te in DB_pokemon.get_type_effective(Types.かくとう, types):
@@ -769,6 +779,7 @@ class Pokemon:
     def on_stage(self):
         self.__rank = Stats(init_value=0)
         self.__kyoken_charge = False
+        self.__battle_type = None
         for waza in self.__waza_list:
             if waza is None:
                 continue

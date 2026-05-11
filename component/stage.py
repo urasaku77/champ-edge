@@ -222,6 +222,18 @@ class Stage:
         self._app.set_active_pokemon(player, pokemon)
         self.calc_damage()
 
+    # 変化後タイプ（battle_type）の設定（へんげんじざい/リベロ用）
+    def select_battle_type(self, player: int):
+        pokemon = self._app.active_poke_frames[player]._pokemon
+        if pokemon.is_empty:
+            return
+        selected: Types = self._app.select_type(player=player)
+        if selected is None:
+            return
+        pokemon.battle_type = None if selected == Types.なし else [selected]
+        self._app.set_info(player, pokemon)
+        self.calc_damage()
+
     # 技追加効果の分岐処理
     def set_waza_effect(self, player: int, wazabase: WazaBase):
         non_player = 0 if player == 1 else 1

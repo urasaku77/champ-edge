@@ -568,6 +568,7 @@ class MainApp(ThemedTk):
         for i in range(2):
             self.party_frames[i].set_stage(stage)
             self.chosen_frames[i].set_stage(stage)
+            self._info_frames[i].set_stage(stage)
             self.active_poke_frames[i].set_stage(stage)
             self.active_poke_frames[i]._status_frame.set_stage(stage)
             self._waza_damage_frames[i].set_stage(stage)
