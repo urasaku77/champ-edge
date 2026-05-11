@@ -10,6 +10,7 @@ from tkinter.scrolledtext import ScrolledText
 
 from natsort import natsorted
 
+from component.frames.common import SeikakuPopup
 from component.parts import images
 from component.parts.button import MyButton, TypeButton
 from component.parts.combobox import (
@@ -23,7 +24,7 @@ from component.parts.dialog import PokemonMemoLabelDialog, TypeSelectDialog
 from component.parts.label import MyLabel
 from database.pokemon import DB_pokemon
 from pokedata.const import Types
-from pokedata.nature import get_seikaku_hosei, get_seikaku_list
+from pokedata.nature import get_seikaku_hosei
 from pokedata.pokemon import Pokemon
 from pokedata.stats import StatsKey
 from recog.recog import get_recog_value
@@ -586,9 +587,10 @@ class PokemonEditor(ttk.LabelFrame):
             label = MyLabel(self, text=text)
             label.grid(column=2, row=i + 1, padx=5, pady=5)
 
-        self._seikaku_combobox = MyCombobox(self, values=get_seikaku_list(), width=24)
-        self._seikaku_combobox.bind("<<ComboboxSelected>>", self.calc_status)
-        self._seikaku_combobox.grid(column=3, row=1, sticky=W + E + N + S)
+        self._seikaku_button = MyButton(
+            self, text="まじめ", command=self.on_push_seikaku_button, width=24
+        )
+        self._seikaku_button.grid(column=3, row=1, sticky=W + E + N + S)
 
         self._item_combobox = MyCombobox(self, values=ALL_ITEM_COMBOBOX_VALUES)
         self._item_combobox.grid(column=3, row=2, sticky=W + E + N + S)
@@ -659,7 +661,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._pokemon_name_var.set(pokemon.name)
         self._teras_var = pokemon.terastype
         self._teras_button.set_type(pokemon.terastype)
-        self._seikaku_combobox.set(pokemon.seikaku)
+        self._seikaku_button["text"] = pokemon.seikaku
         self._item_combobox.set(pokemon.item)
         self._ability_combobox["values"] = pokemon.abilities
         self._ability_combobox.set(pokemon.ability)
@@ -695,7 +697,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._pokemon_name_var.set("")
         self._teras_var = Types.なし
         self._teras_button.set_type(Types.なし)
-        self._seikaku_combobox.set("")
+        self._seikaku_button["text"] = "まじめ"
         self._item_combobox.set("")
         self._ability_combobox["values"] = []
         self._ability_combobox.set("")
@@ -721,6 +723,15 @@ class PokemonEditor(ttk.LabelFrame):
 
         self._memo_text.delete("1.0", tkinter.END)
         self.pokemon = Pokemon()
+
+    def on_push_seikaku_button(self):
+        x = self._seikaku_button.winfo_rootx()
+        y = self._seikaku_button.winfo_rooty() + self._seikaku_button.winfo_height()
+        SeikakuPopup(self, self._on_seikaku_selected).open((x, y))
+
+    def _on_seikaku_selected(self, seikaku: str):
+        self._seikaku_button["text"] = seikaku
+        self.calc_status()
 
     def on_push_terasbutton(self):
         type: Types = self.select_type()
@@ -761,7 +772,7 @@ class PokemonEditor(ttk.LabelFrame):
                     value = math.floor(value / 100) + 5
                     value = math.floor(
                         value
-                        * get_seikaku_hosei(self._seikaku_combobox.get(), StatsKey(i))
+                        * get_seikaku_hosei(self._seikaku_button["text"], StatsKey(i))
                     )
                     self.jissu_list[i].set(value)
 
@@ -776,7 +787,7 @@ class PokemonEditor(ttk.LabelFrame):
                 self._pokemon_name_var.get(),
                 "",
                 all_doryoku,
-                self._seikaku_combobox.get(),
+                self._seikaku_button["text"],
                 self._item_combobox.get(),
                 self._ability_combobox.get(),
                 self._teras_var.name if self._teras_var != Types.なし else "",

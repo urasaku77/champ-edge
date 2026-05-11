@@ -29,7 +29,7 @@ def _sy(v: int) -> int:
 from pokedata.calc import DamageCalcResult
 from pokedata.const import ABILITY_VALUES, Ailments, Types, Walls
 from pokedata.exception import changeble_form_in_battle
-from pokedata.nature import get_seikaku_list
+from pokedata.nature import get_seikaku_from_arrows
 from pokedata.pokemon import Pokemon
 from pokedata.stats import Stats, StatsKey
 from pokedata.waza import WazaBase
@@ -178,6 +178,59 @@ class ChosenFrame(ttk.LabelFrame):
         self._stage.clear_chosen(self._player)
 
 
+class SeikakuPopup(tkinter.Toplevel):
+    _STAT_KEYS = [StatsKey.A, StatsKey.B, StatsKey.C, StatsKey.D, StatsKey.S]
+    _STAT_LABELS = ["こうげき", "ぼうぎょ", "とくこう", "とくぼう", "すばやさ"]
+    _CENTER = 2  # C×C のみ「まじめ」を表示
+
+    def __init__(self, master, callback):
+        super().__init__(master)
+        self.title("性格選択")
+        self._callback = callback
+        self.resizable(False, False)
+        self.grab_set()
+        self.focus_set()
+
+        ttk.Label(self, text="").grid(row=0, column=0)
+        for col, label in enumerate(self._STAT_LABELS):
+            ttk.Label(self, text=f"↓{label}", anchor="center").grid(
+                row=0, column=col + 1, padx=4, pady=4
+            )
+
+        for row, (up_key, up_label) in enumerate(
+            zip(self._STAT_KEYS, self._STAT_LABELS, strict=True)
+        ):
+            ttk.Label(self, text=f"↑{up_label}", anchor="e").grid(
+                row=row + 1, column=0, padx=4, pady=2
+            )
+            for col, down_key in enumerate(self._STAT_KEYS):
+                if row == col:
+                    if row == self._CENTER:
+                        MyButton(
+                            self,
+                            text="まじめ",
+                            command=lambda: self._select("まじめ"),
+                        ).grid(row=row + 1, column=col + 1, padx=2, pady=2)
+                    else:
+                        ttk.Label(self, text="").grid(
+                            row=row + 1, column=col + 1
+                        )
+                else:
+                    nature = get_seikaku_from_arrows(up_key, down_key)
+                    MyButton(
+                        self,
+                        text=nature,
+                        command=lambda n=nature: self._select(n),
+                    ).grid(row=row + 1, column=col + 1, padx=2, pady=2)
+
+    def _select(self, nature: str):
+        self._callback(nature)
+        self.destroy()
+
+    def open(self, location: tuple[int, int]):
+        self.geometry(f"+{location[0]}+{location[1]}")
+
+
 # 選択状態ポケモン表示フレーム
 class ActivePokemonFrame(ttk.LabelFrame):
     def __init__(self, master, player: int, **kwargs):
@@ -224,15 +277,13 @@ class ActivePokemonFrame(ttk.LabelFrame):
         )
         self._form_button.grid(column=0, row=2, pady=5)
 
-        seikakus = get_seikaku_list()
-        seikakus.insert(0, "まじめ")
-        self._seikaku_combobox = MyCombobox(
-            left_frame, values=seikakus, width=const.char_width(default=8, mac=6)
+        self._seikaku_button = MyButton(
+            left_frame,
+            text="まじめ",
+            command=self.on_push_seikaku_button,
+            width=const.char_width(default=8, mac=6),
         )
-        self._seikaku_combobox.set(seikakus[0])
-        self._seikaku_combobox.bind("<<ComboboxSelected>>", self.on_select_seikaku)
-        self._seikaku_combobox.bind("<Return>", self.on_select_seikaku)
-        self._seikaku_combobox.grid(column=0, row=3, sticky=W + E)
+        self._seikaku_button.grid(column=0, row=3, sticky=W + E)
 
         self._status_frame = StatusFrame(self, player, text="ステータス")
         # self._status_combobox.bind("<<ComboboxSelected>>", self.on_select_doryoku)
@@ -311,7 +362,7 @@ class ActivePokemonFrame(ttk.LabelFrame):
             self.all_check_reset()
         self._pokemon_icon.set_pokemon_icon(pid=poke.pid, size=(60, 60))
         self._status_frame.update_pokemon(poke)
-        self._seikaku_combobox.set(poke.seikaku)
+        self._seikaku_button["text"] = poke.seikaku
         self._item_combobox.set(poke.item)
         self._ability_combobox["values"] = poke.abilities
         self._ability_combobox.set(poke.ability)
@@ -361,10 +412,14 @@ class ActivePokemonFrame(ttk.LabelFrame):
             player=self._player, charging=self.charging.get()
         )
 
-    def on_select_seikaku(self, *_args):
-        self._stage.set_value_to_active_pokemon(
-            player=self._player, seikaku=self._seikaku_combobox.get()
-        )
+    def on_push_seikaku_button(self):
+        x = self._seikaku_button.winfo_rootx()
+        y = self._seikaku_button.winfo_rooty() + self._seikaku_button.winfo_height()
+        SeikakuPopup(self, self._on_seikaku_selected).open((x, y))
+
+    def _on_seikaku_selected(self, seikaku: str):
+        self._seikaku_button["text"] = seikaku
+        self._stage.set_value_to_active_pokemon(player=self._player, seikaku=seikaku)
 
     def on_select_item(self, *_args):
         self._stage.set_value_to_active_pokemon(
