@@ -462,6 +462,14 @@ class DamageCalc:
                         hosei[key] = 5120
         # endregion
 
+        # region オーラ特性（場全体：防御側がオーラを持つ場合）
+        if defender.ability in ["フェアリーオーラ", "ダークオーラ"] and attacker.ability != defender.ability:
+            key = "防御特性:" + defender.ability
+            aura_type = Types.フェアリー if defender.ability == "フェアリーオーラ" else Types.あく
+            if waza.type == aura_type:
+                hosei[key] = 3072 if attacker.ability == "オーラブレイク" else 5448
+        # endregion
+
         # region 攻撃側の持ち物補正
         key: str = "持ち物:" + attacker.item
         match attacker.item:
