@@ -133,6 +133,7 @@ class WazaBase:
         self.__type: int = WazaBase.TYPE_NONE
         self.__value_list: tuple[float | float] | None = None
         self.__value = None
+        self.__initial_value = None
         self.__critical: bool = False
 
         # 複数回攻撃
@@ -141,6 +142,7 @@ class WazaBase:
                 self.__type = WazaBase.TYPE_MULTI_HIT
                 self.__value_list = v[0]
                 self.__value = v[1]
+                self.__initial_value = v[1]
                 break
 
         # 威力増加技
@@ -253,6 +255,10 @@ class WazaBase:
             if idx >= len(self.__value_list):
                 idx = 0
             self.__value = self.__value_list[idx]
+
+    def apply_skill_link(self, enabled: bool):
+        if self.__value_list is not None and min(self.__value_list) == 2 and max(self.__value_list) == 5:
+            self.__value = max(self.__value_list) if enabled else self.__initial_value
 
     __multi_hit_values = {
         "タネマシンガン|ロックブラスト|つららばり|スケイルショット|ミサイルばり": (

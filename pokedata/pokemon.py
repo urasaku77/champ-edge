@@ -339,7 +339,14 @@ class Pokemon:
         self.__ability = value
         self.__base_ability = value
         self.set_default_ability_value()
+        self._apply_skill_link()
         self.statechanged()
+
+    def _apply_skill_link(self):
+        enabled = self.__ability == "スキルリンク"
+        for wazabase in self.__waza_list:
+            if wazabase is not None:
+                wazabase.apply_skill_link(enabled)
 
     @property
     def base_ability(self) -> str:
@@ -627,12 +634,14 @@ class Pokemon:
             self.__item = data[4]
             self.__ability = data[5]
             self.__base_ability = data[5]
+            self.set_default_ability_value()
             self.__terastype = Types[data[6]] if data[6] != "" else Types.なし
             self.__memo = data[7]
             if use_data:
                 for i in range(11):
                     if i + 8 < len(data):
                         self.__waza_list[i] = WazaBase(data[i + 8])
+                self._apply_skill_link()
 
     # HOMEデータから技を10個読み取り
     def set_waza_from_home(self):
@@ -642,6 +651,7 @@ class Pokemon:
         for i in range(len(waza_data) if len(waza_data) <= 10 else 10):
             self.__waza_list[i] = WazaBase(waza_data[i][0])
             self.__waza_rate_list[i] = waza_data[i][1]
+        self._apply_skill_link()
 
     # HOMEデータからとくせいを使用率順に並び替え
     def set_ability_from_home(self):
@@ -747,6 +757,8 @@ class Pokemon:
             self.__waza_list[index] = WazaBase(waza_name)
         else:
             self.__waza_list.append(WazaBase(waza_name))
+        if self.__ability == "スキルリンク":
+            self._apply_skill_link()
         self.statechanged()
 
     # 対象のタイプを持っているか（テラスタイプの場合含む）
@@ -774,6 +786,8 @@ class Pokemon:
             self.__base_type = list(self.__type)
             self.__abilities = list(next_form.abilities)
             self.__ability = next_form.ability
+            self.set_default_ability_value()
+            self._apply_skill_link()
             self.statechanged()
 
     def on_stage(self):
