@@ -559,31 +559,37 @@ class RecordFrame(ttk.LabelFrame):
             fg="black",
             insertbackground="black",
         )
-        self.memo.grid(column=1, row=2, columnspan=4, sticky=N + E + W + S)
+        self.memo.grid(column=1, row=2, columnspan=5, sticky=N + E + W + S)
+
+        # 引き分け は 4 文字 + Mac Hiragino は幅広なので width=7
+        _btn_w = const.char_width(default=4, mac=7)
+        anon_btn = MyButton(
+            self, width=_btn_w, text="匿名",
+            command=lambda: (self.tn.delete(0, tkinter.END), self.tn.insert(0, "トレーナー")),
+        )
+        anon_btn.grid(column=2, row=0, sticky=N + E + W + S)
 
         self.favo = tkinter.BooleanVar()
         self.favo.set(False)
         self.favo_checkbox = tkinter.Checkbutton(
             self, variable=self.favo, text="お気に入り"
         )
-        self.favo_checkbox.grid(column=2, row=0)
+        self.favo_checkbox.grid(column=3, row=0)
 
-        # 引き分け は 4 文字 + Mac Hiragino は幅広なので width=7
-        _btn_w = const.char_width(default=4, mac=7)
         win_btn = MyButton(
             self, width=_btn_w, text="勝ち", command=lambda: self.register(1)
         )
         win_btn.grid(column=2, row=1, sticky=N + E + W + S)
-        lose_btn = MyButton(
-            self, width=_btn_w, text="負け", command=lambda: self.register(0)
-        )
-        lose_btn.grid(column=3, row=1, sticky=N + E + W + S)
         draw_btn = MyButton(
             self, width=_btn_w, text="引き分け", command=lambda: self.register(-1)
         )
-        draw_btn.grid(column=4, row=1, sticky=N + E + W + S)
+        draw_btn.grid(column=3, row=1, sticky=N + E + W + S)
+        lose_btn = MyButton(
+            self, width=_btn_w, text="負け", command=lambda: self.register(0)
+        )
+        lose_btn.grid(column=4, row=1, sticky=N + E + W + S)
         clear_btn = MyButton(self, width=_btn_w, text="クリア", command=self.clear)
-        clear_btn.grid(column=3, row=0, sticky=N + E + W + S)
+        clear_btn.grid(column=4, row=0, sticky=N + E + W + S)
 
     def set_stage(self, stage: Stage):
         self._stage = stage
