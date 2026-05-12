@@ -584,6 +584,8 @@ class RecordFrame(ttk.LabelFrame):
         draw_btn.grid(column=4, row=1, sticky=N + E + W + S)
         clear_btn = MyButton(self, width=_btn_w, text="クリア", command=self.clear)
         clear_btn.grid(column=4, row=0, sticky=N + E + W + S)
+        undo_btn = MyButton(self, width=_btn_w, text="取消", command=self.undo)
+        undo_btn.grid(column=3, row=0, sticky=N + E + W + S)
 
     def set_stage(self, stage: Stage):
         self._stage = stage
@@ -592,6 +594,9 @@ class RecordFrame(ttk.LabelFrame):
         self.result = result
         self._stage.record_battle()
         self._stage.loop_image_recognize()
+
+    def undo(self):
+        self._stage.undo_last_battle()
 
     def clear(self):
         self._stage.clear_battle()

@@ -154,6 +154,28 @@ class DB_battle:
         DB_battle.__db.commit()
 
     @staticmethod
+    def delete_latest():
+        cur = DB_battle.__db.cursor()
+        cur.execute("DELETE FROM battle WHERE id = (SELECT MAX(id) FROM battle)")
+        DB_battle.__db.commit()
+        cur.close()
+
+    @staticmethod
+    def delete_by_date_range(from_date: int, to_date: int, rule: int, party_num=0, party_subnum=0):
+        parts = ["date >= ?", "date <= ?", "rule = ?"]
+        params: list = [from_date, to_date, rule]
+        if party_num != 0:
+            parts.append("player_party_num = ?")
+            params.append(party_num)
+        if party_subnum != 0:
+            parts.append("player_party_subnum = ?")
+            params.append(party_subnum)
+        cur = DB_battle.__db.cursor()
+        cur.execute(f"DELETE FROM battle WHERE {' AND '.join(parts)}", tuple(params))
+        DB_battle.__db.commit()
+        cur.close()
+
+    @staticmethod
     def get_battle_data_by_date(
         from_date: int,
         to_date: int,
