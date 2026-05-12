@@ -818,28 +818,23 @@ class Analytics(tkinter.Toplevel):
             self.record_count_label.destroy()
         if self.whole_win_rate_label is not None:
             self.whole_win_rate_label.destroy()
-        if self.result_1_label_list is not []:
-            for kpLabel in self.result_1_label_list:
-                kpLabel.destroy()
-                self.result_1_label_list = []
-        if self.result_2_label_list is not []:
-            for win_rate_label in self.result_2_label_list:
-                win_rate_label.destroy()
-                self.win_rate_label = []
-        if self.canvas_list is not []:
-            for canvas in self.canvas_list:
-                canvas.delete("all")
-                self.canvas_list = []
+        for kpLabel in self.result_1_label_list:
+            kpLabel.destroy()
+        self.result_1_label_list = []
+        for win_rate_label in self.result_2_label_list:
+            win_rate_label.destroy()
+        self.result_2_label_list = []
+        for canvas in self.canvas_list:
+            canvas.delete("all")
+        self.canvas_list = []
 
     def delete_result(self):
-        if self.result_1_label_list is not []:
-            for kp_label in self.result_1_label_list:
-                kp_label.destroy()
-                self.result_1_label_list = []
-        if self.result_2_label_list is not []:
-            for win_rate_label in self.result_2_label_list:
-                win_rate_label.destroy()
-                self.win_rate_label = []
+        for kp_label in self.result_1_label_list:
+            kp_label.destroy()
+        self.result_1_label_list = []
+        for win_rate_label in self.result_2_label_list:
+            win_rate_label.destroy()
+        self.result_2_label_list = []
 
     def zero_pad_number(self, s):
         # 正規表現で最初の数字部分を抽出
