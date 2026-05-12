@@ -836,7 +836,7 @@ class MainApp(ThemedTk):
                     self.party_frames[0].set_first_chosen_to_active()
                     self.stop_image_recognize()
                     return
-            case int():
+            case int() | float():
                 if result != -1:
                     self.record_frame.rank.insert(0, result)
             case _:

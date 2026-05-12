@@ -4,6 +4,7 @@ import glob
 import os
 import re
 import threading
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -139,11 +140,12 @@ class Capture:
                 )
             except Exception:
                 rate_str = ""
-        # レートは小数点付き (例: 1705.195) → float抽出してintに丸める
-        m = re.search(r"\d{3,5}(?:\.\d+)?", rate_str)
+        # 全角数字・全角ピリオドを半角に変換してからレートを抽出
+        rate_clean = unicodedata.normalize("NFKC", re.sub(r"\s+", "", rate_str))
+        m = re.search(r"\d{3,5}(?:\.\d+)?", rate_clean)
         if m:
             self.phase = "battle"
-            return int(round(float(m.group())))
+            return float(m.group())
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
