@@ -490,7 +490,7 @@ class Record(tkinter.Toplevel):
 
     def filter_favorites(self):
         if self.favorite_var.get():
-            self.battle_data_list = [x for x in self.battle_data_list if x[4] == "1"]
+            self.battle_data_list = [x for x in self.battle_data_list if x[4] in (1, "1")]
             self.page_num_var.set(1)
             self.update_result()
         else:
