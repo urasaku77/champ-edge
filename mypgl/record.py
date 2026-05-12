@@ -2,6 +2,7 @@ import datetime
 import json
 import math
 import tkinter
+from tkinter import messagebox
 
 from PIL import Image, ImageTk
 
@@ -224,6 +225,15 @@ class Record(tkinter.Toplevel):
         )
         search_button.place(
             x=Const.searchX + 550, y=Const.searchY + Const.searchDY * 2.7
+        )
+        delete_range_button = tkinter.Button(
+            self,
+            text="この範囲を全削除",
+            command=self.delete_range_data,
+            fg="red",
+        )
+        delete_range_button.place(
+            x=Const.searchX + 620, y=Const.searchY + Const.searchDY * 2.7
         )
         self.favorite_var = tkinter.BooleanVar()
         self.favorite_var.set(False)
@@ -456,6 +466,27 @@ class Record(tkinter.Toplevel):
                     anchor=tkinter.NW,
                 )
                 self.sensyutu_img_list.append(img)
+
+    def delete_range_data(self):
+        if not hasattr(self, "from_date") or not hasattr(self, "to_date"):
+            messagebox.showwarning("警告", "先に検索ボタンで絞り込んでください。")
+            return
+        count = len(self.battle_data_list)
+        if count == 0:
+            messagebox.showinfo("情報", "削除対象のデータがありません。")
+            return
+        if not messagebox.askokcancel(
+            "削除確認",
+            f"この操作は元に戻せません。\n現在の絞り込み範囲（{count}件）のデータを全て削除しますか？",
+        ):
+            return
+        DB_battle.delete_by_date_range(
+            self.from_date, self.to_date, self.rule.get(), self.party_num, self.party_subnum
+        )
+        self.battle_data_list = []
+        self.page_num_var.set(1)
+        self.update_result()
+        messagebox.showinfo("完了", f"{count}件のデータを削除しました。")
 
     def filter_favorites(self):
         if self.favorite_var.get():
