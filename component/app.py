@@ -650,7 +650,12 @@ class MainApp(ThemedTk):
         if player == 1:
             self._waza_damage_frames[player].set_waza_rate(pokemon.waza_rate_list)
             if not change_flag:
-                self.home_frame.set_home_data(pokemon.name)
+                home_name = (
+                    pokemon.base_name
+                    if pokemon.name.startswith("メガ") and pokemon.name != "メガニウム"
+                    else pokemon.name
+                )
+                self.home_frame.set_home_data(home_name)
 
     def after_appear(self, pokemon: Pokemon, player: int):
         match pokemon.ability:
