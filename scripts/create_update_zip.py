@@ -60,6 +60,9 @@ _UPDATE_EXCLUDE = {
 
 def _excluded(arc: str, full: bool) -> bool:
     path = arc.replace("\\", "/")
+    # ソースコード・キャッシュは配布物に含めない
+    if path.endswith(".py") or "/__pycache__/" in path or path.startswith("__pycache__/"):
+        return True
     if any(path == e or path.startswith(e + "/") for e in _ALWAYS_EXCLUDE):
         return True
     if full:
