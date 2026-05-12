@@ -389,7 +389,7 @@ class Stage:
 
     # パーティのクリア
     def clear_party(self, player: int):
-        party = [Pokemon()] * 6
+        party = [Pokemon() for _ in range(6)]
         self._app.set_party(player=player, party=party)
 
     # 選出の登録

@@ -46,7 +46,7 @@ class PartyFrame(ttk.LabelFrame):
         self._player: int = player
         self._stage: Stage | None = None
         self._button_list: list[MyButton] = []
-        self.pokemon_list: list[Pokemon] = [Pokemon()] * 6
+        self.pokemon_list: list[Pokemon] = [Pokemon() for _ in range(6)]
 
         # ポケモン表示ボタン
         for i in range(6):
@@ -135,7 +135,7 @@ class ChosenFrame(ttk.LabelFrame):
         self._player: int = player
         self._stage: Stage | None = None
         self._button_list: list[MyButton] = []
-        self.pokemon_list: list[Pokemon] = [Pokemon()] * sensyutu_num
+        self.pokemon_list: list[Pokemon] = [Pokemon() for _ in range(sensyutu_num)]
         # ポケモン表示ボタン
 
         for i in range(sensyutu_num):
