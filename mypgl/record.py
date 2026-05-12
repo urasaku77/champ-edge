@@ -381,7 +381,7 @@ class Record(tkinter.Toplevel):
             self.canvas.create_text(
                 Const.winLoseX,
                 Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 15),
-                text="win" if battle_data[3] == 1 else "lose",
+                text="win" if battle_data[3] == 1 else ("draw" if battle_data[3] == -1 else "lose"),
                 font=Const.titleFont,
             )
             self.canvas.create_text(
@@ -656,7 +656,7 @@ class SearchRecord(tkinter.Frame):
             self.canvas.create_text(
                 Const.winLoseX,
                 Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 5),
-                text="win" if battle_data[3] == 1 else "lose",
+                text="win" if battle_data[3] == 1 else ("draw" if battle_data[3] == -1 else "lose"),
                 font=Const.titleFont,
             )
             self.canvas.create_text(
