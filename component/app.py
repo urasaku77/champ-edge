@@ -747,13 +747,6 @@ class MainApp(ThemedTk):
         self.weather_frame.reset_weather()
         self.field_frame.reset_field()
 
-    # 最後の対戦記録を取り消す
-    def undo_last_battle(self):
-        if not messagebox.askyesno("確認", "最後に登録した対戦記録を取り消しますか？"):
-            return
-        DB_battle.delete_latest()
-        messagebox.showinfo("完了", "最後の対戦記録を取り消しました。")
-
     # キャプチャ設定画面
     def capture_setting(self):
         dialog = CaptureSetting()

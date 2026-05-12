@@ -16,6 +16,7 @@ class EditBattleDialog(tkinter.Toplevel):
         super().__init__(master)
         self.title("対戦記録の編集")
         self.saved = False
+        self.deleted = False
         self.battle_id = battle_data[0]
 
         tkinter.Label(self, text="TN:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
@@ -39,6 +40,7 @@ class EditBattleDialog(tkinter.Toplevel):
 
         tkinter.Button(self, text="保存", command=self._save).grid(row=4, column=1, pady=10)
         tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=4, column=2, pady=10)
+        tkinter.Button(self, text="削除", fg="red", command=self._delete).grid(row=4, column=3, pady=10)
 
         self.grab_set()
         self.focus_set()
@@ -52,6 +54,13 @@ class EditBattleDialog(tkinter.Toplevel):
             self.memo_text.get("1.0", "end-1c"),
         )
         self.saved = True
+        self.destroy()
+
+    def _delete(self):
+        if not messagebox.askyesno("削除確認", "このレコードを削除しますか？\nこの操作は元に戻せません。", parent=self):
+            return
+        DB_battle.delete_by_id(self.battle_id)
+        self.deleted = True
         self.destroy()
 
 
@@ -567,7 +576,7 @@ class Record(tkinter.Toplevel):
             battle_data = self.battle_data_list[data_index]
             dialog = EditBattleDialog(self, battle_data)
             self.wait_window(dialog)
-            if dialog.saved:
+            if dialog.saved or dialog.deleted:
                 self.get_battle_data()
 
     def delete_range_data(self):

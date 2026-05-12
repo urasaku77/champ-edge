@@ -164,9 +164,9 @@ class DB_battle:
         cur.close()
 
     @staticmethod
-    def delete_latest():
+    def delete_by_id(battle_id: int):
         cur = DB_battle.__db.cursor()
-        cur.execute("DELETE FROM battle WHERE id = (SELECT MAX(id) FROM battle)")
+        cur.execute("DELETE FROM battle WHERE id = ?", (battle_id,))
         DB_battle.__db.commit()
         cur.close()
 

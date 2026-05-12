@@ -457,10 +457,6 @@ class Stage:
     def clear_battle(self):
         self._app.clear_battle()
 
-    # 最後の対戦記録を取り消す
-    def undo_last_battle(self):
-        self._app.undo_last_battle()
-
     # 画像認識ループ制御
     def loop_image_recognize(self):
         self._app.image_recognize()
