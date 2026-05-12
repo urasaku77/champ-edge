@@ -98,6 +98,10 @@ class Waza:
     def multi_hit(self) -> int:
         return self.__multi_hit
 
+    @multi_hit.setter
+    def multi_hit(self, value: int):
+        self.__multi_hit = value
+
     @property
     def priority(self) -> bool:
         return self.__priority

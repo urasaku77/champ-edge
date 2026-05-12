@@ -107,6 +107,9 @@ class DamageCalc:
             ):
                 waza.critical = True
 
+            if attacker.ability == "スキルリンク" and waza.multi_hit != -1:
+                waza.multi_hit = 5
+
             # テラバーストによる種別、タイプ変化
             if waza.name == "テラバースト" and attacker.battle_terastype != Types.なし:
                 waza.category = 物理 if attacker.rankedA >= attacker.rankedC else 特殊
