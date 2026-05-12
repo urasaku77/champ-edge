@@ -7,6 +7,20 @@ from tkinter import filedialog, ttk
 
 from component.parts.button import MyButton
 
+_SETTING_DEFAULTS = {
+    "rule": 1,
+    "battle_data_auto_update": True,
+    "active_chosen_auto": True,
+    "capture_monitor_auto": True,
+    "doryoku_reset_auto": True,
+    "similar_party_auto": False,
+    "search_record_auto": False,
+    "panipani_auto": True,
+    "terastal_enabled": True,
+    "mega_enabled": True,
+    "tesseract_path": "",
+}
+
 
 class CaptureSetting(tkinter.Toplevel):
     def __init__(
@@ -101,19 +115,7 @@ class ModeSetting(tkinter.Toplevel):
             with open(self.path, "r") as json_file:
                 self.initial_data = json.load(json_file)
         except FileNotFoundError:
-            self.initial_data = {
-                "rule": 1,
-                "battle_data_auto_update": True,
-                "active_chosen_auto": True,
-                "capture_monitor_auto": True,
-                "doryoku_reset_auto": True,
-                "similar_party_auto": False,
-                "search_record_auto": False,
-                "panipani_auto": True,
-                "terastal_enabled": True,
-                "mega_enabled": True,
-                "tesseract_path": "",
-            }
+            self.initial_data = dict(_SETTING_DEFAULTS)
 
         # ルールの選択
         self.rule_var = tkinter.IntVar()
@@ -308,17 +310,7 @@ def get_recog_value(key: str):
         raise ValueError("Invalid key provided for recognition settings.")
 
     defaults = {
-        "rule": 1,
-        "battle_data_auto_update": True,
-        "active_chosen_auto": True,
-        "capture_monitor_auto": True,
-        "doryoku_reset_auto": True,
-        "similar_party_auto": False,
-        "search_record_auto": False,
-        "panipani_auto": True,
-        "terastal_enabled": True,
-        "mega_enabled": True,
-        "tesseract_path": "",
+        **_SETTING_DEFAULTS,
         "source_name": "",
         "host_name": "",
         "port": "",
