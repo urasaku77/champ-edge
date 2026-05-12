@@ -1051,7 +1051,7 @@ class PokemonFromHomeDialog(ttk.Frame):
             list = [line.rstrip("\n") for line in lines]
 
         pokes_frame = ttk.Frame(self, padding=10)
-        for i in range(100):
+        for i in range(min(100, len(list))):
             row = int(i / 10)
             column = i % 10
 

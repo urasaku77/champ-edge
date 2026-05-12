@@ -755,7 +755,7 @@ class SearchRecord(tkinter.Frame):
         for battle_data in self.battle_data_list[
             (self.page_num_var.get()) * 5 - 5 : (self.page_num_var.get()) * 5
         ]:
-            battle_time = datetime.datetime.fromtimestamp(battle_data[2])
+            battle_time = datetime.datetime.fromtimestamp(battle_data[1])
             self.canvas.create_text(
                 Const.summaryX + 50,
                 Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 5),
