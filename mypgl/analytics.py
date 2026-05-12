@@ -318,32 +318,18 @@ class Analytics(tkinter.Toplevel):
         self.main_title_label["state"] = (
             "disable" if self.party_num == 0 and self.party_subnum == 0 else "normal"
         )
-        self.pokemon_list = [
-            item[0]
-            for item in DB_battle.calc_kp(
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
-            )
-        ]
-        self.result_1_list = [
-            item[1]
-            for item in DB_battle.calc_kp(
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
-            )
-        ]
+        _kp_result = DB_battle.calc_kp(
+            self.from_date,
+            self.to_date,
+            self.rule.get(),
+            self.party_num,
+            self.party_subnum,
+            self.regends_dict[self.regend_num.get()]
+            if self.regend_num.get() != "0"
+            else "0",
+        )
+        self.pokemon_list = [item[0] for item in _kp_result]
+        self.result_1_list = [item[1] for item in _kp_result]
         self.result_2_list = DB_battle.get_win_rate(
             self.pokemon_list,
             self.from_date,
@@ -543,32 +529,18 @@ class Analytics(tkinter.Toplevel):
 
         elif self.title_var.get() == "初手と勝率":
             self.title_var.set("ＫＰと勝率")
-            self.pokemon_list = [
-                item[0]
-                for item in DB_battle.calc_kp(
-                    self.from_date,
-                    self.to_date,
-                    self.rule.get(),
-                    self.party_num,
-                    self.party_subnum,
-                    self.regends_dict[self.regend_num.get()]
-                    if self.regend_num.get() != "0"
-                    else "0",
-                )
-            ]
-            self.result_1_list = [
-                item[1]
-                for item in DB_battle.calc_kp(
-                    self.from_date,
-                    self.to_date,
-                    self.rule.get(),
-                    self.party_num,
-                    self.party_subnum,
-                    self.regends_dict[self.regend_num.get()]
-                    if self.regend_num.get() != "0"
-                    else "0",
-                )
-            ]
+            _kp_result = DB_battle.calc_kp(
+                self.from_date,
+                self.to_date,
+                self.rule.get(),
+                self.party_num,
+                self.party_subnum,
+                self.regends_dict[self.regend_num.get()]
+                if self.regend_num.get() != "0"
+                else "0",
+            )
+            self.pokemon_list = [item[0] for item in _kp_result]
+            self.result_1_list = [item[1] for item in _kp_result]
 
             self.result_2_list = DB_battle.get_win_rate(
                 self.pokemon_list,
