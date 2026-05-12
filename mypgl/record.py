@@ -6,7 +6,9 @@ from tkinter import messagebox
 
 from PIL import Image, ImageTk
 
+from component.parts.combobox import AutoCompleteCombobox
 from database.battle import DB_battle
+from database.pokemon import DB_pokemon
 from mypgl.const import Const
 from recog.recog import get_recog_value
 
@@ -30,7 +32,7 @@ class EditBattleDialog(tkinter.Toplevel):
         tkinter.Label(self, text="メモ:").grid(row=2, column=0, sticky="ne", padx=5, pady=5)
         self.memo_text = tkinter.Text(self, width=30, height=4)
         self.memo_text.insert("1.0", battle_data[7] or "")
-        self.memo_text.grid(row=2, column=1, columnspan=3, padx=5)
+        self.memo_text.grid(row=2, column=1, columnspan=3, sticky="w", padx=5)
 
         tkinter.Label(self, text="勝敗:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
         self.result_var = tkinter.IntVar(value=battle_data[3])
@@ -38,20 +40,79 @@ class EditBattleDialog(tkinter.Toplevel):
         tkinter.Radiobutton(self, text="負け", variable=self.result_var, value=0).grid(row=3, column=2)
         tkinter.Radiobutton(self, text="引き分け", variable=self.result_var, value=-1).grid(row=3, column=3)
 
-        tkinter.Button(self, text="保存", command=self._save).grid(row=4, column=1, pady=10)
-        tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=4, column=2, pady=10)
-        tkinter.Button(self, text="削除", fg="red", command=self._delete).grid(row=4, column=3, pady=10)
+        tkinter.Label(self, text="自分P:").grid(row=4, column=0, sticky="e", padx=5, pady=3)
+        p_frame = tkinter.Frame(self)
+        p_frame.grid(row=4, column=1, columnspan=3, sticky="w", padx=5)
+        self.player_pokemon_vars = []
+        for col in range(10, 16):
+            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
+            AutoCompleteCombobox.pokemons(p_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            self.player_pokemon_vars.append(var)
+
+        tkinter.Label(self, text="相手P:").grid(row=5, column=0, sticky="e", padx=5, pady=3)
+        o_frame = tkinter.Frame(self)
+        o_frame.grid(row=5, column=1, columnspan=3, sticky="w", padx=5)
+        self.opponent_pokemon_vars = []
+        for col in range(16, 22):
+            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
+            AutoCompleteCombobox.pokemons(o_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            self.opponent_pokemon_vars.append(var)
+
+        tkinter.Label(self, text="自分選:").grid(row=6, column=0, sticky="e", padx=5, pady=3)
+        pc_frame = tkinter.Frame(self)
+        pc_frame.grid(row=6, column=1, columnspan=3, sticky="w", padx=5)
+        self.player_choice_vars = []
+        for col in range(22, 26):
+            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
+            AutoCompleteCombobox.pokemons(pc_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            self.player_choice_vars.append(var)
+
+        tkinter.Label(self, text="相手選:").grid(row=7, column=0, sticky="e", padx=5, pady=3)
+        oc_frame = tkinter.Frame(self)
+        oc_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5)
+        self.opponent_choice_vars = []
+        for col in range(26, 30):
+            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
+            AutoCompleteCombobox.pokemons(oc_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            self.opponent_choice_vars.append(var)
+
+        tkinter.Button(self, text="保存", command=self._save).grid(row=8, column=1, pady=10)
+        tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=8, column=2, pady=10)
+        tkinter.Button(self, text="削除", fg="red", command=self._delete).grid(row=8, column=3, pady=10)
 
         self.grab_set()
         self.focus_set()
 
+    @staticmethod
+    def _pid_to_name(pid: str) -> str:
+        if not pid or pid == "-1":
+            return ""
+        try:
+            return DB_pokemon.get_pokemon_name_by_pid(pid) or ""
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _name_to_pid(name: str) -> str:
+        name = (name or "").strip()
+        if not name:
+            return "-1"
+        try:
+            return DB_pokemon.get_pokemon_pid_by_name(name) or "-1"
+        except Exception:
+            return "-1"
+
     def _save(self):
-        DB_battle.update_battle(
+        DB_battle.update_battle_full(
             self.battle_id,
             self.result_var.get(),
             self.tn_var.get(),
             self.rate_var.get(),
             self.memo_text.get("1.0", "end-1c"),
+            [self._name_to_pid(v.get()) for v in self.player_pokemon_vars],
+            [self._name_to_pid(v.get()) for v in self.opponent_pokemon_vars],
+            [self._name_to_pid(v.get()) for v in self.player_choice_vars],
+            [self._name_to_pid(v.get()) for v in self.opponent_choice_vars],
         )
         self.saved = True
         self.destroy()
@@ -317,7 +378,7 @@ class Record(tkinter.Toplevel):
             self,
             text="対戦時間",
         )
-        koumoku_label0.place(x=Const.summaryX + 20, y=Const.koumokuY)
+        koumoku_label0.place(x=Const.summaryX + 60, y=Const.koumokuY)
         koumoku_label1 = tkinter.Label(
             self,
             text="自分のパーティ",
@@ -398,9 +459,11 @@ class Record(tkinter.Toplevel):
     def update_result(self):
         self.sensyutu_img_list = []
 
+        self.trash_photo = ImageTk.PhotoImage(Image.open("image/menu/trush.png"))
+
         self.canvas = tkinter.Canvas(self, width=1800, height=720)
         self.canvas.place(x=0, y=Const.pokemonImageY + 5)
-        self.canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
+        self.canvas.bind("<Button-3>", self._on_canvas_right_click)
         self.canvas.create_line(
             Const.outlineX,
             Const.outlineY,
@@ -437,10 +500,29 @@ class Record(tkinter.Toplevel):
             (self.page_num_var.get()) * 15 - 15 : (self.page_num_var.get()) * 15
         ]:
             battle_time = datetime.datetime.fromtimestamp(battle_data[1])
+            row_y = Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 15)
             self.canvas.create_text(
-                Const.summaryX + 50,
-                Const.textStartY + Const.imageStartY + Const.battleDataDY * int(i % 15),
-                text=battle_time.strftime("%Y/%m/%d %H:%M"),
+                Const.summaryX + 60,
+                row_y - 8,
+                text=battle_time.strftime("%Y/%m/%d"),
+            )
+            self.canvas.create_text(
+                Const.summaryX + 60,
+                row_y + 8,
+                text=battle_time.strftime("%H:%M"),
+            )
+            trash_tag = f"trash_{i % 15}"
+            self.canvas.create_image(
+                Const.summaryX + 10,
+                row_y,
+                image=self.trash_photo,
+                tags=(trash_tag,),
+                anchor=tkinter.CENTER,
+            )
+            battle_id = battle_data[0]
+            self.canvas.tag_bind(
+                trash_tag, "<Button-1>",
+                lambda e, bid=battle_id: self._delete_single(bid),
             )
             self.display_my_pokemon(battle_data, int(i % 15))
             self.display_my_sensyutu(battle_data, int(i % 15))
@@ -569,7 +651,7 @@ class Record(tkinter.Toplevel):
         except Exception as e:
             messagebox.showerror("エラー", f"エクスポートに失敗しました。\n{e}")
 
-    def _on_canvas_double_click(self, event):
+    def _on_canvas_right_click(self, event):
         row_index = (event.y - Const.imageStartY) // Const.battleDataDY
         data_index = (self.page_num_var.get() - 1) * 15 + row_index
         if 0 <= data_index < len(self.battle_data_list):
@@ -578,6 +660,13 @@ class Record(tkinter.Toplevel):
             self.wait_window(dialog)
             if dialog.saved or dialog.deleted:
                 self.get_battle_data()
+
+    def _delete_single(self, battle_id: int):
+        if not messagebox.askyesno("削除確認", "この対戦記録を削除しますか？\nこの操作は元に戻せません。", parent=self):
+            return
+        DB_battle.delete_by_id(battle_id)
+        self.battle_data_list = [d for d in self.battle_data_list if d[0] != battle_id]
+        self.update_result()
 
     def delete_range_data(self):
         if not hasattr(self, "from_date") or not hasattr(self, "to_date"):

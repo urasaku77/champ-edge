@@ -164,6 +164,30 @@ class DB_battle:
         cur.close()
 
     @staticmethod
+    def update_battle_full(
+        battle_id: int, result: int, opponent_tn: str, opponent_rate: str, battle_memo: str,
+        player_pokemons: list, opponent_pokemons: list,
+        player_choices: list, opponent_choices: list,
+    ):
+        cur = DB_battle.__db.cursor()
+        cur.execute(
+            """UPDATE battle SET
+               result = ?, opponent_tn = ?, opponent_rate = ?, battle_memo = ?,
+               player_pokemon1 = ?, player_pokemon2 = ?, player_pokemon3 = ?,
+               player_pokemon4 = ?, player_pokemon5 = ?, player_pokemon6 = ?,
+               opponent_pokemon1 = ?, opponent_pokemon2 = ?, opponent_pokemon3 = ?,
+               opponent_pokemon4 = ?, opponent_pokemon5 = ?, opponent_pokemon6 = ?,
+               player_choice1 = ?, player_choice2 = ?, player_choice3 = ?, player_choice4 = ?,
+               opponent_choice1 = ?, opponent_choice2 = ?, opponent_choice3 = ?, opponent_choice4 = ?
+               WHERE id = ?""",
+            (result, opponent_tn, opponent_rate, battle_memo,
+             *player_pokemons, *opponent_pokemons, *player_choices, *opponent_choices,
+             battle_id),
+        )
+        DB_battle.__db.commit()
+        cur.close()
+
+    @staticmethod
     def delete_by_id(battle_id: int):
         cur = DB_battle.__db.cursor()
         cur.execute("DELETE FROM battle WHERE id = ?", (battle_id,))
