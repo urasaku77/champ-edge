@@ -5,6 +5,20 @@ from PIL import Image, ImageTk
 from pokedata.const import Types
 
 blank_images = {}
+_unrecognized_images = {}
+
+
+def get_unrecognized_image(size: tuple[int, int] = (30, 30)):
+    size_key = f"{size[0]}x{size[1]}"
+    if size_key in _unrecognized_images:
+        return _unrecognized_images[size_key]
+    from PIL import ImageDraw
+    img = Image.new("RGBA", size, (200, 50, 50, 255))
+    draw = ImageDraw.Draw(img)
+    draw.text((size[0] // 2, size[1] // 2), "?", fill="white", anchor="mm")
+    tk_img = ImageTk.PhotoImage(img)
+    _unrecognized_images[size_key] = tk_img
+    return tk_img
 
 
 def get_blank_image(size: tuple[int, int]):
