@@ -821,6 +821,7 @@ class MainApp(ThemedTk):
         match result:
             case tuple():
                 self.party_frames[1].set_party_from_capture(result[0])
+                self.record_frame.tn.delete(0, tkinter.END)
                 self.record_frame.tn.insert(0, result[1])
                 if get_recog_value("similar_party_auto"):
                     self.search_similar_party(isOpen=False)
@@ -838,6 +839,7 @@ class MainApp(ThemedTk):
                     return
             case int() | float():
                 if result != -1:
+                    self.record_frame.rank.delete(0, tkinter.END)
                     self.record_frame.rank.insert(0, result)
             case _:
                 pass
@@ -915,6 +917,7 @@ class MainApp(ThemedTk):
 
     def _on_manual_capture_result(self, result):
         self.party_frames[1].set_party_from_capture(result[0])
+        self.record_frame.tn.delete(0, tkinter.END)
         self.record_frame.tn.insert(0, result[1])
 
     # 類似パーティ検索
