@@ -238,7 +238,7 @@ class ModeSetting(tkinter.Toplevel):
         self.cancel_button.grid(row=11, column=1, pady=10)
         caution = ttk.Label(
             self,
-            text="※設定を反映するには、再起動が必要です。",
+            text="※ルール・テラスタル・メガシンカの変更は再起動が必要です。",
             foreground="red",
             padding=10,
         )
