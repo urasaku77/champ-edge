@@ -240,6 +240,7 @@ class MainApp(ThemedTk):
         menu.add_cascade(label="ボックス編集", command=self.open_box)
         menu.add_cascade(label="対戦履歴", command=self.open_records)
         menu.add_cascade(label="対戦分析", command=self.open_analytics)
+        menu.add_command(label="DBバックアップ", command=self.backup_database)
         menu.add_command(label="アップデート確認", command=self.check_update)
 
         for i, side in enumerate(["自分側", "相手側"]):
@@ -1290,6 +1291,24 @@ class MainApp(ThemedTk):
     def open_analytics(self):
         dialog = analytics.Analytics()
         dialog.open()
+
+    # DBバックアップ
+    def backup_database(self):
+        import shutil
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(
+            title="バックアップ先を選択",
+            defaultextension=".db",
+            filetypes=[("SQLite DB", "*.db"), ("すべてのファイル", "*.*")],
+            initialfile="battle_backup.db",
+        )
+        if not path:
+            return
+        try:
+            shutil.copy2("database/battle.db", path)
+            messagebox.showinfo("完了", f"バックアップを保存しました。\n{path}")
+        except Exception as e:
+            messagebox.showerror("エラー", f"バックアップに失敗しました。\n{e}")
 
     def on_change_transport(self, event):
         # -transparentcolor は Windows 専用の Tk 属性
