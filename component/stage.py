@@ -434,7 +434,7 @@ class Stage:
     # 選出の削除
     def delete_chosen(self, player: int, index: int):
         self._app.chosen_frames[player].pokemon_list[index] = Pokemon()
-        self._app.set_chosen(player, Pokemon, index)
+        self._app.set_chosen(player, Pokemon(), index)
 
     # 選出のクリア
     def clear_chosen(self, player: int):
