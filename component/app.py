@@ -1203,6 +1203,11 @@ class MainApp(ThemedTk):
                                     ),
                                 )
 
+                import zipfile
+                if not zipfile.is_zipfile(zip_path):
+                    os.remove(zip_path)
+                    raise ValueError("ダウンロードしたファイルが壊れています")
+
                 bat = (
                     "@echo off\n"
                     'cd /d "%~dp0"\n'
