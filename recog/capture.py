@@ -129,10 +129,13 @@ class Capture:
                     os.environ["PATH"] += os.pathsep + self.path_tesseract
                 tools = pyocr.get_available_tools()
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                _, binary = cv2.threshold(gray, 85, 255, cv2.THRESH_BINARY)
+                gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+                _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                binary = cv2.bitwise_not(binary)
+                padded = cv2.copyMakeBorder(binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
                 builder = pyocr.builders.TextBuilder(tesseract_layout=7)
                 rate_str = tools[0].image_to_string(
-                    Image.fromarray(binary), lang="eng", builder=builder
+                    Image.fromarray(padded), lang="eng", builder=builder
                 )
             except Exception:
                 rate_str = ""
