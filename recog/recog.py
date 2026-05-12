@@ -91,7 +91,7 @@ class CaptureSetting(tkinter.Toplevel):
 
 # モード切替画面
 class ModeSetting(tkinter.Toplevel):
-    def __init__(self, title: str = "モード切替", width: int = 400, height: int = 450):
+    def __init__(self, title: str = "モード切替", width: int = 400, height: int = 480):
         super().__init__()
         self.title(title)
         self.path = "recog/setting.json"
@@ -103,6 +103,7 @@ class ModeSetting(tkinter.Toplevel):
         except FileNotFoundError:
             self.initial_data = {
                 "rule": 1,
+                "battle_data_auto_update": True,
                 "active_chosen_auto": True,
                 "capture_monitor_auto": True,
                 "doryoku_reset_auto": True,
@@ -126,13 +127,23 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.rule_button2.grid(row=0, column=1, pady=5)
 
+        # チェックボックス0（起動時バトルデータ自動更新）
+        self.battle_data_auto_update_var = tkinter.BooleanVar()
+        self.battle_data_auto_update_var.set(self.initial_data.get("battle_data_auto_update", True))
+        self.battle_data_auto_update_checkbox = tkinter.Checkbutton(
+            self,
+            text="起動時バトルデータ自動更新",
+            variable=self.battle_data_auto_update_var,
+        )
+        self.battle_data_auto_update_checkbox.grid(row=1, column=0, columnspan=2, pady=5)
+
         # チェックボックス1
         self.active_chosen_auto_var = tkinter.BooleanVar()
         self.active_chosen_auto_var.set(self.initial_data["active_chosen_auto"])
         self.active_chosen_auto_checkbox = tkinter.Checkbutton(
             self, text="相手選出自動登録モード", variable=self.active_chosen_auto_var
         )
-        self.active_chosen_auto_checkbox.grid(row=1, column=0, columnspan=2, pady=5)
+        self.active_chosen_auto_checkbox.grid(row=2, column=0, columnspan=2, pady=5)
 
         # チェックボックス2
         self.capture_monitor_auto_var = tkinter.BooleanVar()
@@ -142,7 +153,7 @@ class ModeSetting(tkinter.Toplevel):
             text="キャプチャ監視自動開始モード",
             variable=self.capture_monitor_auto_var,
         )
-        self.capture_monitor_auto_checkbox.grid(row=2, column=0, columnspan=2, pady=5)
+        self.capture_monitor_auto_checkbox.grid(row=3, column=0, columnspan=2, pady=5)
 
         # チェックボックス3
         self.doryoku_reset_auto_var = tkinter.BooleanVar()
@@ -152,7 +163,7 @@ class ModeSetting(tkinter.Toplevel):
             text="相手性格変更時自動努力値変更モード",
             variable=self.doryoku_reset_auto_var,
         )
-        self.doryoku_reset_auto_checkbox.grid(row=3, column=0, columnspan=2, pady=5)
+        self.doryoku_reset_auto_checkbox.grid(row=4, column=0, columnspan=2, pady=5)
 
         # チェックボックス4
         self.similar_party_auto_var = tkinter.BooleanVar()
@@ -162,7 +173,7 @@ class ModeSetting(tkinter.Toplevel):
             text="類似パーティ自動検索モード（構築記事）",
             variable=self.similar_party_auto_var,
         )
-        self.similar_party_auto_checkbox.grid(row=4, column=0, columnspan=2, pady=5)
+        self.similar_party_auto_checkbox.grid(row=5, column=0, columnspan=2, pady=5)
 
         # チェックボックス5
         self.search_record_auto_var = tkinter.BooleanVar()
@@ -172,7 +183,7 @@ class ModeSetting(tkinter.Toplevel):
             text="類似パーティ自動検索モード（対戦履歴）",
             variable=self.search_record_auto_var,
         )
-        self.search_record_auto_checkbox.grid(row=5, column=0, columnspan=2, pady=5)
+        self.search_record_auto_checkbox.grid(row=6, column=0, columnspan=2, pady=5)
 
         # チェックボックス6
         self.panipani_auto_var = tkinter.BooleanVar()
@@ -182,7 +193,7 @@ class ModeSetting(tkinter.Toplevel):
             text="ぱにぱにツール自動起動モード",
             variable=self.panipani_auto_var,
         )
-        self.panipani_auto_checkbox.grid(row=6, column=0, columnspan=2, pady=5)
+        self.panipani_auto_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
 
         # チェックボックス7
         self.terastal_enabled_var = tkinter.BooleanVar()
@@ -192,7 +203,7 @@ class ModeSetting(tkinter.Toplevel):
             text="テラスタル有効",
             variable=self.terastal_enabled_var,
         )
-        self.terastal_enabled_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
+        self.terastal_enabled_checkbox.grid(row=8, column=0, columnspan=2, pady=5)
 
         # チェックボックス8
         self.mega_enabled_var = tkinter.BooleanVar()
@@ -202,7 +213,7 @@ class ModeSetting(tkinter.Toplevel):
             text="メガシンカ有効",
             variable=self.mega_enabled_var,
         )
-        self.mega_enabled_checkbox.grid(row=8, column=0, columnspan=2, pady=5)
+        self.mega_enabled_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
 
         # Tesseractフォルダ
         tess_frame = ttk.Frame(self)
@@ -215,21 +226,21 @@ class ModeSetting(tkinter.Toplevel):
         MyButton(tess_frame, text="参照", command=self.browse_tesseract_path).pack(
             side="left", padx=5
         )
-        tess_frame.grid(row=9, column=0, columnspan=2, pady=5)
+        tess_frame.grid(row=10, column=0, columnspan=2, pady=5)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=10, column=0, pady=10)
+        self.submit_button.grid(row=11, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=10, column=1, pady=10)
+        self.cancel_button.grid(row=11, column=1, pady=10)
         caution = ttk.Label(
             self,
             text="※設定を反映するには、再起動が必要です。",
             foreground="red",
             padding=10,
         )
-        caution.grid(row=11, column=0, columnspan=2, pady=5)
+        caution.grid(row=12, column=0, columnspan=2, pady=5)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -249,6 +260,7 @@ class ModeSetting(tkinter.Toplevel):
         # 入力された値をJSONファイルに保存
         data = {
             "rule": self.rule_var.get(),
+            "battle_data_auto_update": self.battle_data_auto_update_var.get(),
             "active_chosen_auto": self.active_chosen_auto_var.get(),
             "capture_monitor_auto": self.capture_monitor_auto_var.get(),
             "doryoku_reset_auto": self.doryoku_reset_auto_var.get(),
@@ -278,6 +290,7 @@ def get_recog_value(key: str):
 
     if key not in [
         "rule",
+        "battle_data_auto_update",
         "active_chosen_auto",
         "capture_monitor_auto",
         "doryoku_reset_auto",
@@ -296,6 +309,7 @@ def get_recog_value(key: str):
 
     defaults = {
         "rule": 1,
+        "battle_data_auto_update": True,
         "active_chosen_auto": True,
         "capture_monitor_auto": True,
         "doryoku_reset_auto": True,

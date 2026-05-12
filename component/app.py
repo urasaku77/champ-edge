@@ -542,10 +542,12 @@ class MainApp(ThemedTk):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception:
+            self.after(0, self._auto_update_battle_data)
             return
 
         latest = data.get("tag_name", "").lstrip("v")
         if not latest or self._parse_version(latest) <= self._parse_version(current):
+            self.after(0, self._auto_update_battle_data)
             return
 
         assets = [
@@ -554,6 +556,7 @@ class MainApp(ThemedTk):
             if a["name"] == "champedge_forwin_update.zip"
         ]
         if not assets:
+            self.after(0, self._auto_update_battle_data)
             return
 
         asset_id = assets[0]["id"]
@@ -568,8 +571,30 @@ class MainApp(ThemedTk):
             f"新しいバージョンがあります\n\n現在: v{current}  →  最新: v{latest}\n\n"
             "アップデートしますか？\n（パーティやDBのデータは保持されます）",
         ):
+            self._auto_update_battle_data()
             return
         self._apply_update(asset_id)
+
+    def _auto_update_battle_data(self):
+        if not get_recog_value("battle_data_auto_update"):
+            return
+        threading.Thread(target=self._auto_update_battle_data_worker, daemon=True).start()
+
+    def _auto_update_battle_data_worker(self):
+        try:
+            local_date = open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8").read().strip()
+        except FileNotFoundError:
+            local_date = ""
+
+        try:
+            remote_date = self._fetch_text(f"{self._STATS_BASE_URL}/last_update_battle.txt").strip()
+            if remote_date == local_date:
+                return
+            self._download_stats_files(self._BATTLE_FILES, lambda _: None)
+            with open(self._LAST_BATTLE_UPDATE_FILE, "w", encoding="utf-8") as f:
+                f.write(remote_date)
+        except Exception:
+            pass
 
     # 各フレームにStageクラスを配置
     def set_stage(self, stage):
