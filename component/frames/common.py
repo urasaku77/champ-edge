@@ -840,7 +840,8 @@ class DamageDispFrame(ttk.Frame):
     def set_calc_result(self, result: DamageCalcResult):
         if result is not None and result.is_damage:
             self.dmg1_label["text"] = result.damage_text
-            self.dmg2_label["text"] = result.damage_per_text
+            ko = result.ko_text
+            self.dmg2_label["text"] = result.damage_per_text + (f"  {ko}" if ko else "")
             self.hpbar.set_damage(
                 mindmg=result.min_damage_per, maxdmg=result.max_damage_per
             )

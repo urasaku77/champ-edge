@@ -193,9 +193,10 @@ class DB_battle:
         party_num=0,
         party_subnum=0,
         regend_num="0",
+        keyword: str = "",
     ):
         where, params = DB_battle._build_base_where(
-            from_date, to_date, rule, party_num, party_subnum, regend_num
+            from_date, to_date, rule, party_num, party_subnum, regend_num, keyword
         )
         return DB_battle.__select(f"SELECT * FROM battle WHERE {where}", tuple(params))
 
@@ -699,7 +700,7 @@ class DB_battle:
 
     @staticmethod
     def _build_base_where(
-        from_date, to_date, rule, party_num=0, party_subnum=0, regend_num="0"
+        from_date, to_date, rule, party_num=0, party_subnum=0, regend_num="0", keyword: str = ""
     ) -> tuple[str, list]:
         parts = ["date >= ?", "date <= ?", "rule = ?"]
         params: list = [from_date, to_date, rule]
@@ -712,6 +713,10 @@ class DB_battle:
         if regend_num != "0":
             parts.append(DB_battle._OPPO_POKE_ANY)
             params.extend([regend_num] * 6)
+        if keyword:
+            parts.append("(opponent_tn LIKE ? OR battle_memo LIKE ?)")
+            like = f"%{keyword}%"
+            params.extend([like, like])
         return " AND ".join(parts), params
 
     @staticmethod

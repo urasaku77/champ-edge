@@ -262,6 +262,11 @@ class Record(tkinter.Toplevel):
         self.regend_num.set("0")
         # --- ここまで ---
 
+        keyword_label = tkinter.Label(self, text="キーワード")
+        keyword_label.place(x=Const.searchX + 530, y=Const.searchY)
+        self.keyword_txt = tkinter.Entry(self, width=20)
+        self.keyword_txt.place(x=Const.searchX + 600, y=Const.searchY)
+
         search_button = tkinter.Button(
             self,
             text="検索",
@@ -375,6 +380,7 @@ class Record(tkinter.Toplevel):
             self.regends_dict[self.regend_num.get()]
             if self.regend_num.get() != "0"
             else "0",
+            self.keyword_txt.get().strip(),
         )
 
         self.page_num_var.set(1)

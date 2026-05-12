@@ -56,6 +56,17 @@ class DamageCalcResult:
         return str(self.min_damage_per) + "%-" + str(self.max_damage_per) + "%"
 
     @property
+    def ko_text(self) -> str:
+        hp = self.defender[StatsKey.H]
+        for n in range(1, 5):
+            k = sum(1 for d in self.damages if d * n >= hp)
+            if k == 16:
+                return f"確定{n}発"
+            if k > 0:
+                return f"乱数{n}発 ({k}/16)"
+        return ""
+
+    @property
     def to_string(self) -> str:
         return "{0} {1}".format(self.waza.name, self.min_damage_per)
 
