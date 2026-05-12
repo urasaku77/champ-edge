@@ -566,7 +566,7 @@ class RecordFrame(ttk.LabelFrame):
         self.favo_checkbox = tkinter.Checkbutton(
             self, variable=self.favo, text="お気に入り"
         )
-        self.favo_checkbox.grid(column=2, row=0, columnspan=2)
+        self.favo_checkbox.grid(column=2, row=0)
 
         # 引き分け は 4 文字 + Mac Hiragino は幅広なので width=7
         _btn_w = const.char_width(default=4, mac=7)
