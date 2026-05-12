@@ -154,6 +154,16 @@ class DB_battle:
         DB_battle.__db.commit()
 
     @staticmethod
+    def update_battle(battle_id: int, result: int, opponent_tn: str, opponent_rate: str, battle_memo: str):
+        cur = DB_battle.__db.cursor()
+        cur.execute(
+            "UPDATE battle SET result = ?, opponent_tn = ?, opponent_rate = ?, battle_memo = ? WHERE id = ?",
+            (result, opponent_tn, opponent_rate, battle_memo, battle_id),
+        )
+        DB_battle.__db.commit()
+        cur.close()
+
+    @staticmethod
     def delete_latest():
         cur = DB_battle.__db.cursor()
         cur.execute("DELETE FROM battle WHERE id = (SELECT MAX(id) FROM battle)")

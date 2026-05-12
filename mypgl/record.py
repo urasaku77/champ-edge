@@ -11,6 +11,50 @@ from mypgl.const import Const
 from recog.recog import get_recog_value
 
 
+class EditBattleDialog(tkinter.Toplevel):
+    def __init__(self, master, battle_data):
+        super().__init__(master)
+        self.title("対戦記録の編集")
+        self.saved = False
+        self.battle_id = battle_data[0]
+
+        tkinter.Label(self, text="TN:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        self.tn_var = tkinter.StringVar(value=battle_data[5] or "")
+        tkinter.Entry(self, textvariable=self.tn_var, width=20).grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
+
+        tkinter.Label(self, text="レート:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        self.rate_var = tkinter.StringVar(value=battle_data[6] or "")
+        tkinter.Entry(self, textvariable=self.rate_var, width=20).grid(row=1, column=1, columnspan=3, sticky="w", padx=5)
+
+        tkinter.Label(self, text="メモ:").grid(row=2, column=0, sticky="ne", padx=5, pady=5)
+        self.memo_text = tkinter.Text(self, width=30, height=4)
+        self.memo_text.insert("1.0", battle_data[7] or "")
+        self.memo_text.grid(row=2, column=1, columnspan=3, padx=5)
+
+        tkinter.Label(self, text="勝敗:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        self.result_var = tkinter.IntVar(value=battle_data[3])
+        tkinter.Radiobutton(self, text="勝ち", variable=self.result_var, value=1).grid(row=3, column=1)
+        tkinter.Radiobutton(self, text="負け", variable=self.result_var, value=0).grid(row=3, column=2)
+        tkinter.Radiobutton(self, text="引き分け", variable=self.result_var, value=-1).grid(row=3, column=3)
+
+        tkinter.Button(self, text="保存", command=self._save).grid(row=4, column=1, pady=10)
+        tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=4, column=2, pady=10)
+
+        self.grab_set()
+        self.focus_set()
+
+    def _save(self):
+        DB_battle.update_battle(
+            self.battle_id,
+            self.result_var.get(),
+            self.tn_var.get(),
+            self.rate_var.get(),
+            self.memo_text.get("1.0", "end-1c"),
+        )
+        self.saved = True
+        self.destroy()
+
+
 class Record(tkinter.Toplevel):
     def __init__(self):
         super().__init__()
@@ -333,6 +377,7 @@ class Record(tkinter.Toplevel):
 
         self.canvas = tkinter.Canvas(self, width=1800, height=720)
         self.canvas.place(x=0, y=Const.pokemonImageY + 5)
+        self.canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
         self.canvas.create_line(
             Const.outlineX,
             Const.outlineY,
@@ -466,6 +511,16 @@ class Record(tkinter.Toplevel):
                     anchor=tkinter.NW,
                 )
                 self.sensyutu_img_list.append(img)
+
+    def _on_canvas_double_click(self, event):
+        row_index = (event.y - Const.imageStartY) // Const.battleDataDY
+        data_index = (self.page_num_var.get() - 1) * 15 + row_index
+        if 0 <= data_index < len(self.battle_data_list):
+            battle_data = self.battle_data_list[data_index]
+            dialog = EditBattleDialog(self, battle_data)
+            self.wait_window(dialog)
+            if dialog.saved:
+                self.get_battle_data()
 
     def delete_range_data(self):
         if not hasattr(self, "from_date") or not hasattr(self, "to_date"):
