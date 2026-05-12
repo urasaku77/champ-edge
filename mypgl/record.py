@@ -279,6 +279,14 @@ class Record(tkinter.Toplevel):
         delete_range_button.place(
             x=Const.searchX + 620, y=Const.searchY + Const.searchDY * 2.7
         )
+        export_button = tkinter.Button(
+            self,
+            text="CSVエクスポート",
+            command=self.export_csv,
+        )
+        export_button.place(
+            x=Const.searchX + 760, y=Const.searchY + Const.searchDY * 2.7
+        )
         self.favorite_var = tkinter.BooleanVar()
         self.favorite_var.set(False)
         favorite_check = tkinter.Checkbutton(
@@ -511,6 +519,40 @@ class Record(tkinter.Toplevel):
                     anchor=tkinter.NW,
                 )
                 self.sensyutu_img_list.append(img)
+
+    def export_csv(self):
+        import csv
+        from tkinter import filedialog
+        if not hasattr(self, "battle_data_list") or len(self.battle_data_list) == 0:
+            messagebox.showinfo("情報", "エクスポートするデータがありません。先に検索してください。")
+            return
+        path = filedialog.asksaveasfilename(
+            title="エクスポート先を選択",
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv"), ("すべてのファイル", "*.*")],
+            initialfile="battle_export.csv",
+        )
+        if not path:
+            return
+        headers = [
+            "id", "日時", "ルール", "勝敗", "お気に入り",
+            "相手TN", "相手レート", "メモ", "パーティ番号", "パーティ連番",
+            "自分P1", "自分P2", "自分P3", "自分P4", "自分P5", "自分P6",
+            "相手P1", "相手P2", "相手P3", "相手P4", "相手P5", "相手P6",
+            "自分選出1", "自分選出2", "自分選出3", "自分選出4",
+            "相手選出1", "相手選出2", "相手選出3", "相手選出4",
+        ]
+        try:
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                for row in self.battle_data_list:
+                    dt = datetime.datetime.fromtimestamp(row[1]).strftime("%Y/%m/%d %H:%M")
+                    result_str = "勝ち" if row[3] == 1 else ("引き分け" if row[3] == -1 else "負け")
+                    writer.writerow([row[0], dt, row[2], result_str] + list(row[4:]))
+            messagebox.showinfo("完了", f"{len(self.battle_data_list)}件をエクスポートしました。\n{path}")
+        except Exception as e:
+            messagebox.showerror("エラー", f"エクスポートに失敗しました。\n{e}")
 
     def _on_canvas_double_click(self, event):
         row_index = (event.y - Const.imageStartY) // Const.battleDataDY
