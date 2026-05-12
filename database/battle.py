@@ -91,8 +91,6 @@ class Battle:
 
 
 class DB_battle:
-    __db = sqlite3.connect("database/battle.db", check_same_thread=False)
-
     _init_sql = """
         CREATE TABLE IF NOT EXISTS battle (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,8 +125,16 @@ class DB_battle:
             opponent_choice4 TEXT
         )
     """
-    __db.execute(_init_sql)
-    __db.commit()
+
+    try:
+        __db = sqlite3.connect("database/battle.db", check_same_thread=False)
+        __db.execute(_init_sql)
+        __db.commit()
+    except Exception as _e:
+        import tkinter.messagebox as _mb
+        _mb.showerror("起動エラー", f"対戦データベースを開けませんでした。\n{_e}")
+        import sys as _sys
+        _sys.exit(1)
 
     def register_battle(battle):
         cur = DB_battle.__db.cursor()
