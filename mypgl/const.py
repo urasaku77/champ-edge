@@ -1,3 +1,4 @@
+import datetime
 import sys
 
 if sys.platform == "darwin":
@@ -50,7 +51,7 @@ class Const(object):
     searchY = 60
     searchDY = 20
     txtboxWidth = 5
-    yearList = [2026]
+    yearList = list(range(2026, datetime.date.today().year + 2))
     monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     dateList = [
         1,
