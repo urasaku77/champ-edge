@@ -483,10 +483,13 @@ class UseParty(ttk.LabelFrame):
         if value == "":
             typ = [("", "*.csv")]
             current_directory = os.getcwd()
-            value = filedialog.askopenfilename(
+            fle = filedialog.askopenfilename(
                 filetypes=typ,
                 initialdir=os.path.join(current_directory, "party", "csv"),
-            ).split("party/csv/")[1]
+            )
+            if not fle:
+                return
+            value = os.path.basename(fle)
 
         with open("party\\setting.txt", "w", encoding="utf-8") as txt:
             txt.write(value)

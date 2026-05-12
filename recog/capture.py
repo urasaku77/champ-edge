@@ -15,7 +15,7 @@ from PIL import Image
 
 from pokedata.exception import unrecognizable_pokemon
 from pokedata.pokemon import Pokemon
-from recog.coodinate import ConfCoordinate
+from recog.coordinate import ConfCoordinate
 from recog.obs import Obs
 from recog.recog import get_recog_value, get_tesseract_path
 

@@ -12,7 +12,7 @@ sys.path.insert(0, r"e:\champ-edge")
 import cv2
 import numpy as np
 
-from recog.coodinate import ConfCoordinate
+from recog.coordinate import ConfCoordinate
 from recog.recog import get_recog_value
 
 IMAGE_PATH = r"C:\Users\okada\Desktop\IMG_7612.JPG"
