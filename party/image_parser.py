@@ -111,8 +111,14 @@ _TYPE_ICON_DIR = "image/typeicon"
 # 名前行のタイプアイコン走査領域 (x1, y1, x2, y2) — スプライト右端から技アイコン手前まで
 _TYPE_ICON_SCAN = (200, 3, 450, 48)
 
+# OCR誤認識を正しいアイテム名に直接変換するマップ
+_ITEM_OCR_CORRECTIONS: dict[str, str] = {
+    "オレンのみ": "オボンのみ",
+    "マゴのみ": "カゴのみ",
+}
+
 _ranking_cache: list[str] = []
-_type_icon_tpl: dict[str, "np.ndarray"] = {}
+_type_icon_tpl: dict[str, "tuple[np.ndarray, np.ndarray]"] = {}
 # スプライトテンプレートキャッシュ: pid → (gray, alpha_mask or None)
 _pokemon_sprite_cache: dict[str, tuple["np.ndarray", "np.ndarray | None"]] = {}
 # home_waza.csv のキャッシュ: {ポケモン名: {技名, ...}}
@@ -140,8 +146,8 @@ def _load_ranking() -> list[str]:
     return _ranking_cache
 
 
-def _load_type_icon_templates() -> dict[str, "np.ndarray"]:
-    """image/typeicon/*.png をBGRで読み込んで返す（透明部分は白でコンポジット）。"""
+def _load_type_icon_templates() -> dict[str, "tuple[np.ndarray, np.ndarray]"]:
+    """image/typeicon/*.png を (BGR, alpha_mask) のペアで返す。"""
     global _type_icon_tpl
     if _type_icon_tpl:
         return _type_icon_tpl
@@ -158,13 +164,12 @@ def _load_type_icon_templates() -> dict[str, "np.ndarray"]:
             if raw is None:
                 continue
             if raw.ndim == 3 and raw.shape[2] == 4:
-                alpha = raw[:, :, 3:4].astype(np.float32) / 255.0
-                bgr = raw[:, :, :3].astype(np.float32)
-                white = np.ones_like(bgr) * 255.0
-                bgr = (bgr * alpha + white * (1.0 - alpha)).astype(np.uint8)
+                bgr = raw[:, :, :3]
+                alpha = raw[:, :, 3]
             else:
                 bgr = raw[:, :, :3]
-            _type_icon_tpl[name] = bgr
+                alpha = np.full(bgr.shape[:2], 255, dtype=np.uint8)
+            _type_icon_tpl[name] = (bgr, alpha)
     except Exception:
         pass
     return _type_icon_tpl
@@ -172,12 +177,12 @@ def _load_type_icon_templates() -> dict[str, "np.ndarray"]:
 
 _TYPE_ICON_SCALES = [0.4, 0.5, 0.6, 0.7, 0.8]
 _SPRITE_SCALES = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0]
-_TYPE_MATCH_THRESHOLD = 0.35
-_TYPE_TOP_N = 2
+_TYPE_MATCH_THRESHOLD = 0.60
+_TYPE_TOP_N = 1
 
 
 def _detect_types_from_card(card: Image.Image) -> set[str]:
-    """タイプアイコン領域に全テンプレートをマッチングしてタイプを検出する。"""
+    """タイプアイコン領域にアルファマスク付きテンプレートマッチングを行いタイプを検出する。"""
     try:
         import cv2
 
@@ -190,15 +195,16 @@ def _detect_types_from_card(card: Image.Image) -> set[str]:
         rh, rw = region.shape[:2]
 
         scores: dict[str, float] = {}
-        for type_name, tpl in templates.items():
+        for type_name, (bgr, alpha) in templates.items():
             best = 0.0
             for sc in _TYPE_ICON_SCALES:
-                th = max(1, int(tpl.shape[0] * sc))
-                tw = max(1, int(tpl.shape[1] * sc))
+                th = max(1, int(bgr.shape[0] * sc))
+                tw = max(1, int(bgr.shape[1] * sc))
                 if th > rh or tw > rw:
                     continue
-                t = cv2.resize(tpl, (tw, th))
-                res = cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED)
+                t = cv2.resize(bgr, (tw, th))
+                m = cv2.resize(alpha, (tw, th))
+                res = cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED, mask=m)
                 _, v, _, _ = cv2.minMaxLoc(res)
                 best = max(best, v)
             scores[type_name] = best
@@ -376,6 +382,7 @@ def _identify_pokemon(
     abil: str,
     item: str,
     moves: list[str],
+    used_names: set[str] | None = None,
 ) -> str:
     """①〜⑦のシグナルを順に適用してポケモン名を確定する。
 
@@ -453,6 +460,23 @@ def _identify_pokemon(
         ranking_idx = {pid: i for i, pid in enumerate(ranking)}
         candidates.sort(key=lambda p: ranking_idx.get(p, len(ranking)))
 
+    # ⑧ 技ゼロマッチ検証（candidates[0]の技が全滅かつ合致する別候補があれば差し替え）
+    if ocr_moves and len(candidates) > 1:
+        home_waza = _load_home_waza()
+        if not (ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "", set())):
+            alt = next(
+                (p for p in candidates[1:] if ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(p) or "", set())),
+                None,
+            )
+            if alt is not None:
+                candidates[0] = alt
+
+    # ⑨ 重複排除: 同じパーティに同一ポケモンは入れられないので既出名を除外
+    if used_names and candidates:
+        deduped = [p for p in candidates if (DB_pokemon.get_pokemon_name_by_pid(p) or "") not in used_names]
+        if deduped:
+            candidates = deduped
+
     return DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "" if candidates else ""
 
 
@@ -477,14 +501,6 @@ def _closest_match(text: str, candidates: list[str], cutoff: float = 0.45) -> st
     matches = difflib.get_close_matches(text, candidates, n=1, cutoff=cutoff)
     if matches:
         return matches[0]
-    # Lower-cutoff fallback for very short strings
-    if len(text) <= 3:
-        best = max(
-            candidates, key=lambda c: difflib.SequenceMatcher(None, text, c).ratio()
-        )
-        ratio = difflib.SequenceMatcher(None, text, best).ratio()
-        if ratio >= 0.3:
-            return best
     return ""
 
 
@@ -731,7 +747,7 @@ def _detect_cards(img: Image.Image, rows: int = 3, cols: int = 2) -> list[Image.
 # ---------------------------------------------------------------------------
 
 
-def _parse_info_card(card: Image.Image) -> dict:
+def _parse_info_card(card: Image.Image, used_names: set[str] | None = None) -> dict:
     """
     Parse one info card (能力タブ):
       Left half  → name / ability / item  (3 lines via psm 6)
@@ -743,23 +759,28 @@ def _parse_info_card(card: Image.Image) -> dict:
     left = card.crop((0, 0, w // 2, h))
     right = card.crop((w // 2, 0, w, h))
 
-    # OCR left half as a block → split into lines, take first 3.
-    # Two noise filters:
-    #  1. Lines with ≤ 2 characters: icon/border artifacts.
-    #  2. Lines with fewer than 2 kana characters (hiragana U+3040-309F or
-    #     katakana U+30A0-30FF): all Pokémon names, abilities, and items in
-    #     SV contain kana, so lines without kana are UI-background OCR noise
-    #     (e.g. "EPREEREEE昌還EEEE還還還" which has only ASCII/kanji).
+    # OCR left half as a block → split into lines.
+    # name行はニックネームのためkanaが0でも位置で確定する。
+    # ability/item行のみkana >= 2 フィルタを適用してUIノイズを除去する。
+    # （旧実装: 全行kana >= 2 フィルタ → ニックネーム行が消えて行ズレが発生）
     raw_left = _ocr_block(left, scale=5)
-    left_lines = [
-        ln
-        for line in raw_left.splitlines()
-        if len((ln := line.strip())) > 2 and sum(1 for c in ln if "぀" <= c <= "ヿ") >= 2
-    ]
+    all_content = [ln for line in raw_left.splitlines() if len((ln := line.strip())) > 2]
+    kana_lines = [ln for ln in all_content if sum(1 for c in ln if "぀" <= c <= "ヿ") >= 2]
 
-    name_raw = left_lines[0] if len(left_lines) > 0 else ""
-    abil_raw = left_lines[1] if len(left_lines) > 1 else ""
-    item_raw = left_lines[2] if len(left_lines) > 2 else ""
+    name_raw = all_content[0] if all_content else ""
+    abil_raw = kana_lines[0] if kana_lines else ""
+    item_raw = kana_lines[1] if len(kana_lines) > 1 else ""
+    # kana_lines[0]が名前行の場合（name_raw==abil_raw かつ kana_lines>=3）はシフト。
+    # kana_lines<3のとき名前行はOCRで読めなかったと判断してシフトしない（リザードン等）。
+    _item_scan_start = 2
+    if name_raw and name_raw == abil_raw and len(kana_lines) >= 3:
+        abil_raw = kana_lines[1]
+        item_raw = kana_lines[2]
+        _item_scan_start = 3
+    for _ln in kana_lines[_item_scan_start:]:
+        if _closest_match(_ln, _item_names, cutoff=0.40):
+            item_raw = _ln
+            break
 
     # OCR the right half as a block (psm 6) using three skip amounts and
     # taking whichever produces the most lines.  Different type-icon colors
@@ -777,10 +798,11 @@ def _parse_info_card(card: Image.Image) -> dict:
     moves_raw = (best_lines + [""] * 4)[:4]
 
     abil = _closest_match(abil_raw, _ability_names, cutoff=0.40)
-    item = _closest_match(item_raw, _item_names, cutoff=0.40)
+    _item_raw_match = _closest_match(item_raw, _item_names, cutoff=0.40)
+    item = _ITEM_OCR_CORRECTIONS.get(_item_raw_match, _item_raw_match)
     moves = [_closest_match(m, _waza_names, cutoff=0.40) for m in moves_raw]
 
-    name = _identify_pokemon(card, name_raw, abil, item, moves)
+    name = _identify_pokemon(card, name_raw, abil, item, moves, used_names)
 
     # 画像ファイルのないフォームは、実際に画像が存在するフォームの名前に差し替える
     # ただしメガフォーム(form=11)への置き換えは行わない
@@ -958,15 +980,16 @@ def parse_party_images(
     count = min(6, len(cards1) if cards1 else 6, len(cards2) if cards2 else 6)
 
     results: list[CardData] = []
+    used_names: set[str] = set()
     for i in range(count):
         if cards1 and cards2:
-            info = _parse_info_card(cards1[i])
+            info = _parse_info_card(cards1[i], used_names)
             ev_data = _parse_ev_card(cards2[i])
         elif cards1:
-            info = _parse_info_card(cards1[i])
+            info = _parse_info_card(cards1[i], used_names)
             ev_data = {"nature": "まじめ", "evs": {k: 0 for k in _EV_KEYS}}
         else:
-            name_info = _parse_info_card(cards2[i])
+            name_info = _parse_info_card(cards2[i], used_names)
             info = {
                 "name": name_info["name"],
                 "ability": "",
@@ -974,6 +997,8 @@ def parse_party_images(
                 "moves": ["", "", "", ""],
             }
             ev_data = _parse_ev_card(cards2[i])
+        if info["name"]:
+            used_names.add(info["name"])
 
         card = CardData(
             name=info["name"],
