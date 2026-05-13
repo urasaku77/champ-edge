@@ -652,7 +652,7 @@ class MainApp(ThemedTk):
             if not change_flag:
                 home_name = (
                     pokemon.base_name
-                    if pokemon.name.startswith("メガ") and pokemon.name != "メガニウム"
+                    if 10 <= pokemon.form <= 19
                     else pokemon.name
                 )
                 self.home_frame.set_home_data(home_name)
