@@ -233,15 +233,15 @@ class MainApp(ThemedTk):
         battle_menu.add_command(
             label="構築記事最終更新日", command=self.show_last_battle_update_date
         )
-        menu.add_cascade(label="バトルデータ", menu=battle_menu)
+        menu.add_cascade(label="アプリ設定", command=self.mode_setting)
         menu.add_cascade(label="キャプチャ設定", command=self.capture_setting)
-        menu.add_cascade(label="モード切替", command=self.mode_setting)
         menu.add_cascade(label="パーティ編集", command=self.edit_party_csv)
         menu.add_cascade(label="ボックス編集", command=self.open_box)
         menu.add_cascade(label="対戦履歴", command=self.open_records)
         menu.add_cascade(label="対戦分析", command=self.open_analytics)
         menu.add_command(label="DBバックアップ", command=self.backup_database)
         menu.add_command(label="アップデート確認", command=self.check_update)
+        menu.add_cascade(label="バトルデータ", menu=battle_menu)
 
         for i, side in enumerate(["自分側", "相手側"]):
             sticky = N + W + S if side == "自分側" else N + E + S

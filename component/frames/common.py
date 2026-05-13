@@ -899,6 +899,8 @@ class WazaDamageListFrame(ttk.LabelFrame):
         self._dmgframe_list = []
 
         num = 5 if self._index == 0 else 10
+        self._current_results: list = [None] * num
+
         for i in range(num):
             if self._index == 1:
                 lbl = MyLabel(self, text="", width=4)
@@ -918,6 +920,7 @@ class WazaDamageListFrame(ttk.LabelFrame):
 
             dmgframe = DamageDispFrame(self)
             dmgframe.grid(column=3, row=i, sticky=W + E)
+            dmgframe.set_right_click_callback(lambda e: self._open_multi_waza_window(e))
             self._dmgframe_list.append(dmgframe)
 
     def set_stage(self, stage: Stage):
@@ -963,9 +966,23 @@ class WazaDamageListFrame(ttk.LabelFrame):
                 self._lbl_list[i]["text"] = ""
 
     def set_damages(self, lst: list[DamageCalcResult]):
+        self._current_results = list(lst)
         for i in range(len(self._dmgframe_list)):
             result = lst[i]
             self._dmgframe_list[i].set_calc_result(result)
+
+    def _open_multi_waza_window(self, event=None):
+        items = []
+        for i, cbx in enumerate(self._cbx_list):
+            name = cbx.get().strip()
+            if name:
+                result = self._current_results[i] if i < len(self._current_results) else None
+                items.append((name, result))
+        if not items:
+            return
+        win = MultiWazaDamageWindow(self, items)
+        if event is not None:
+            win.geometry(f"+{event.x_root}+{event.y_root}")
 
 
 # ダメージ表示
@@ -997,6 +1014,202 @@ class DamageDispFrame(ttk.Frame):
             self.dmg1_label["text"] = ""
             self.dmg2_label["text"] = ""
             self.hpbar.clear()
+
+    def set_right_click_callback(self, callback):
+        def _bind(widget):
+            widget.bind("<Button-3>", callback)
+            for child in widget.winfo_children():
+                _bind(child)
+        _bind(self)
+
+
+_HEAL_ITEMS = [
+    ("オボンのみ", Fraction(1, 4)),
+    ("たべのこし", Fraction(1, 16)),
+    ("混乱実", Fraction(1, 3)),
+    ("やどりぎのタネ", Fraction(1, 8)),
+]
+
+
+# 複数技ダメージ確認ウィンドウ
+class MultiWazaDamageWindow(tkinter.Toplevel):
+    def __init__(self, master, items: list[tuple[str, "DamageCalcResult | None"]]):
+        super().__init__(master)
+        self.title("加算ツール")
+        self.resizable(False, False)
+
+        self._items = items
+        # ("move", item_idx) or ("heal", name, Fraction)
+        self._pressed: list[tuple] = []
+
+        # 初期化時に守備側HPを取得しておく（回復量計算用）
+        self._defender_hp: int | None = None
+        for _, result in items:
+            if result is not None and result.is_damage:
+                self._defender_hp = result.defender[StatsKey.H]
+                break
+
+        # 技選択ボタン (5列グリッド) + クリアボタン
+        btn_frame = ttk.Frame(self, padding=(8, 8, 8, 4))
+        btn_frame.pack(fill="x")
+        _cols = 5
+        _btn_w = const.char_width(default=12, mac=9)
+        for i, (name, _) in enumerate(items):
+            tkinter.Button(
+                btn_frame, text=name, width=_btn_w, anchor="w",
+                command=lambda idx=i: self._press_move(idx),
+            ).grid(row=i // _cols, column=i % _cols, padx=2, pady=2, sticky=W + E)
+        _last_btn_row = (len(items) - 1) // _cols if items else 0
+        tkinter.Button(
+            btn_frame, text="クリア", command=self._clear,
+        ).grid(row=_last_btn_row + 1, column=0, columnspan=_cols, padx=2, pady=(6, 2), sticky=W + E)
+
+        # 回復ボタン
+        heal_frame = ttk.LabelFrame(self, text="回復", padding=(8, 4))
+        heal_frame.pack(fill="x", padx=4, pady=(0, 4))
+        for i, (h_name, h_frac) in enumerate(_HEAL_ITEMS):
+            heal_frame.columnconfigure(i, weight=1)
+            tkinter.Button(
+                heal_frame, text=h_name, anchor="w",
+                command=lambda n=h_name, f=h_frac: self._press_heal(n, f),
+            ).grid(row=0, column=i, padx=2, pady=2, sticky=W + E)
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=4, pady=4)
+
+        # ダメージ結果テーブル
+        self._result_frame = ttk.Frame(self, padding=(8, 0, 8, 4))
+        self._result_frame.pack(fill="x")
+        self._result_frame.columnconfigure(0, minsize=const.char_width(default=110, mac=85))
+        self._result_frame.columnconfigure(1, minsize=80)
+        self._result_frame.columnconfigure(2, minsize=180)
+        ttk.Label(self._result_frame, text="技名").grid(row=0, column=0, sticky=W, padx=2)
+        ttk.Label(self._result_frame, text="ダメージ").grid(row=0, column=1, sticky=W, padx=4)
+        ttk.Label(self._result_frame, text="割合 / 確定").grid(row=0, column=2, sticky=W, padx=4)
+        self._row_widgets: list[tuple] = []
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x", padx=4, pady=4)
+
+        # 合計行
+        total_frame = ttk.Frame(self, padding=(8, 0, 8, 8))
+        total_frame.pack(fill="x")
+        ttk.Label(total_frame, text="合計:").grid(row=0, column=0, sticky=W)
+        self._total_label = MyLabel(total_frame, text="")
+        self._total_label.grid(row=0, column=1, sticky=W, padx=8)
+
+    def _press_move(self, index: int):
+        self._pressed.append(("move", index))
+        self._update_display()
+
+    def _press_heal(self, name: str, frac: "Fraction"):
+        self._pressed.append(("heal", name, frac))
+        self._update_display()
+
+    def _remove(self, index: int):
+        del self._pressed[index]
+        self._update_display()
+
+    def _clear(self):
+        self._pressed.clear()
+        self._update_display()
+
+    def _update_display(self):
+        for widgets in self._row_widgets:
+            for w in widgets:
+                w.destroy()
+        self._row_widgets.clear()
+
+        total_min = 0
+        total_max = 0
+        total_heal = 0
+        first_result = None
+
+        for seq_i, action in enumerate(self._pressed):
+            r = seq_i + 1
+            name_lbl = MyLabel(self._result_frame, text="", cursor="hand2")
+            name_lbl.grid(row=r, column=0, sticky=W, padx=2, pady=1)
+            dmg_lbl = MyLabel(self._result_frame, text="", cursor="hand2")
+            dmg_lbl.grid(row=r, column=1, sticky=W, padx=4)
+            pct_lbl = MyLabel(self._result_frame, text="", font=(const.FONT_FAMILY, 8), cursor="hand2")
+            pct_lbl.grid(row=r, column=2, sticky=W, padx=4)
+            for lbl in (name_lbl, dmg_lbl, pct_lbl):
+                lbl.bind("<Button-1>", lambda e, idx=seq_i: self._remove(idx))
+            self._row_widgets.append((name_lbl, dmg_lbl, pct_lbl))
+
+            if action[0] == "move":
+                _, item_idx = action
+                name, result = self._items[item_idx]
+                name_lbl["text"] = name
+                if result is not None and result.is_damage:
+                    c = int(result.defender[StatsKey.H] * result.defender.constant_damage)
+                    dmg_lbl["text"] = result.damage_text
+                    ko = result.ko_text
+                    pct_lbl["text"] = result.damage_per_text + (f"  {ko}" if ko else "")
+                    total_min += result.min_damage + c
+                    total_max += result.max_damage + c
+                    if first_result is None:
+                        first_result = result
+                else:
+                    dmg_lbl["text"] = "-"
+            elif action[0] == "heal":
+                _, heal_name, heal_frac = action
+                name_lbl["text"] = heal_name
+                hp = self._defender_hp
+                if hp is not None:
+                    heal_hp = hp * heal_frac.numerator // heal_frac.denominator
+                    heal_pct = round(heal_hp / hp * 100, 1)
+                    dmg_lbl["text"] = f"-{heal_hp}"
+                    pct_lbl["text"] = f"-{heal_pct}%"
+                    total_heal += heal_hp
+                else:
+                    dmg_lbl["text"] = "-"
+
+        if first_result is not None:
+            hp = first_result.defender[StatsKey.H]
+            entry = (int(hp * first_result.defender.get_stealth_rock_damage())
+                     if first_result.defender.has_stealth_rock else 0)
+            effective_hp = max(1, hp - entry)
+            net_min = total_min - total_heal
+            net_max = total_max - total_heal
+            min_pct = round(net_min / hp * 100, 1)
+            max_pct = round(net_max / hp * 100, 1)
+            ko = self._calc_ko_text(effective_hp, total_heal)
+            total_text = f"{net_min}-{net_max}  {min_pct}%-{max_pct}%"
+            if ko:
+                total_text += f"  {ko}"
+            self._total_label["text"] = total_text
+        else:
+            self._total_label["text"] = ""
+
+    def _calc_ko_text(self, effective_hp: int, total_heal: int) -> str:
+        damage_lists = []
+        for action in self._pressed:
+            if action[0] != "move":
+                continue
+            _, item_idx = action
+            _, result = self._items[item_idx]
+            if result is not None and result.is_damage:
+                c = int(result.defender[StatsKey.H] * result.defender.constant_damage)
+                damage_lists.append([d + c for d in result.damages])
+        if not damage_lists:
+            return ""
+        threshold = effective_hp + total_heal
+        dp: dict[int, int] = {0: 1}
+        total_combos = 1
+        for damages in damage_lists:
+            new_dp: dict[int, int] = {}
+            for dmg, count in dp.items():
+                for d in damages:
+                    key = dmg + d
+                    new_dp[key] = new_dp.get(key, 0) + count
+            dp = new_dp
+            total_combos *= 16
+        ko_count = sum(count for dmg, count in dp.items() if dmg >= threshold)
+        if ko_count == 0:
+            return ""
+        if ko_count == total_combos:
+            return "確定KO"
+        pct = round(ko_count / total_combos * 100, 1)
+        return f"乱数KO ({pct}%)"
 
 
 # HPバー表示フレーム
