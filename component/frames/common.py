@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tkinter
 import webbrowser
+from fractions import Fraction
 from tkinter import E, N, S, W, ttk
 from typing import TYPE_CHECKING
 
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
     from component.stage import Stage
 
 
+
 # パーティ表示フレーム
 class PartyFrame(ttk.LabelFrame):
     def __init__(self, master, player: int, **kwargs):
@@ -56,6 +58,7 @@ class PartyFrame(ttk.LabelFrame):
                 padding=0,
                 command=lambda idx=i: self.on_push_pokemon_button(idx),
             )
+            btn.bind("<Button-3>", lambda e, idx=i: self._on_right_click_pokemon(e, idx))
             btn.grid(column=i, row=0, sticky=W)
             self._button_list.append(btn)
 
@@ -86,6 +89,34 @@ class PartyFrame(ttk.LabelFrame):
                 command=lambda: self.on_push_clear_button(),
             )
             load_btn.grid(column=7, row=0, sticky=E)
+
+    def _on_right_click_pokemon(self, event, index: int):
+        pokemon = self.pokemon_list[index]
+        if pokemon.is_empty:
+            return
+        menu = tkinter.Menu(self, tearoff=0)
+        menu.add_command(
+            label="ポケ徹で開く",
+            command=lambda: webbrowser.open(
+                "https://yakkun.com/sv/zukan/?national_no=" + str(pokemon.no)
+            ),
+        )
+        menu.add_command(
+            label="バトルDBで開く",
+            command=lambda: self._open_battle_db(pokemon),
+        )
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _open_battle_db(self, pokemon: Pokemon):
+        try:
+            with open("stats/season.txt", encoding="utf-8") as f:
+                season = f.read().strip()
+        except FileNotFoundError:
+            season = "1"
+        pid = str(pokemon.no).zfill(4) + "-0" + str(pokemon.form)
+        webbrowser.open(
+            f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
+        )
 
     def set_stage(self, stage: Stage):
         self._stage = stage
@@ -252,21 +283,13 @@ class ActivePokemonFrame(ttk.LabelFrame):
         )
         self._pokemon_icon.grid(column=0, row=0)
 
-        teras_frame = ttk.LabelFrame(left_frame, text="テラス", labelanchor="n")
-        teras_frame.grid(column=0, row=1, sticky=W + E)
-        teras_frame.columnconfigure(0, weight=1)
-
-        self._teras_button = TypeIconButton(
-            teras_frame,
-            types=Types.なし,
-            command=self.on_push_terasbutton
-            if get_recog_value("terastal_enabled")
-            else None,
-            state=tkinter.NORMAL
-            if get_recog_value("terastal_enabled")
-            else tkinter.DISABLED,
+        self._seikaku_button = MyButton(
+            left_frame,
+            text="まじめ",
+            command=self.on_push_seikaku_button,
+            padding=0,
         )
-        self._teras_button.grid(column=0, row=0, sticky=W + E)
+        self._seikaku_button.grid(column=0, row=1, sticky=W + E)
 
         self._form_button_state = tkinter.BooleanVar()
         self._form_button_state.set(False)
@@ -274,93 +297,92 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._form_button = MyButton(
             left_frame,
             text="フォーム",
+            padding=0,
             state=tkinter.DISABLED,
             command=self.change_form,
             **_form_kwargs,
         )
-        self._form_button.grid(column=0, row=2, pady=5)
+        self._form_button.grid(column=0, row=2)
 
-        self._seikaku_button = MyButton(
-            left_frame,
-            text="まじめ",
-            command=self.on_push_seikaku_button,
-            width=const.char_width(default=8, mac=6),
-        )
-        self._seikaku_button.grid(column=0, row=3, sticky=W + E)
-
-        self._status_frame = StatusFrame(self, player, text="ステータス")
-        # self._status_combobox.bind("<<ComboboxSelected>>", self.on_select_doryoku)
-        self._status_frame.grid(
-            column=1, row=0, columnspan=4, sticky=S + N + W + E, padx=3
-        )
-
-        self._item_label = MyLabel(self, text="持ち物")
-        self._item_label.grid(column=1, row=2, padx=5, pady=5)
-        self._item_combobox = MyCombobox(self, values=ITEM_COMBOBOX_VALUES)
-        self._item_combobox.set(ITEM_COMBOBOX_VALUES[0])
-        self._item_combobox.bind("<<ComboboxSelected>>", self.on_select_item)
-        self._item_combobox.bind("<Return>", self.on_select_item)
-        self._item_combobox.bind("<Button-3>", self._on_right_click_item)
-        self._item_combobox.grid(column=2, row=2, sticky=W + E)
-
-        self._ability_label = MyLabel(self, text="特性")
-        self._ability_label.grid(column=1, row=3, padx=5, pady=5)
-        self._ability_combobox = MyCombobox(self)
-        self._ability_combobox.bind("<<ComboboxSelected>>", self.on_select_ability)
-        self._ability_combobox.bind("<Button-3>", self._on_right_click_ability)
-        self._ability_combobox.grid(column=2, row=3, sticky=W + E)
-
-        self._ability_value_combobox = MyCombobox(self, width=4, state="disable")
-        self._ability_value_combobox.bind(
-            "<<ComboboxSelected>>", self.on_select_ability_value
-        )
-        self._ability_value_combobox.grid(column=3, row=3)
-
-        wall_frame = ttk.Frame(self)
-
-        self._wall_combobox = MyCombobox(
-            wall_frame, width=12, values=WALL_COMBOBOX_VALUES
-        )
-        self._wall_combobox.set(WALL_COMBOBOX_VALUES[0])
-        self._wall_combobox.bind("<<ComboboxSelected>>", self.on_select_wall)
-        self._wall_combobox.grid(column=1, row=0, sticky=W)
-
-        wall_frame.grid(column=4, row=3, sticky=W)
-        wall_label = MyLabel(wall_frame, text="壁")
-        wall_label.grid(column=0, row=0, padx=5, pady=5)
-
-        checkbox_frame = ttk.Frame(self)
-
+        # 急所・やけど（左フレーム row=3-4、フォームの下、センタリング）
         self.critical = tkinter.BooleanVar()
         self.critical_check = tkinter.Checkbutton(
-            checkbox_frame,
-            text="急所",
-            variable=self.critical,
-            command=self.change_critical,
+            left_frame, text="急所", variable=self.critical, command=self.change_critical
         )
-        self.critical_check.grid(column=0, row=0, sticky=W + E)
+        self.critical_check.grid(column=0, row=3)
 
         self.burned = tkinter.BooleanVar()
         self.burned_check = tkinter.Checkbutton(
-            checkbox_frame,
-            text="やけど",
-            variable=self.burned,
-            command=self.change_burned,
+            left_frame, text="やけど", variable=self.burned, command=self.change_burned
         )
-        self.burned_check.grid(column=1, row=0, sticky=W)
+        self.burned_check.grid(column=0, row=4)
 
+        self._status_frame = StatusFrame(self, player, text="ステータス")
+        self._status_frame.grid(
+            column=1, row=0, columnspan=5, sticky=S + N + W + E, padx=3
+        )
+
+        # 上段: 持ち物・特性2つ・壁（ラベルなし）
+        self._item_combobox = MyCombobox(self, values=ITEM_COMBOBOX_VALUES, width=14)
+        self._item_combobox.set("もちものなし")
+        self._item_combobox.bind("<<ComboboxSelected>>", self.on_select_item)
+        self._item_combobox.bind("<Return>", self.on_select_item)
+        self._item_combobox.bind("<Button-3>", self._on_right_click_item)
+        self._item_combobox.grid(column=1, row=2, sticky=W, padx=(3, 0), pady=3)
+
+        _ability_frame = ttk.Frame(self)
+        self._ability_combobox = MyCombobox(_ability_frame, width=14)
+        self._ability_combobox.set("とくせい")
+        self._ability_combobox.bind("<<ComboboxSelected>>", self.on_select_ability)
+        self._ability_combobox.bind("<Button-3>", self._on_right_click_ability)
+        self._ability_combobox.pack(side="left")
+
+        self._ability_value_combobox = MyCombobox(_ability_frame, width=4, state="disable")
+        self._ability_value_combobox.bind(
+            "<<ComboboxSelected>>", self.on_select_ability_value
+        )
+        self._ability_value_combobox.pack(side="left", fill="x", expand=True)
+        _ability_frame.grid(column=2, row=2, columnspan=2, sticky=W + E, pady=3)
+
+        self._wall_combobox = MyCombobox(self, width=12, values=WALL_COMBOBOX_VALUES)
+        self._wall_combobox.set(WALL_COMBOBOX_VALUES[0])
+        self._wall_combobox.bind("<<ComboboxSelected>>", self.on_select_wall)
+        self._wall_combobox.grid(column=4, row=2, sticky=W, pady=3)
+
+        # 下段: 定数ダメージ加算パネル
+        self._const_dmg_frac: Fraction = Fraction(0)
+
+        _const_row = ttk.Frame(self)
+        _const_row.grid(column=1, row=3, columnspan=5, sticky=W + E, padx=3, pady=(0, 3))
+
+        _const_title = MyLabel(_const_row, text="定数ダメ：")
+        _const_title.pack(side="left")
+        _const_title.bind("<Button-3>", lambda _e: self._on_show_const_list())
+        self._const_dmg_label = MyLabel(
+            _const_row, text="なし", width=const.char_width(default=7, mac=5), anchor="w"
+        )
+        self._const_dmg_label.pack(side="left")
+
+        # ボタンは右詰め（クリアが一番右になるよう逆順でpack）
+        tkinter.Button(_const_row, text="クリア",
+                       command=self._on_clear_const_dmg).pack(side="right", padx=(1, 0))
+        for _lbl, _frac in reversed([("1/16", Fraction(1, 16)), ("1/10", Fraction(1, 10)),
+                                      ("1/8",  Fraction(1, 8)),  ("1/6",  Fraction(1, 6)),
+                                      ("1/4",  Fraction(1, 4)),  ("1/2",  Fraction(1, 2))]):
+            tkinter.Button(_const_row, text=_lbl,
+                           command=lambda f=_frac: self._on_add_const_dmg(f)
+                           ).pack(side="right", padx=1)
+        tkinter.Button(_const_row, text="ステロ",
+                       command=self._on_add_sr).pack(side="right", padx=(0, 1))
+
+        # じゅうでん（やけどの下）
         self.charging = tkinter.BooleanVar()
         self.charging_check = tkinter.Checkbutton(
-            checkbox_frame,
-            text="じゅうでん",
-            variable=self.charging,
-            command=self.change_charging,
+            left_frame, text="じゅうでん", variable=self.charging, command=self.change_charging
         )
-        self.charging_check.grid(column=2, row=0, sticky=W)
+        self.charging_check.grid(column=0, row=5)
 
         self.all_check_reset()
-
-        checkbox_frame.grid(column=3, row=2, columnspan=2)
 
     def set_pokemon(self, poke: Pokemon):
         if not self._pokemon.no == poke.no:
@@ -368,14 +390,13 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._pokemon_icon.set_pokemon_icon(pid=poke.pid, size=(60, 60))
         self._status_frame.update_pokemon(poke)
         self._seikaku_button["text"] = poke.seikaku
-        self._item_combobox.set(poke.item)
+        self._item_combobox.set("もちものなし" if poke.item == "なし" else poke.item)
         self._ability_combobox["values"] = poke.abilities
-        self._ability_combobox.set(poke.ability)
+        self._ability_combobox.set(poke.ability if poke.ability else "とくせい")
         self.set_ability_values(poke.ability)
         self._ability_value_combobox.set(poke.ability_value)
-        self._teras_button.set_type(poke.battle_terastype)
-        self._update_teras_state(poke.ability)
-        self._wall_combobox.set(poke.wall.name)
+        self._wall_combobox.set("壁なし" if poke.wall == Walls.なし else poke.wall.name)
+
         if poke.no in changeble_form_in_battle:
             self._form_button["state"] = tkinter.NORMAL
         else:
@@ -427,22 +448,14 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._stage.set_value_to_active_pokemon(player=self._player, seikaku=seikaku)
 
     def on_select_item(self, *_args):
-        self._stage.set_value_to_active_pokemon(
-            player=self._player, item=self._item_combobox.get()
-        )
-
-    def _update_teras_state(self, ability: str):
-        enabled = get_recog_value("terastal_enabled")
-        self._teras_button.config(
-            state=tkinter.NORMAL if enabled else tkinter.DISABLED,
-            command=self.on_push_terasbutton if enabled else (lambda: None),
-        )
+        selected = self._item_combobox.get()
+        item = "なし" if selected == "もちものなし" else selected
+        self._stage.set_value_to_active_pokemon(player=self._player, item=item)
 
     def on_select_ability(self, *_args):
         ability = self._ability_combobox.get()
         self._stage.set_value_to_active_pokemon(player=self._player, ability=ability)
         self.set_ability_values(ability)
-        self._update_teras_state(ability)
 
     def on_select_ability_value(self, *_args):
         self._stage.set_value_to_active_pokemon(
@@ -450,15 +463,141 @@ class ActivePokemonFrame(ttk.LabelFrame):
         )
 
     def on_select_wall(self, *_args):
+        selected = self._wall_combobox.get()
+        name = "なし" if selected == "壁なし" else selected
         for wall in Walls:
-            if wall.name == self._wall_combobox.get():
+            if wall.name == name:
                 self._stage.set_value_to_active_pokemon(player=self._player, wall=wall)
 
     def on_push_pokemon_button(self):
         self._stage.set_chosen(self._player)
 
-    def on_push_terasbutton(self, *_args):
-        self._stage.select_terastype(self._player)
+    def _refresh_const_display(self):
+        if self._const_dmg_frac != 0:
+            f = self._const_dmg_frac
+            self._const_dmg_label.config(text=f"{f.numerator}/{f.denominator}")
+        else:
+            self._const_dmg_label.config(text="なし")
+
+    def _on_add_const_dmg(self, frac: Fraction):
+        if self._pokemon.is_empty:
+            return
+        self._const_dmg_frac += frac
+        self._refresh_const_display()
+        self._stage.set_value_to_active_pokemon(
+            player=self._player,
+            constant_damage=float(self._const_dmg_frac),
+        )
+
+    def _on_add_sr(self):
+        if self._pokemon.is_empty:
+            return
+        sr_frac = Fraction(self._pokemon.get_stealth_rock_damage()).limit_denominator(32)
+        self._const_dmg_frac += sr_frac
+        self._refresh_const_display()
+        self._stage.set_value_to_active_pokemon(
+            player=self._player,
+            constant_damage=float(self._const_dmg_frac),
+        )
+
+    def _on_clear_const_dmg(self):
+        if self._pokemon.is_empty:
+            return
+        self._const_dmg_frac = Fraction(0)
+        self._refresh_const_display()
+        self._stage.set_value_to_active_pokemon(
+            player=self._player,
+            constant_damage=0.0,
+        )
+
+    def _on_show_const_list(self):
+        win = tkinter.Toplevel(self)
+        win.title("定数ダメージ一覧")
+        win.resizable(False, False)
+        content = (
+            "■ 状態異常\n"
+            "─────────────────────────────────────────────\n"
+            "やけど                        1/16\n"
+            "どく                          1/8\n"
+            "もうどく                      n/16（最大15/16）\n"
+            "\n"
+            "■ 天気\n"
+            "─────────────────────────────────────────────\n"
+            "すなあらし                    1/16\n"
+            "\n"
+            "■ 場の状態（登場時）\n"
+            "─────────────────────────────────────────────\n"
+            "ステルスロック（等倍）         1/8\n"
+            "ステルスロック（2倍弱点）      1/4\n"
+            "ステルスロック（4倍弱点）      1/2\n"
+            "ステルスロック（0.5倍耐性）    1/16\n"
+            "ステルスロック（0.25倍耐性）   1/32\n"
+            "まきびし 1回                  1/8\n"
+            "まきびし 2回                  1/6\n"
+            "まきびし 3回                  1/4\n"
+            "ひのうみ                      1/8（ほのお無効）\n"
+            "\n"
+            "■ 特性\n"
+            "─────────────────────────────────────────────\n"
+            "さめはだ / てつのとげ          1/8（直接攻撃した相手）\n"
+            "サンパワー / かんそうはだ      1/8（晴れ時毎ターン）\n"
+            "ナイトメア                    1/8\n"
+            "ばけのかわ                    1/8\n"
+            "ゆうばく                      1/4（ひんし時、しめりけ無効）\n"
+            "\n"
+            "■ 状態変化\n"
+            "─────────────────────────────────────────────\n"
+            "バインド・まとわりつく等       1/8\n"
+            "やどりぎのタネ                1/8（くさ無効）\n"
+            "しおづけ                      1/16（みず・はがね 1/8）\n"
+            "ふんじん                      1/4\n"
+            "あくむ                        1/4\n"
+            "\n"
+            "■ 持ち物\n"
+            "─────────────────────────────────────────────\n"
+            "いのちのたま                  1/10\n"
+            "くろいヘドロ（非どくタイプ）   1/8\n"
+            "くっつきバリ                  1/8\n"
+            "ゴツゴツメット                1/6\n"
+            "ジャポのみ                    1/8\n"
+            "レンブのみ                    1/8\n"
+            "\n"
+            "■ 技\n"
+            "─────────────────────────────────────────────\n"
+            "いかりのまえば / しぜんのいかり  相手HP×1/2\n"
+            "はらだいこ                    自分HP×1/2\n"
+            "とびげり / とびひざげり        自分HP×1/2（失敗時）\n"
+            "かかとおとし / サンダーダイブ   自分HP×1/2（失敗時）\n"
+            "ビックリヘッド / てっていこうせん 相手HP×1/2（切上）\n"
+            "クロロブラスト                相手HP×1/2（切上）\n"
+            "みがわり                      自分HP×1/4\n"
+            "わるあがき                    自分HP×1/4（四捨五入）\n"
+            "うのミサイル                  相手HP×1/4（最大3発）\n"
+            "ニードルガード                直接攻撃した相手HP×1/8\n"
+            "はじけるほのお                相手HP×1/16（毎ターン）\n"
+            "\n"
+            "■ ダイマックス技\n"
+            "─────────────────────────────────────────────\n"
+            "キョダイコウジン               はがね相性×1/8\n"
+            "キョダイゴクエン              1/6（ほのお無効）\n"
+            "キョダイフンセキ              1/6（いわ無効）\n"
+            "キョダイベンタツ              1/6（くさ無効）\n"
+            "キョダイホウゲキ              1/6（みず無効）\n"
+        )
+        frame = ttk.Frame(win)
+        frame.pack(fill="both", expand=True, padx=8, pady=8)
+        sb = ttk.Scrollbar(frame, orient="vertical")
+        text_widget = tkinter.Text(
+            frame, width=50, height=36,
+            font=(const.FONT_FAMILY, 10),
+            state="normal", wrap="none",
+            yscrollcommand=sb.set,
+        )
+        sb.config(command=text_widget.yview)
+        sb.pack(side="right", fill="y")
+        text_widget.insert("1.0", content)
+        text_widget.config(state="disabled")
+        text_widget.pack(side="left", fill="both", expand=True)
 
     def change_form(self):
         self._pokemon.form_change()
@@ -473,7 +612,7 @@ class ActivePokemonFrame(ttk.LabelFrame):
 
     def _on_right_click_item(self, _event=None):
         name = self._item_combobox.get()
-        if not name or name == "なし":
+        if not name or name in ("なし", "もちものなし"):
             return
         from database.pokemon import DB_pokemon
         effect = DB_pokemon.get_item_effect(name)
@@ -506,6 +645,8 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self.critical.set(False)
         self.burned.set(False)
         self.charging.set(False)
+        self._const_dmg_frac = Fraction(0)
+        self._refresh_const_display()
 
 
 # ステータスフレーム
@@ -938,20 +1079,18 @@ class InfoFrame(ttk.LabelFrame):
         self.type2_icon.grid(column=2, row=0, sticky="w")
         self.type2_icon.bind("<Button-1>", lambda _e: self._on_click_type())
 
-        buttons = ttk.Frame(basic_info_flame)
-        self.poketetsu_button = MyButton(
-            buttons,
-            image=images.get_menu_icon("poketetsu"),
-            command=self.open_poketetsu,
+        self._teras_button = TypeIconButton(
+            basic_info_flame,
+            types=Types.なし,
+            padding=0,
+            command=self.on_push_terasbutton
+            if get_recog_value("terastal_enabled")
+            else None,
+            state=tkinter.NORMAL
+            if get_recog_value("terastal_enabled")
+            else tkinter.DISABLED,
         )
-        self.poketetsu_button.pack(fill="both", expand=0, side="left")
-
-        self.db_button = MyButton(
-            buttons, image=images.get_menu_icon("battle_db"), command=self.open_db
-        )
-        self.db_button.pack(fill="both", expand=0, side="left")
-
-        buttons.grid(column=3, row=0)
+        self._teras_button.grid(column=3, row=0, sticky=W + E)
         basic_info_flame.pack(side="top", anchor="w")
 
         status_flame = ttk.Frame(
@@ -1018,6 +1157,18 @@ class InfoFrame(ttk.LabelFrame):
             )
             for _i, statskey in enumerate([x for x in StatsKey]):
                 self.syuzoku[statskey].set(pokemon.syuzoku[statskey])
+            self._teras_button.set_type(pokemon.battle_terastype)
+            self._update_teras_state(pokemon.ability)
+
+    def _update_teras_state(self, ability: str):
+        enabled = get_recog_value("terastal_enabled")
+        self._teras_button.config(
+            state=tkinter.NORMAL if enabled else tkinter.DISABLED,
+            command=self.on_push_terasbutton if enabled else (lambda: None),
+        )
+
+    def on_push_terasbutton(self, *_args):
+        self._stage.select_terastype(self._player)
 
     def open_poketetsu(self):
         if self._no != 0:

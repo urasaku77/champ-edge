@@ -86,6 +86,8 @@ class Stage:
         critical: bool = None,
         ailment: Ailments = None,
         charging: bool = None,
+        constant_damage: float = None,
+        has_stealth_rock: bool = None,
         is_same: bool = False,
     ):
         pokemon = self._app.active_poke_frames[player]._pokemon
@@ -157,6 +159,10 @@ class Stage:
                     w.critical = critical
         if charging is not None:
             pokemon.charging = charging
+        if constant_damage is not None:
+            pokemon.constant_damage = constant_damage
+        if has_stealth_rock is not None:
+            pokemon.has_stealth_rock = has_stealth_rock
 
         self.calc_damage()
 

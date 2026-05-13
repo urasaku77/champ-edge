@@ -259,7 +259,6 @@ class MainApp(ThemedTk):
                 height=_sy(60),
                 text=side + "パーティ",
             )
-            party_frame.pack(fill="both", expand=0, side="left")
             self.party_frames.append(party_frame)
 
             # 選出表示フレーム
@@ -270,8 +269,10 @@ class MainApp(ThemedTk):
                 height=_sy(60),
                 text=side + "選出",
             )
-            chosen_frame.pack(fill="both", expand=0, side="left")
             self.chosen_frames.append(chosen_frame)
+
+            party_frame.pack(fill="both", expand=0, side="left")
+            chosen_frame.pack(fill="both", expand=0, side="left")
 
             # 選択ポケモン基本情報表示フレーム
             # Mac は status row (H A B C D S 値) が 14px に潰される問題があるので明示的に高めに
@@ -646,6 +647,7 @@ class MainApp(ThemedTk):
     def set_active_pokemon(self, player: int, pokemon: Pokemon):
         change_flag = self.active_poke_frames[player]._pokemon.no == pokemon.no
         self.active_poke_frames[player].set_pokemon(pokemon)
+        self._info_frames[player].set_info(pokemon)
         self._waza_damage_frames[player].set_waza_info(pokemon.waza_list)
         if player == 1:
             self._waza_damage_frames[player].set_waza_rate(pokemon.waza_rate_list)

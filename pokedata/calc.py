@@ -38,17 +38,24 @@ class DamageCalcResult:
         return self.damages[15]
 
     @property
+    def _constant_hp(self) -> int:
+        return int(self.defender[StatsKey.H] * self.defender.constant_damage)
+
+    @property
     def damage_text(self) -> str:
-        return str(self.min_damage) + "-" + str(self.max_damage)
+        c = self._constant_hp
+        return str(self.min_damage + c) + "-" + str(self.max_damage + c)
 
     @property
     def min_damage_per(self) -> float:
-        per = Decimal(self.damages[0] / self.defender[StatsKey.H] * 100)
+        hp = self.defender[StatsKey.H]
+        per = Decimal((self.damages[0] + self._constant_hp) / hp * 100)
         return float(per.quantize(Decimal("0.1")))
 
     @property
     def max_damage_per(self) -> float:
-        per = Decimal(self.damages[15] / self.defender[StatsKey.H] * 100)
+        hp = self.defender[StatsKey.H]
+        per = Decimal((self.damages[15] + self._constant_hp) / hp * 100)
         return float(per.quantize(Decimal("0.1")))
 
     @property
@@ -58,8 +65,11 @@ class DamageCalcResult:
     @property
     def ko_text(self) -> str:
         hp = self.defender[StatsKey.H]
+        entry = int(hp * self.defender.get_stealth_rock_damage()) if self.defender.has_stealth_rock else 0
+        effective_hp = max(1, hp - entry)
+        constant = int(hp * self.defender.constant_damage)
         for n in range(1, 5):
-            k = sum(1 for d in self.damages if d * n >= hp)
+            k = sum(1 for d in self.damages if d * n + constant * n >= effective_hp)
             if k == 16:
                 return f"確定{n}発"
             if k > 0:

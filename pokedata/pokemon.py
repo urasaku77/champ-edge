@@ -52,6 +52,8 @@ class Pokemon:
         self.__ailment: Ailments = Ailments.なし
         self.__charging: bool = False
         self.__kyoken_charge: bool = False
+        self.__constant_damage: float = 0.0
+        self.__has_stealth_rock: bool = False
         self.__wall: Walls = Walls.なし
         self.__battle_type: list[Types] | None = None
         self.__waza_list: list[Optional[WazaBase]] = [None for _ in range(10)]
@@ -383,6 +385,35 @@ class Pokemon:
     def kyoken_charge(self, value: bool) -> None:
         self.__kyoken_charge = value
         self.statechanged()
+
+    @property
+    def constant_damage(self) -> float:
+        return self.__constant_damage
+
+    @constant_damage.setter
+    def constant_damage(self, value: float) -> None:
+        self.__constant_damage = value
+
+    @property
+    def has_stealth_rock(self) -> bool:
+        return self.__has_stealth_rock
+
+    @has_stealth_rock.setter
+    def has_stealth_rock(self, value: bool) -> None:
+        self.__has_stealth_rock = value
+
+    def get_stealth_rock_damage(self) -> float:
+        from decimal import Decimal
+        if self.__battle_type is not None:
+            types = self.__battle_type
+        elif self.__battle_terastype not in (Types.なし, Types.ステラ):
+            types = [self.__battle_terastype]
+        else:
+            types = self.__type
+        effectiveness = Decimal("1.0")
+        for te in DB_pokemon.get_type_effective(Types.いわ, types):
+            effectiveness *= Decimal(str(te.value))
+        return float(effectiveness) / 8.0
 
     @property
     def wall(self) -> Walls:

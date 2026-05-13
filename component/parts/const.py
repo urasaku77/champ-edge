@@ -254,7 +254,7 @@ ALL_ITEM_COMBOBOX_VALUES = [
 ]
 
 ITEM_COMBOBOX_VALUES = [
-    "なし",
+    "もちものなし",
     # "こだわりハチマキ",
     # "こだわりメガネ",
     # "いのちのたま",
@@ -283,7 +283,7 @@ DORYOKU_COMBOBOX_VALUES = [
     "おだやか HD32",
 ]
 
-WALL_COMBOBOX_VALUES = ["なし", "リフレクター", "ひかりのかべ", "オーロラベール"]
+WALL_COMBOBOX_VALUES = ["壁なし", "リフレクター", "ひかりのかべ", "オーロラベール"]
 
 WEATHER_COMBOBOX_VALUES = ["なし", "晴れ", "雨", "砂嵐", "雪"]
 
