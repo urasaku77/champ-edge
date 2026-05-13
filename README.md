@@ -387,16 +387,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 初回データ取得
-
-起動しただけでは HOME情報・構築記事データが空のため、メニューから事前取得が必要。
-
-1. メニュー「バトルデータ」→「HOME情報取得」を実行（ranking.txt / CSVが更新される）
-2. `stats/season.txt` に取得したいシーズン番号（例: `1`）を記載（自動的に前シーズンも取得される）
-3. メニュー「バトルデータ」→「構築記事取得」を実行（ranking.json が更新される）
-
-> 構築記事取得には Chrome と ChromeDriver が必要。同日に2回以上の実行はブロックされる。
-
 ## 開発者向け：Windows ビルド・リリース手順
 
 Windows 向けのビルドとリリースは GitHub Actions で自動化されている。
