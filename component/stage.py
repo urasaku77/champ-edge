@@ -88,6 +88,7 @@ class Stage:
         charging: bool = None,
         constant_damage: float = None,
         has_stealth_rock: bool = None,
+        smackdown: bool = None,
         is_same: bool = False,
     ):
         pokemon = self._app.active_poke_frames[player]._pokemon
@@ -163,6 +164,8 @@ class Stage:
             pokemon.constant_damage = constant_damage
         if has_stealth_rock is not None:
             pokemon.has_stealth_rock = has_stealth_rock
+        if smackdown is not None:
+            pokemon.smackdown = smackdown
 
         self.calc_damage()
 

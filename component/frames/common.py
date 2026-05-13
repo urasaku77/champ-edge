@@ -304,18 +304,11 @@ class ActivePokemonFrame(ttk.LabelFrame):
         )
         self._form_button.grid(column=0, row=2)
 
-        # 急所・やけど（左フレーム row=3-4、フォームの下、センタリング）
-        self.critical = tkinter.BooleanVar()
-        self.critical_check = tkinter.Checkbutton(
-            left_frame, text="急所", variable=self.critical, command=self.change_critical
-        )
-        self.critical_check.grid(column=0, row=3)
-
         self.burned = tkinter.BooleanVar()
         self.burned_check = tkinter.Checkbutton(
             left_frame, text="やけど", variable=self.burned, command=self.change_burned
         )
-        self.burned_check.grid(column=0, row=4)
+        self.burned_check.grid(column=0, row=3)
 
         self._status_frame = StatusFrame(self, player, text="ステータス")
         self._status_frame.grid(
@@ -355,17 +348,19 @@ class ActivePokemonFrame(ttk.LabelFrame):
         _const_row = ttk.Frame(self)
         _const_row.grid(column=1, row=3, columnspan=5, sticky=W + E, padx=3, pady=(0, 3))
 
-        _const_title = MyLabel(_const_row, text="定数ダメ：")
-        _const_title.pack(side="left")
-        _const_title.bind("<Button-3>", lambda _e: self._on_show_const_list())
-        self._const_dmg_label = MyLabel(
-            _const_row, text="なし", width=const.char_width(default=7, mac=5), anchor="w"
+        self._const_dmg_btn = tkinter.Button(
+            _const_row, text="定数ダメージなし", width=const.char_width(default=12, mac=10),
+            anchor="w", relief=tkinter.FLAT, command=self._on_clear_const_dmg,
         )
-        self._const_dmg_label.pack(side="left")
+        self._const_dmg_btn.pack(side="left")
+        self._const_dmg_btn.bind("<Button-3>", lambda _: self._on_show_const_list())
 
-        # ボタンは右詰め（クリアが一番右になるよう逆順でpack）
-        tkinter.Button(_const_row, text="クリア",
-                       command=self._on_clear_const_dmg).pack(side="right", padx=(1, 0))
+        # ボタンは右詰め（急所が一番右）
+        self.critical = tkinter.BooleanVar()
+        self.critical_check = tkinter.Checkbutton(
+            _const_row, text="急所", variable=self.critical, command=self.change_critical
+        )
+        self.critical_check.pack(side="right", padx=(1, 1))
         for _lbl, _frac in reversed([("1/16", Fraction(1, 16)), ("1/10", Fraction(1, 10)),
                                       ("1/8",  Fraction(1, 8)),  ("1/6",  Fraction(1, 6)),
                                       ("1/4",  Fraction(1, 4)),  ("1/2",  Fraction(1, 2))]):
@@ -375,12 +370,17 @@ class ActivePokemonFrame(ttk.LabelFrame):
         tkinter.Button(_const_row, text="ステロ",
                        command=self._on_add_sr).pack(side="right", padx=(0, 1))
 
-        # じゅうでん（やけどの下）
         self.charging = tkinter.BooleanVar()
         self.charging_check = tkinter.Checkbutton(
             left_frame, text="じゅうでん", variable=self.charging, command=self.change_charging
         )
-        self.charging_check.grid(column=0, row=5)
+        self.charging_check.grid(column=0, row=4)
+
+        self.smackdown = tkinter.BooleanVar()
+        self.smackdown_check = tkinter.Checkbutton(
+            left_frame, text="うちおとす", variable=self.smackdown, command=self.change_smackdown
+        )
+        self.smackdown_check.grid(column=0, row=5)
 
         self.all_check_reset()
 
@@ -438,6 +438,11 @@ class ActivePokemonFrame(ttk.LabelFrame):
             player=self._player, charging=self.charging.get()
         )
 
+    def change_smackdown(self):
+        self._stage.set_value_to_active_pokemon(
+            player=self._player, smackdown=self.smackdown.get()
+        )
+
     def on_push_seikaku_button(self):
         x = self._seikaku_button.winfo_rootx()
         y = self._seikaku_button.winfo_rooty() + self._seikaku_button.winfo_height()
@@ -475,9 +480,9 @@ class ActivePokemonFrame(ttk.LabelFrame):
     def _refresh_const_display(self):
         if self._const_dmg_frac != 0:
             f = self._const_dmg_frac
-            self._const_dmg_label.config(text=f"{f.numerator}/{f.denominator}")
+            self._const_dmg_btn.config(text=f"{f.numerator}/{f.denominator}")
         else:
-            self._const_dmg_label.config(text="なし")
+            self._const_dmg_btn.config(text="定数ダメージなし")
 
     def _on_add_const_dmg(self, frac: Fraction):
         if self._pokemon.is_empty:
@@ -645,6 +650,7 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self.critical.set(False)
         self.burned.set(False)
         self.charging.set(False)
+        self.smackdown.set(False)
         self._const_dmg_frac = Fraction(0)
         self._refresh_const_display()
 

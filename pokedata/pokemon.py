@@ -54,6 +54,7 @@ class Pokemon:
         self.__kyoken_charge: bool = False
         self.__constant_damage: float = 0.0
         self.__has_stealth_rock: bool = False
+        self.__smackdown: bool = False
         self.__wall: Walls = Walls.なし
         self.__battle_type: list[Types] | None = None
         self.__waza_list: list[Optional[WazaBase]] = [None for _ in range(10)]
@@ -402,6 +403,14 @@ class Pokemon:
     def has_stealth_rock(self, value: bool) -> None:
         self.__has_stealth_rock = value
 
+    @property
+    def smackdown(self) -> bool:
+        return self.__smackdown
+
+    @smackdown.setter
+    def smackdown(self, value: bool) -> None:
+        self.__smackdown = value
+
     def get_stealth_rock_damage(self) -> float:
         from decimal import Decimal
         if self.__battle_type is not None:
@@ -561,6 +570,8 @@ class Pokemon:
 
     @property
     def is_flying(self) -> bool:
+        if self.__smackdown:
+            return False
         return (
             (Types.ひこう in self.__type)
             or self.__ability == "ふゆう"
@@ -761,6 +772,13 @@ class Pokemon:
                 (ability == "しんがん" or ability == "きもったま")
                 and (waza.type == Types.ノーマル or waza.type == Types.かくとう)
                 and type_effective.df_type == Types.ゴースト
+            ):
+                value = value * Decimal(1.0)
+            elif (
+                self.__smackdown
+                and waza.type == Types.じめん
+                and type_effective.df_type == Types.ひこう
+                and type_effective.value == 0
             ):
                 value = value * Decimal(1.0)
             else:
