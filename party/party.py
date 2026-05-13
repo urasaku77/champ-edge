@@ -32,9 +32,29 @@ from recog.recog import get_recog_value
 
 # パーティCSV編集用ダイアログ
 class PartyEditor(tkinter.Toplevel):
-    def __init__(self, title: str = "パーティ編集"):
+    def __init__(self, title: str = "パーティ編集", capture=None):
         super().__init__()
         self.title(title)
+        self._capture = capture
+
+        menubar = tkinter.Menu(self)
+        self.config(menu=menubar)
+
+        menubar.add_command(label="CSV読込", command=self.select_csv)
+        menubar.add_command(label="CSV書込", command=self.save_csv)
+
+        import_menu = tkinter.Menu(menubar, tearoff=0)
+        import_menu.add_command(label="画像ファイルから読込", command=self.import_from_images)
+        import_menu.add_command(
+            label="OBS画面から読込",
+            command=self.import_from_obs,
+            state="normal" if capture is not None else "disabled",
+        )
+        menubar.add_cascade(label="構築読込", menu=import_menu)
+
+        menubar.add_command(label="並び替え", command=lambda: self.pokemons._open_reorder())
+        menubar.add_command(label="星取表作成", command=self.make_table)
+        menubar.add_command(label="全クリア", command=self.all_clear)
 
         main_frame = ttk.Frame(self, padding=5)
         main_frame.grid(row=0, column=0, sticky=N + E + W + S)
@@ -42,61 +62,11 @@ class PartyEditor(tkinter.Toplevel):
         self.settings = PartySettings(main_frame, padding=5)
         self.settings.grid(row=0, column=0, columnspan=2, sticky=N + E + W + S)
 
-        csv_button = ttk.Frame(main_frame)
-        self.read_csv_button = MyButton(
-            csv_button, text="CSV読込", command=self.select_csv
-        )
-        self.read_csv_button.grid(row=0, column=0, padx=5, pady=5, sticky=N + S + W + E)
-
-        self.write_csv_button = MyButton(
-            csv_button, text="CSV書込", command=self.save_csv
-        )
-        self.write_csv_button.grid(
-            row=1, column=0, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        self.image_import_button = MyButton(
-            csv_button, text="構築画像読込", command=self.import_from_images
-        )
-        self.image_import_button.grid(
-            row=0, column=1, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        self.reorder_button = MyButton(
-            csv_button, text="並び替え", command=lambda: self.pokemons._open_reorder()
-        )
-        self.reorder_button.grid(
-            row=1, column=1, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        self.make_table_button = MyButton(
-            csv_button, text="星取表作成", command=self.make_table
-        )
-        self.make_table_button.grid(
-            row=0, column=2, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        self.all_clear_button = MyButton(
-            csv_button, text="全クリア", command=self.all_clear
-        )
-        self.all_clear_button.grid(
-            row=1, column=2, padx=5, pady=5, sticky=N + S + W + E
-        )
-
-        csv_button.grid(
-            row=0,
-            column=2,
-            columnspan=2,
-            padx=5,
-            pady=5,
-            sticky=N + S + W,
-        )
-
         self.using = UseParty(main_frame, text="使用パーティ", padding=5)
-        self.using.grid(row=0, column=4, columnspan=1, sticky=N + E + S + W)
+        self.using.grid(row=0, column=2, columnspan=1, sticky=N + E + S + W)
 
         self.pokemons = PokemonEditors(main_frame, padding=5)
-        self.pokemons.grid(row=1, column=0, columnspan=5, sticky=N + E + W + S)
+        self.pokemons.grid(row=1, column=0, columnspan=3, sticky=N + E + W + S)
 
         csv = self.using.using_var.get()
         if csv:
@@ -224,16 +194,13 @@ class PartyEditor(tkinter.Toplevel):
                 pokemon.clear_pokemon()
 
     def import_from_images(self):
-        import threading
-
-        from party.image_parser import CardData, check_available, parse_party_images
+        from party.image_parser import check_available
 
         ok, reason = check_available()
         if not ok:
             messagebox.showerror("OCRエラー", reason)
             return
 
-        # 画像選択（片方のみでも続行、両方未選択はエラー）
         current_directory = os.getcwd()
         img1_path: str | None = filedialog.askopenfilename(
             title="1枚目の画像（ポケモン名・特性・持ち物・技）を選択",
@@ -249,7 +216,69 @@ class PartyEditor(tkinter.Toplevel):
             messagebox.showerror("エラー", "画像が選択されませんでした。")
             return
 
-        # 進捗ウィンドウ
+        self._run_image_import(img1_path, img2_path)
+
+    def import_from_obs(self):
+        import tempfile
+
+        import cv2
+
+        from party.image_parser import check_available
+
+        ok, reason = check_available()
+        if not ok:
+            messagebox.showerror("OCRエラー", reason)
+            return
+
+        if not messagebox.askokcancel(
+            "OBS画面から読込（1/2）",
+            "OBSに能力タブ（ポケモン名・特性・持ち物・技）を表示した状態でOKを押してください。",
+        ):
+            return
+        try:
+            self._capture.get_screenshot()
+            img1_arr = self._capture.img.copy()
+        except Exception as e:
+            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}")
+            return
+
+        if not messagebox.askokcancel(
+            "OBS画面から読込（2/2）",
+            "OBSにステータスタブ（努力値・性格）を表示した状態でOKを押してください。",
+        ):
+            return
+        try:
+            self._capture.get_screenshot()
+            img2_arr = self._capture.img.copy()
+        except Exception as e:
+            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}")
+            return
+
+        img1_path = img2_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                img1_path = f.name
+            cv2.imwrite(img1_path, img1_arr)
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                img2_path = f.name
+            cv2.imwrite(img2_path, img2_arr)
+        except Exception as e:
+            for p in [img1_path, img2_path]:
+                if p:
+                    try:
+                        os.unlink(p)
+                    except Exception:
+                        pass
+            messagebox.showerror("エラー", f"画像の保存に失敗しました:\n{e}")
+            return
+
+        self._run_image_import(img1_path, img2_path, cleanup_temps=True)
+
+    def _run_image_import(self, img1_path, img2_path, cleanup_temps: bool = False):
+        import threading
+
+        from party.image_parser import CardData, parse_party_images
+
         progress_win = tkinter.Toplevel(self)
         progress_win.title("画像読み込み中...")
         progress_win.resizable(False, False)
@@ -288,6 +317,13 @@ class PartyEditor(tkinter.Toplevel):
             except Exception as e:
                 error_holder.append(e)
             finally:
+                if cleanup_temps:
+                    for p in [img1_path, img2_path]:
+                        if p:
+                            try:
+                                os.unlink(p)
+                            except Exception:
+                                pass
                 self.after(0, progress_win.destroy)
 
         threading.Thread(target=_run, daemon=True).start()
@@ -299,7 +335,6 @@ class PartyEditor(tkinter.Toplevel):
 
         data_list: list[CardData] = result_holder[0]
 
-        # パーティ情報設定ダイアログ
         dialog = ImageImportSettingDialog(self)
         dialog.open(location=(self.winfo_x() + 50, self.winfo_y() + 50))
         self.wait_window(dialog)
@@ -312,7 +347,6 @@ class PartyEditor(tkinter.Toplevel):
         memo = dialog.result["memo"]
         is_use = dialog.result["is_use"]
 
-        # 連番の自動採番（空欄時）
         if not sub_num:
             file_list = sorted(glob.glob("party/csv/*"))
             same_num_list = [
@@ -323,7 +357,6 @@ class PartyEditor(tkinter.Toplevel):
             )
             sub_num = str(int(os.path.basename(last).split("-")[1].split("_")[0]) + 1)
 
-        # CSV書き込み
         filepath = f"party\\csv\\{num}-{sub_num}_{title}.csv"
         with open(filepath, "w", newline="", encoding="cp932", errors="replace") as party_csv:
             writer = csv.writer(party_csv, lineterminator="\n")
@@ -336,17 +369,14 @@ class PartyEditor(tkinter.Toplevel):
                     + d.moves
                 )
 
-        # メモファイル作成
         os.makedirs("party\\txt", exist_ok=True)
         txt_path = f"party\\txt\\{num}-{sub_num}_{title}.txt"
         with open(txt_path, "w") as txt:
             txt.write(memo)
 
-        # 使用するパーティに設定
         if is_use:
             self.using.change_csv(value=f"{num}-{sub_num}_{title}.csv")
 
-        # PartyEditorに表示
         self.select_csv(csv=f"{num}-{sub_num}_{title}.csv")
         messagebox.showinfo(
             "完了",
@@ -441,7 +471,7 @@ class PartySettings(ttk.Frame):
 
         self.memo_label = ttk.Label(self.edit_frame, text="メモ")
         self.memo_label.grid(column=5, row=0, rowspan=2, sticky=N + E + W + S)
-        self.memo = ScrolledText(self.edit_frame, height=3, width=40, padx=3, pady=3)
+        self.memo = ScrolledText(self.edit_frame, height=3, width=46, padx=3, pady=3)
         self.memo.grid(column=6, row=0, columnspan=4, rowspan=2, sticky=N + E + W + S)
 
     def clear_setting(self):
@@ -460,7 +490,7 @@ class UseParty(ttk.LabelFrame):
 
         self.using_var = tkinter.StringVar()
         self.using_var.set("test.csv")
-        self.using_label = MyLabel(self, textvariable=self.using_var, width=30)
+        self.using_label = MyLabel(self, textvariable=self.using_var, width=20)
         self.using_label.grid(
             column=0, row=0, sticky=N + W + E + S
         )
@@ -659,7 +689,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._clear_button = MyButton(
             self, image=images.get_menu_icon("trush"), command=self.clear_pokemon
         )
-        self._clear_button.grid(column=0, row=4)
+        self._clear_button.grid(column=4, row=4, sticky=N + S + E)
 
         self._teras_var = Types.なし
         _tera_enabled = get_recog_value("terastal_enabled")
@@ -688,7 +718,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._seikaku_button = MyButton(
             self, text="まじめ", command=self.on_push_seikaku_button, width=6
         )
-        self._seikaku_button.grid(column=0, row=3, columnspan=2, padx=4, pady=4, sticky=W + E + N + S)
+        self._seikaku_button.grid(column=0, row=3, columnspan=2, padx=4, sticky=W + E + N + S)
 
         self._item_combobox = MyCombobox(self, values=ALL_ITEM_COMBOBOX_VALUES, width=10)
         self._item_combobox.grid(column=3, row=2, sticky=W + E + N + S)
@@ -731,14 +761,17 @@ class PokemonEditor(ttk.LabelFrame):
             padding=0,
             command=self.register_pokemon_in_box,
         )
-        self._register_button.grid(column=4, row=4, sticky=N + S + E)
+        self._register_button.grid(column=0, row=4)
 
         self._ev_frame = EvEditors(master=self, callback=self.change_ev)
         self._ev_frame.grid(
             column=3, row=5, rowspan=6, padx=2, pady=2, sticky=N + W + E
         )
 
-        self._memo_text = ScrolledText(self, height=3, width=16, wrap=tkinter.WORD)
+        self._memo_label = MyLabel(self, text="メモ")
+        self._memo_label.grid(column=4, row=4, sticky=W, padx=2)
+
+        self._memo_text = ScrolledText(self, height=3, width=13, wrap=tkinter.WORD)
         self._memo_text.grid(
             column=4, row=5, rowspan=6, padx=2, pady=2, sticky=N + S + E + W
         )

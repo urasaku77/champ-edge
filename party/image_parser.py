@@ -64,29 +64,28 @@ def _load_reference_lists() -> None:
     global _pokemon_names, _waza_names, _ability_names, _item_names
     if _pokemon_names:
         return
-    import glob as _g
 
     from component.parts.const import ALL_ITEM_COMBOBOX_VALUES
     from database.pokemon import DB_pokemon
 
-    # image/pokemon/ に画像が存在するポケモン名のみ（図鑑外・未実装ポケを除外）
+    # メガフォーム(form=11)を除いた全ポケモン名をDBから取得
+    # image/pokemon/ に画像がなくても認識対象とする（フラエッテ等）
+    conn = sqlite3.connect("database/pokemon.db")
+    conn.row_factory = sqlite3.Row
     seen: set[str] = set()
-    img_names: list[str] = []
-    for fp in sorted(_g.glob("image/pokemon/*.png")):
-        stem = Path(fp).stem
-        parts = stem.split("-")
-        if len(parts) == 2:
-            pid = f"{int(parts[0])}-{int(parts[1])}"
-            pname = DB_pokemon.get_pokemon_name_by_pid(pid)
-            if pname and pname not in seen:
-                img_names.append(pname)
-                seen.add(pname)
-    _pokemon_names = img_names
+    all_names: list[str] = []
+    for row in conn.execute(
+        "SELECT name FROM pokemon_data WHERE form != 11 ORDER BY no, form"
+    ):
+        name = row["name"]
+        if name and name not in seen:
+            all_names.append(name)
+            seen.add(name)
+    _pokemon_names = all_names
+
     _waza_names = list(DB_pokemon.get_waza_namedict().values())
     _item_names = list(ALL_ITEM_COMBOBOX_VALUES)
 
-    conn = sqlite3.connect("database/pokemon.db")
-    conn.row_factory = sqlite3.Row
     abilities: set[str] = set()
     for col in ("ability1", "ability2", "ability3"):
         for row in conn.execute(
@@ -225,6 +224,9 @@ def _load_pokemon_sprite_templates() -> dict[str, tuple["np.ndarray", "np.ndarra
             stem = Path(fp).stem
             parts = stem.split("-")
             if len(parts) != 2:
+                continue
+            # メガフォーム(form=11)はスプライトテンプレートから除外
+            if int(parts[1]) == 11:
                 continue
             pid = f"{int(parts[0])}-{int(parts[1])}"
             raw = cv2.imdecode(np.fromfile(fp, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
@@ -405,7 +407,7 @@ def _identify_pokemon(
         or ch in "♂♀（）"
     )
     ocr_name = _closest_match(name_clean, _pokemon_names, cutoff=0.85) if name_clean else ""
-    if ocr_name and _ability_matches_pokemon(ocr_name, abil):
+    if ocr_name and (name_clean == ocr_name or _ability_matches_pokemon(ocr_name, abil)):
         return ocr_name
 
     # ③ 特性フィルタ（空になる場合は無視）
@@ -510,9 +512,9 @@ def _preprocess_white_text(img: Image.Image, scale: int = 3) -> Image.Image:
 # ---------------------------------------------------------------------------
 
 
-def _ocr_block(img: Image.Image) -> str:
+def _ocr_block(img: Image.Image, scale: int = 3) -> str:
     _configure_tesseract()
-    prep = _preprocess_white_text(img)
+    prep = _preprocess_white_text(img, scale=scale)
     return pytesseract.image_to_string(
         prep, lang="jpn", config="--psm 6 --oem 3"
     ).strip()
@@ -748,7 +750,7 @@ def _parse_info_card(card: Image.Image) -> dict:
     #     katakana U+30A0-30FF): all Pokémon names, abilities, and items in
     #     SV contain kana, so lines without kana are UI-background OCR noise
     #     (e.g. "EPREEREEE昌還EEEE還還還" which has only ASCII/kanji).
-    raw_left = _ocr_block(left)
+    raw_left = _ocr_block(left, scale=5)
     left_lines = [
         ln
         for line in raw_left.splitlines()
@@ -781,6 +783,7 @@ def _parse_info_card(card: Image.Image) -> dict:
     name = _identify_pokemon(card, name_raw, abil, item, moves)
 
     # 画像ファイルのないフォームは、実際に画像が存在するフォームの名前に差し替える
+    # ただしメガフォーム(form=11)への置き換えは行わない
     if name:
         try:
             from component.parts.images import resolve_pid_by_image
@@ -789,7 +792,9 @@ def _parse_info_card(card: Image.Image) -> dict:
             pid = DB_pokemon.get_pokemon_pid_by_name(name)
             actual_pid = resolve_pid_by_image(pid)
             if actual_pid != pid:
-                name = DB_pokemon.get_pokemon_name_by_pid(actual_pid)
+                _, _, actual_form = actual_pid.partition("-")
+                if actual_form != "11":
+                    name = DB_pokemon.get_pokemon_name_by_pid(actual_pid)
         except Exception:
             pass
 

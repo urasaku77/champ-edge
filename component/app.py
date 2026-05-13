@@ -624,7 +624,7 @@ class MainApp(ThemedTk):
 
     # パーティCSV編集
     def edit_party_csv(self):
-        dialog = PartyEditor()
+        dialog = PartyEditor(capture=self.capture if self.websocket else None)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.withdraw()
         self.wait_window(dialog)
