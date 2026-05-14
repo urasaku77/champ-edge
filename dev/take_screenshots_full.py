@@ -49,25 +49,29 @@ def step_load_parties(app, stage):
     # 自分パーティ（setting.txt → 2-1_テスト.csv）
     stage.load_party(0)
 
-    # 相手パーティを手動設定
+    # 相手パーティを手動設定（HOME技データをロードして技名・使用率を表示）
     from pokedata.pokemon import Pokemon
-    opp_names = ["ガブリアス", "ミミッキュ", "ドラパルト", "ドドゲザン", "アーマーガア", "ハバタクカミ"]
+    opp_names = ["ガブリアス", "ミミッキュ", "ドラパルト", "ドドゲザン", "アーマーガア", "カイリュー"]
     opp_party = []
     for name in opp_names:
         p = Pokemon.by_name(name)
         p.form_selected = True
+        p.set_waza_from_home()
         opp_party.append(p)
     stage.set_party(1, opp_party)
     print("  両パーティロード完了")
 
 
 def step_select_pokemons(app, stage):
-    """自分側マスカーニャ・相手側ガブリアスを選択してダメージ計算発動"""
+    """自分側マスカーニャ・相手側ガブリアスを選択してダメージ計算発動、両者3体ずつ選出"""
     # 自分側: index 0 (マスカーニャ)
     app.party_frames[0].on_push_pokemon_button(0)
     # 相手側: index 0 (ガブリアス) - HOME情報も自動ロード
     app.party_frames[1].on_push_pokemon_button(0)
-    print("  ポケモン選択完了")
+    # 両者の選出を先頭3体に設定
+    stage.set_chosen(0, [0, 1, 2])
+    stage.set_chosen(1, [0, 1, 2])
+    print("  ポケモン選択・選出設定完了")
 
 
 def step_shot_battle(app, stage):
