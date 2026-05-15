@@ -48,7 +48,7 @@ class DB_pokemon:
         result = DB_pokemon.__select(
             "SELECT name FROM pokemon_data where no = ? and form = ?", (no, form)
         )
-        return result[0]["name"]
+        return result[0]["name"] if result else None
 
     @staticmethod
     def get_pokemon_pid_by_name(name: str) -> str:

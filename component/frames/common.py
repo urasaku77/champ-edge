@@ -113,7 +113,7 @@ class PartyFrame(ttk.LabelFrame):
                 season = f.read().strip()
         except FileNotFoundError:
             season = "1"
-        pid = str(pokemon.no).zfill(4) + "-0" + str(pokemon.form)
+        pid = str(pokemon.no).zfill(4) + "-" + str(pokemon.form).zfill(2)
         webbrowser.open(
             f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
         )
@@ -1397,7 +1397,7 @@ class InfoFrame(ttk.LabelFrame):
     def open_db(self):
         if self._no != 0:
             season = 1
-            pid = str(self._no).zfill(4) + "-0" + str(self._form)
+            pid = str(self._no).zfill(4) + "-" + str(self._form).zfill(2)
             with open("stats/season.txt", encoding="utf-8") as ranking_txt:
                 season = ranking_txt.read()
 
