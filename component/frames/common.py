@@ -613,6 +613,7 @@ class ActivePokemonFrame(ttk.LabelFrame):
         self._status_frame.update_pokemon(self._pokemon, False)
         self._stage.set_info(self._player)
         self._stage._app._waza_damage_frames[self._player].set_waza_info(self._pokemon.waza_list)
+        self._stage._app.after_appear(self._pokemon, self._player)
         self._stage.calc_damage()
 
     def _on_right_click_item(self, _event=None):
