@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 from functools import reduce
 
 from selenium import webdriver
@@ -81,11 +82,10 @@ class Search:
         party_list = []
         try:
             for i, pid in enumerate(pids):
-                num = 200 if i < 30 else 50 if i < 100 else 10
                 print(f"{i+1}/{len(pids)}：{pid}")
                 if progress_callback:
                     progress_callback(f"{i + 1} / {len(pids)}  {pid}")
-                parties = self._scrape_parties(driver, pid, seasons, num)
+                parties = self._scrape_parties(driver, pid, seasons)
                 party_list.append({"pid": pid, "parties": parties})
         finally:
             driver.quit()
@@ -95,7 +95,7 @@ class Search:
             json.dump(party_list, f, indent=2, ensure_ascii=False)
         print("書き込み完了")
 
-    def _scrape_parties(self, driver, pid: str, seasons: list[str], num: int) -> list[dict]:
+    def _scrape_parties(self, driver, pid: str, seasons: list[str]) -> list[dict]:
         results: list[dict] = []
         seen_urls: set[str] = set()
 
@@ -125,15 +125,18 @@ class Search:
                         WebDriverWait(driver, 10).until(
                             lambda d, n=initial_count: len(d.find_elements(By.CLASS_NAME, "trainer-card")) > n
                         )
+                        prev = 0
+                        for _ in range(20):
+                            time.sleep(0.5)
+                            cur = len(driver.find_elements(By.CLASS_NAME, "trainer-card"))
+                            if cur == prev:
+                                break
+                            prev = cur
                     except Exception:
                         pass
 
                 trainer_classes = driver.find_elements(By.CLASS_NAME, "trainer-card")
-                count = 0
                 for trainer in trainer_classes:
-                    if count >= num:
-                        break
-
                     icon_classes = trainer.find_elements(
                         By.CLASS_NAME, "trainer-card-team__pokemon"
                     )
@@ -160,7 +163,6 @@ class Search:
                     if article_url and article_url not in seen_urls and len(icons) == 6:
                         seen_urls.add(article_url)
                         results.append({"url": article_url, "icons": icons})
-                        count += 1
 
             except Exception as e:
                 print(f"  取得失敗 {pid} season={season}: {e}")
