@@ -1281,11 +1281,20 @@ class MainApp(ThemedTk):
                     "    timeout /t 1 /nobreak > nul\n"
                     "    goto wait_loop\n"
                     ")\n"
-                    "timeout /t 1 /nobreak > nul\n"
+                    "timeout /t 5 /nobreak > nul\n"
+                    "set RETRY=0\n"
+                    ":try_extract\n"
+                    "set /a RETRY+=1\n"
                     "powershell -Command "
                     "\"Expand-Archive -LiteralPath '_champedge_update.zip' "
                     "-DestinationPath '.' -Force\"\n"
-                    "del _champedge_update.zip\n"
+                    "if not errorlevel 1 goto extract_done\n"
+                    "if %RETRY% lss 5 (\n"
+                    "    timeout /t 5 /nobreak > nul\n"
+                    "    goto try_extract\n"
+                    ")\n"
+                    ":extract_done\n"
+                    "if exist _champedge_update.zip del _champedge_update.zip\n"
                     'start "" "%~dp0champedge.exe"\n'
                     'del "%~f0"\n'
                 )
