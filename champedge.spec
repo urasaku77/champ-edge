@@ -14,7 +14,15 @@ _icon = 'image/favicon.ico' if sys.platform == 'win32' else None
 # Tesseract バイナリをバンドル（コンパイル版で OCR フォールバックが動作するように）
 _tess_datas = []
 if sys.platform == 'win32':
+    import json as _json
     _tess_dir = r'C:\Program Files\Tesseract-OCR'
+    try:
+        with open('recog/setting.json') as _sf:
+            _configured = _json.load(_sf).get('tesseract_path', '')
+            if _configured and os.path.isdir(_configured):
+                _tess_dir = _configured
+    except Exception:
+        pass
     if os.path.isdir(_tess_dir):
         for _f in _glob.glob(os.path.join(_tess_dir, '*.exe')) + _glob.glob(os.path.join(_tess_dir, '*.dll')):
             _tess_datas.append((_f, 'tesseract'))
