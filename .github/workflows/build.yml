@@ -62,6 +62,16 @@ jobs:
           Start-Process -FilePath $installer.FullName -ArgumentList "/S" -Wait
           & "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
 
+      - name: Download Tesseract jpn tessdata
+        shell: pwsh
+        run: |
+          $tessdata = "C:\Program Files\Tesseract-OCR\tessdata"
+          Invoke-WebRequest `
+            -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/jpn.traineddata" `
+            -OutFile "$tessdata\jpn.traineddata"
+          $size = [math]::Round((Get-Item "$tessdata\jpn.traineddata").Length / 1MB, 1)
+          Write-Output "Downloaded: jpn.traineddata ($size MB)"
+
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
 
