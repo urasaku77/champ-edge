@@ -1,5 +1,14 @@
 [
   {
+    "name": "M-2",
+    "from_year": 2026,
+    "from_month": 5,
+    "from_date": 13,
+    "to_year": 2026,
+    "to_month": 6,
+    "to_date": 17
+  },
+  {
     "name": "M-1",
     "from_year": 2026,
     "from_month": 4,
