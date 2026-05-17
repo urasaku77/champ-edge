@@ -269,8 +269,16 @@ class TesseractSetupDialog(tkinter.Toplevel):
                 else:
                     self._log("WARNING: インストールパスを自動検出できませんでした。手動で指定してください。")
 
-            # 4. 日本語パック取得
-            self._download_tessdata()
+            # 4. 日本語パック取得（未取得のものだけ）
+            tessdata_dir = os.path.abspath(_TESSDATA_DIR)
+            missing = [
+                lang for lang in _TESSDATA_URLS
+                if not os.path.isfile(os.path.join(tessdata_dir, f"{lang}.traineddata"))
+            ]
+            if missing:
+                self._download_tessdata()
+            else:
+                self._log("日本語パックは取得済みです。スキップします。")
 
         except Exception as e:
             self._log(f"ERROR: {e}")
