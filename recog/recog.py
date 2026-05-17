@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import tkinter
-from tkinter import filedialog, ttk
+from tkinter import ttk
 
 from component.parts.button import MyButton
 
@@ -217,17 +217,11 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.mega_enabled_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
 
-        # Tesseractフォルダ
+        # Tesseractセットアップ
         tess_frame = ttk.Frame(self)
-        tkinter.Label(tess_frame, text="Tesseractフォルダ:").pack(side="left", padx=5)
-        self.tesseract_path_var = tkinter.StringVar()
-        self.tesseract_path_var.set(self.initial_data.get("tesseract_path", ""))
-        tkinter.Entry(tess_frame, textvariable=self.tesseract_path_var, width=30).pack(
-            side="left", padx=5
-        )
-        MyButton(tess_frame, text="参照", command=self.browse_tesseract_path).pack(
-            side="left", padx=5
-        )
+        MyButton(
+            tess_frame, text="Tesseract セットアップ", command=self.open_tesseract_setup
+        ).pack(side="left", padx=5)
         tess_frame.grid(row=10, column=0, columnspan=2, pady=5)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
@@ -249,14 +243,10 @@ class ModeSetting(tkinter.Toplevel):
         self.focus_set()
         self.geometry("+{0}+{1}".format(location[0], location[1]))
 
-    def browse_tesseract_path(self):
-        current = self.tesseract_path_var.get()
-        folder = filedialog.askdirectory(
-            title="Tesseractのインストールフォルダを選択",
-            initialdir=current if current else "C:\\",
-        )
-        if folder:
-            self.tesseract_path_var.set(folder.replace("/", "\\"))
+    def open_tesseract_setup(self):
+        from recog.tesseract_setup import TesseractSetupDialog
+        dialog = TesseractSetupDialog(self)
+        self.wait_window(dialog)
 
     def submit_form(self):
         # 入力された値をJSONファイルに保存
@@ -271,11 +261,19 @@ class ModeSetting(tkinter.Toplevel):
             "panipani_auto": self.panipani_auto_var.get(),
             "terastal_enabled": self.terastal_enabled_var.get(),
             "mega_enabled": self.mega_enabled_var.get(),
-            "tesseract_path": self.tesseract_path_var.get(),
         }
 
+        # tesseract_path は TesseractSetupDialog が直接保存するため、
+        # 既存値を読み取って上書きしないよう merge する
+        try:
+            with open(self.path, "r") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+        existing.update(data)
+
         with open(self.path, "w") as json_file:
-            json.dump(data, json_file, indent=2)
+            json.dump(existing, json_file, indent=2)
 
         self.destroy()
 
@@ -330,12 +328,27 @@ def get_recog_value(key: str):
 
 
 def get_tesseract_path() -> str:
-    """バンドル済みTesseract（PyInstaller exe）を優先し、なければ設定値を返す。"""
-    if getattr(sys, 'frozen', False):
-        bundled = os.path.join(sys._MEIPASS, 'tesseract')
-        if os.path.isdir(bundled):
-            tessdata = os.path.join(bundled, 'tessdata')
-            if os.path.isdir(tessdata):
-                os.environ.setdefault('TESSDATA_PREFIX', tessdata)
-            return bundled
-    return get_recog_value("tesseract_path")
+    """Tesseract のインストールフォルダを返す。TESSDATA_PREFIX も設定する。"""
+    # アプリフォルダ直下の tessdata/ を優先して TESSDATA_PREFIX に設定
+    local_tessdata = os.path.abspath("tessdata")
+    if os.path.isdir(local_tessdata):
+        os.environ["TESSDATA_PREFIX"] = local_tessdata
+
+    # 設定ファイルの値
+    configured = get_recog_value("tesseract_path")
+    if configured:
+        return configured
+
+    # 自動検出（共通インストール先）
+    if sys.platform == "win32":
+        for loc in [
+            r"C:\Program Files\Tesseract-OCR",
+            r"C:\Program Files (x86)\Tesseract-OCR",
+        ]:
+            if os.path.isfile(os.path.join(loc, "tesseract.exe")):
+                return loc
+    elif sys.platform == "darwin":
+        for prefix in ["/opt/homebrew", "/usr/local"]:
+            if os.path.isfile(os.path.join(prefix, "bin", "tesseract")):
+                return os.path.join(prefix, "bin")
+    return ""

@@ -25,8 +25,6 @@ BUILD_DIR = os.path.join("dist", "champedge")
 # スキャン対象のルート（ファイルまたはディレクトリ）
 # 各ディレクトリ内の新規ファイルは自動的にzipに含まれる
 # 含めたくないものは _UPDATE_EXCLUDE / _ALWAYS_EXCLUDE に追加する
-_TESSERACT_DIR = "vendor/tesseract/windows" if sys.platform == "win32" else "vendor/tesseract/mac"
-
 _DATA_ROOTS = [
     "version.txt",
     "README.pdf",
@@ -35,7 +33,6 @@ _DATA_ROOTS = [
     "stats",
     "recog",
     "party",
-    _TESSERACT_DIR,
 ]
 
 # フルインストール・アップデート共通で除外するパス
@@ -54,7 +51,7 @@ _UPDATE_EXCLUDE = {
     "recog/capture.json",
     "recog/setting.json",
     "image/outputImg",
-    _TESSERACT_DIR,
+    "tessdata",
 }
 
 

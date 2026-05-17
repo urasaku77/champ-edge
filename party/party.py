@@ -193,13 +193,31 @@ class PartyEditor(tkinter.Toplevel):
             for pokemon in self.pokemons.pokemon_panel_list:
                 pokemon.clear_pokemon()
 
+    def _prompt_tesseract_setup(self, reason: str) -> bool:
+        """Tesseract が未設定のときセットアップダイアログを開く。
+        ユーザーがセットアップを完了した場合 True を返す。"""
+        from recog.tesseract_setup import TesseractSetupDialog
+
+        if not messagebox.askokcancel(
+            "Tesseract セットアップ",
+            f"{reason}\n\nセットアップウィザードを開きますか？",
+        ):
+            return False
+        dialog = TesseractSetupDialog(self)
+        self.wait_window(dialog)
+        return True
+
     def import_from_images(self):
         from party.image_parser import check_available
 
         ok, reason = check_available()
         if not ok:
-            messagebox.showerror("OCRエラー", reason)
-            return
+            if not self._prompt_tesseract_setup(reason):
+                return
+            ok, reason = check_available()
+            if not ok:
+                messagebox.showerror("OCRエラー", reason)
+                return
 
         current_directory = os.getcwd()
         img1_path: str | None = filedialog.askopenfilename(
@@ -227,8 +245,12 @@ class PartyEditor(tkinter.Toplevel):
 
         ok, reason = check_available()
         if not ok:
-            messagebox.showerror("OCRエラー", reason)
-            return
+            if not self._prompt_tesseract_setup(reason):
+                return
+            ok, reason = check_available()
+            if not ok:
+                messagebox.showerror("OCRエラー", reason)
+                return
 
         if not messagebox.askokcancel(
             "OBS画面から読込（1/2）",

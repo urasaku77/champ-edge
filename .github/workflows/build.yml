@@ -42,36 +42,6 @@ jobs:
           $deps | Out-File -FilePath requirements_ci.txt -Encoding utf8
           pip install -r requirements_ci.txt
 
-      - name: Download Tesseract OCR installer
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/UB-Mannheim/tesseract/releases/latest" `
-            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "GitHub-Actions" }
-          $asset = $release.assets | Where-Object { $_.name -match "w64-setup.*\.exe$" } | Select-Object -First 1
-          New-Item -ItemType Directory -Force "vendor\tesseract\windows" | Out-Null
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "vendor\tesseract\windows\$($asset.name)"
-          Write-Output "Downloaded: $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB)"
-
-      - name: Install Tesseract for PyInstaller bundling
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem "vendor\tesseract\windows" -Filter "*.exe" | Select-Object -First 1
-          Write-Output "Installing: $($installer.Name)"
-          Start-Process -FilePath $installer.FullName -ArgumentList "/S" -Wait
-          & "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
-
-      - name: Download Tesseract jpn tessdata
-        shell: pwsh
-        run: |
-          $tessdata = "C:\Program Files\Tesseract-OCR\tessdata"
-          Invoke-WebRequest `
-            -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/jpn.traineddata" `
-            -OutFile "$tessdata\jpn.traineddata"
-          $size = [math]::Round((Get-Item "$tessdata\jpn.traineddata").Length / 1MB, 1)
-          Write-Output "Downloaded: jpn.traineddata ($size MB)"
-
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
 
@@ -149,30 +119,8 @@ jobs:
           grep -v "^-e\|^#\|^$" requirements.lock > requirements_ci.txt
           pip install -r requirements_ci.txt
 
-      - name: Install Tesseract for PyInstaller bundling
-        run: brew install tesseract tesseract-lang
-
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
-
-      - name: Create Tesseract pkg installer
-        run: |
-          TESS_VER=$(tesseract --version 2>&1 | head -1 | awk '{print $2}')
-          PKG_ROOT=$(mktemp -d)
-          mkdir -p "$PKG_ROOT/usr/local/bin"
-          mkdir -p "$PKG_ROOT/usr/local/share/tessdata"
-          cp "$(brew --prefix)/bin/tesseract" "$PKG_ROOT/usr/local/bin/"
-          TESSDATA_SRC="$(brew --prefix)/share/tessdata"
-          if [ -d "$TESSDATA_SRC" ]; then
-            cp "$TESSDATA_SRC/"*.traineddata "$PKG_ROOT/usr/local/share/tessdata/" 2>/dev/null || true
-          fi
-          mkdir -p vendor/tesseract/mac
-          pkgbuild \
-            --root "$PKG_ROOT" \
-            --identifier com.tesseract-ocr.tesseract \
-            --version "$TESS_VER" \
-            "vendor/tesseract/mac/tesseract-$TESS_VER.pkg"
-          echo "Created: vendor/tesseract/mac/tesseract-$TESS_VER.pkg"
 
       - name: Create zips
         run: |
