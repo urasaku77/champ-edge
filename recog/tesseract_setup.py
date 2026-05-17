@@ -161,12 +161,21 @@ class TesseractSetupDialog(tkinter.Toplevel):
         exe = "tesseract.exe" if sys.platform == "win32" else "tesseract"
         has_exe = path != "" and os.path.isfile(os.path.join(path, exe))
 
-        tessdata_dir = os.path.abspath(_TESSDATA_DIR)
-        has_jpn = os.path.isfile(os.path.join(tessdata_dir, "jpn.traineddata"))
+        local_tessdata = os.path.abspath(_TESSDATA_DIR)
+        jpn_local = os.path.isfile(os.path.join(local_tessdata, "jpn.traineddata"))
+        jpn_system = path != "" and os.path.isfile(
+            os.path.join(path, "tessdata", "jpn.traineddata")
+        )
+        if jpn_local:
+            jpn_label = f"✓  {local_tessdata}"
+        elif jpn_system:
+            jpn_label = f"✓  {os.path.join(path, 'tessdata')}"
+        else:
+            jpn_label = "✗  未取得"
 
         lines = [
             f"Tesseract 実行ファイル: {'✓  ' + path if has_exe else '✗  未検出'}",
-            f"日本語パック (jpn):     {'✓  tessdata/ フォルダあり' if has_jpn else '✗  未取得'}",
+            f"日本語パック (jpn):     {jpn_label}",
         ]
         self._status_var.set("\n".join(lines))
 
@@ -269,11 +278,16 @@ class TesseractSetupDialog(tkinter.Toplevel):
                 else:
                     self._log("WARNING: インストールパスを自動検出できませんでした。手動で指定してください。")
 
-            # 4. 日本語パック取得（未取得のものだけ）
-            tessdata_dir = os.path.abspath(_TESSDATA_DIR)
+            # 4. 日本語パック取得（ローカル or システム tessdata にあればスキップ）
+            tess_path = self._path_var.get()
+            system_tessdata = os.path.join(tess_path, "tessdata") if tess_path else ""
+            local_tessdata = os.path.abspath(_TESSDATA_DIR)
             missing = [
                 lang for lang in _TESSDATA_URLS
-                if not os.path.isfile(os.path.join(tessdata_dir, f"{lang}.traineddata"))
+                if not os.path.isfile(os.path.join(local_tessdata, f"{lang}.traineddata"))
+                and not (system_tessdata and os.path.isfile(
+                    os.path.join(system_tessdata, f"{lang}.traineddata")
+                ))
             ]
             if missing:
                 self._download_tessdata()
