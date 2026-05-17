@@ -217,51 +217,57 @@ class TesseractSetupDialog(tkinter.Toplevel):
 
     def _run_auto_setup(self):
         try:
-            # 1. インストーラをダウンロード
-            self._log("Tesseract インストーラを取得中...")
-            resp = urlopen(
-                "https://api.github.com/repos/UB-Mannheim/tesseract/releases/latest"
-            )
-            release = json.loads(resp.read())
-            asset = next(
-                (
-                    a
-                    for a in release["assets"]
-                    if "w64-setup" in a["name"] and a["name"].endswith(".exe")
-                ),
-                None,
-            )
-            if not asset:
-                self._log("ERROR: インストーラが見つかりませんでした。")
-                return
-
-            self._log(
-                f"ダウンロード中: {asset['name']}"
-                f" ({asset['size'] // 1024 // 1024} MB)"
-            )
-            with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as tmp:
-                tmp_path = tmp.name
-            _download_file(asset["browser_download_url"], tmp_path, "installer", self._log)
-
-            # 2. サイレントインストール（UAC が必要な場合はダイアログが表示される）
-            self._log("インストール中（UAC ダイアログが表示される場合があります）...")
-            result = subprocess.run([tmp_path, "/S"], timeout=180)
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            if result.returncode != 0:
-                self._log(f"WARNING: インストーラが終了コード {result.returncode} で終了しました。")
+            # インストール済みチェック
+            existing = detect_tesseract()
+            if existing:
+                self._log(f"Tesseract は既にインストールされています: {existing}")
+                self.after(0, lambda p=existing: self._path_var.set(p))
             else:
-                self._log("Tesseract インストール完了。")
+                # 1. インストーラをダウンロード
+                self._log("Tesseract インストーラを取得中...")
+                resp = urlopen(
+                    "https://api.github.com/repos/UB-Mannheim/tesseract/releases/latest"
+                )
+                release = json.loads(resp.read())
+                asset = next(
+                    (
+                        a
+                        for a in release["assets"]
+                        if "w64-setup" in a["name"] and a["name"].endswith(".exe")
+                    ),
+                    None,
+                )
+                if not asset:
+                    self._log("ERROR: インストーラが見つかりませんでした。")
+                    return
 
-            # 3. パス自動検出
-            path = detect_tesseract()
-            if path:
-                self._log(f"検出パス: {path}")
-                self.after(0, lambda p=path: self._path_var.set(p))
-            else:
-                self._log("WARNING: インストールパスを自動検出できませんでした。手動で指定してください。")
+                self._log(
+                    f"ダウンロード中: {asset['name']}"
+                    f" ({asset['size'] // 1024 // 1024} MB)"
+                )
+                with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as tmp:
+                    tmp_path = tmp.name
+                _download_file(asset["browser_download_url"], tmp_path, "installer", self._log)
+
+                # 2. サイレントインストール（UAC が必要な場合はダイアログが表示される）
+                self._log("インストール中（UAC ダイアログが表示される場合があります）...")
+                result = subprocess.run([tmp_path, "/S"], timeout=180)
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                if result.returncode != 0:
+                    self._log(f"WARNING: インストーラが終了コード {result.returncode} で終了しました。")
+                else:
+                    self._log("Tesseract インストール完了。")
+
+                # 3. パス自動検出
+                path = detect_tesseract()
+                if path:
+                    self._log(f"検出パス: {path}")
+                    self.after(0, lambda p=path: self._path_var.set(p))
+                else:
+                    self._log("WARNING: インストールパスを自動検出できませんでした。手動で指定してください。")
 
             # 4. 日本語パック取得
             self._download_tessdata()
