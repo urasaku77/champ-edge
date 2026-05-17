@@ -3,6 +3,13 @@ import math
 import tkinter
 import webbrowser
 from tkinter import E, N, S, W, messagebox, ttk
+
+
+def _open_url(url: str):
+    try:
+        webbrowser.open(url)
+    except Exception as e:
+        messagebox.showerror("エラー", f"ブラウザを開けませんでした\n{e}")
 from tkinter.font import Font
 
 from component.parts import images
@@ -683,9 +690,7 @@ class SimilarParty(tkinter.Toplevel):
                     link_button = MyButton(
                         icons_frame,
                         text="構築記事",
-                        command=lambda url=result_perfect[i]["url"]: webbrowser.open(
-                            url
-                        ),
+                        command=lambda url=result_perfect[i]["url"]: _open_url(url),
                     )
                     link_button.pack(side="left", padx=50)
                     icons_frame.pack(side="top")
@@ -706,7 +711,7 @@ class SimilarParty(tkinter.Toplevel):
                     link_button = MyButton(
                         icons_frame,
                         text="構築記事",
-                        command=lambda url=result_part[i]["url"]: webbrowser.open(url),
+                        command=lambda url=result_part[i]["url"]: _open_url(url),
                     )
                     link_button.pack(side="left", padx=50)
                     icons_frame.pack(side="top")

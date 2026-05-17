@@ -197,6 +197,22 @@ class MainApp(ThemedTk):
         else:
             self.geometry(f"{_sx(950)}x{_sy(915)}")
 
+        def _handle_exc(exc, val, tb):
+            import traceback as _tb
+            import os as _os
+            log_dir = _os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else "."
+            try:
+                with open(_os.path.join(log_dir, "error.log"), "a", encoding="utf-8") as f:
+                    _tb.print_exception(exc, val, tb, file=f)
+            except Exception:
+                pass
+            try:
+                messagebox.showerror("エラー", f"{val}")
+            except Exception:
+                pass
+
+        self.report_callback_exception = _handle_exc
+
         self.capture = Capture()
         self.websocket = False
         self.monitor = False
