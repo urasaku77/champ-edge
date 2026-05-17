@@ -241,6 +241,7 @@ class MainApp(ThemedTk):
         menu.add_cascade(label="対戦分析", command=self.open_analytics)
         menu.add_command(label="DBバックアップ", command=self.backup_database)
         menu.add_command(label="アップデート確認", command=self.check_update)
+        menu.add_command(label="Tesseractセットアップ", command=self.open_tesseract_setup)
         menu.add_cascade(label="バトルデータ", menu=battle_menu)
 
         for i, side in enumerate(["自分側", "相手側"]):
@@ -764,6 +765,12 @@ class MainApp(ThemedTk):
     def mode_setting(self):
         dialog = ModeSetting()
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
+        self.wait_window(dialog)
+
+    # Tesseractセットアップ
+    def open_tesseract_setup(self):
+        from recog.tesseract_setup import TesseractSetupDialog
+        dialog = TesseractSetupDialog(self)
         self.wait_window(dialog)
 
     # Websocket処理
