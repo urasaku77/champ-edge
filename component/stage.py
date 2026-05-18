@@ -365,16 +365,17 @@ class Stage:
             try:
                 csv_data = get_party_data()
             except FileNotFoundError as e:
-                messagebox.showerror("読み込みエラー", str(e))
+                messagebox.showerror("読み込みエラー", str(e), parent=self._app)
                 return
             except ValueError as e:
-                messagebox.showerror("読み込みエラー", str(e))
+                messagebox.showerror("読み込みエラー", str(e), parent=self._app)
                 return
             for _i, data in enumerate(csv_data):
                 if not data or len(data) < 8:
                     messagebox.showerror(
                         "読み込みエラー",
                         f"CSVのカラムが不足しています（{_i + 2}行目）",
+                        parent=self._app,
                     )
                     return
                 try:
@@ -383,6 +384,7 @@ class Stage:
                     messagebox.showerror(
                         "読み込みエラー",
                         f"ポケモン名が正しくありません（{_i + 2}行目）: {data[0]}",
+                        parent=self._app,
                     )
                     return
                 try:
@@ -391,6 +393,7 @@ class Stage:
                     messagebox.showerror(
                         "読み込みエラー",
                         f"CSVの内容が正しくありません（{_i + 2}行目）",
+                        parent=self._app,
                     )
                     return
                 party.append(pokemon)

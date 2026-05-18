@@ -76,6 +76,7 @@ class PartyEditor(tkinter.Toplevel):
         ret = messagebox.askyesno(
             "確認",
             "表示されているデータをCSV書き込みますか？\n（既存のファイルの場合は上書きされます）",
+            parent=self,
         )
         if ret is False:
             return
@@ -89,7 +90,7 @@ class PartyEditor(tkinter.Toplevel):
         # 新規登録時の採番処理
         file_list = sorted(glob.glob("party/csv/*"))
         if self.num == "":
-            messagebox.showinfo("警告", "番号を入力してください")
+            messagebox.showinfo("警告", "番号を入力してください", parent=self)
             return
         elif self.sub_num == "":
             same_num_list = [
@@ -186,7 +187,7 @@ class PartyEditor(tkinter.Toplevel):
 
     def all_clear(self):
         ret = messagebox.askyesno(
-            "確認", "表示されているデータをすべてクリアしますか？"
+            "確認", "表示されているデータをすべてクリアしますか？", parent=self
         )
         if ret is True:
             self.settings.clear_setting()
@@ -201,6 +202,7 @@ class PartyEditor(tkinter.Toplevel):
         if not messagebox.askokcancel(
             "Tesseract セットアップ",
             f"{reason}\n\nセットアップウィザードを開きますか？",
+            parent=self,
         ):
             return False
         dialog = TesseractSetupDialog(self)
@@ -216,7 +218,7 @@ class PartyEditor(tkinter.Toplevel):
                 return
             ok, reason = check_available()
             if not ok:
-                messagebox.showerror("OCRエラー", reason)
+                messagebox.showerror("OCRエラー", reason, parent=self)
                 return
 
         current_directory = os.getcwd()
@@ -231,7 +233,7 @@ class PartyEditor(tkinter.Toplevel):
             initialdir=current_directory,
         ) or None
         if not img1_path and not img2_path:
-            messagebox.showerror("エラー", "画像が選択されませんでした。")
+            messagebox.showerror("エラー", "画像が選択されませんでした。", parent=self)
             return
 
         self._run_image_import(img1_path, img2_path)
@@ -249,31 +251,33 @@ class PartyEditor(tkinter.Toplevel):
                 return
             ok, reason = check_available()
             if not ok:
-                messagebox.showerror("OCRエラー", reason)
+                messagebox.showerror("OCRエラー", reason, parent=self)
                 return
 
         if not messagebox.askokcancel(
             "OBS画面から読込（1/2）",
             "OBSに能力タブ（ポケモン名・特性・持ち物・技）を表示した状態でOKを押してください。",
+            parent=self,
         ):
             return
         try:
             self._capture.get_screenshot()
             img1_arr = self._capture.img.copy()
         except Exception as e:
-            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}")
+            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}", parent=self)
             return
 
         if not messagebox.askokcancel(
             "OBS画面から読込（2/2）",
             "OBSにステータスタブ（努力値・性格）を表示した状態でOKを押してください。",
+            parent=self,
         ):
             return
         try:
             self._capture.get_screenshot()
             img2_arr = self._capture.img.copy()
         except Exception as e:
-            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}")
+            messagebox.showerror("エラー", f"スクリーンショットの取得に失敗しました:\n{e}", parent=self)
             return
 
         img1_path = img2_path = None
@@ -291,7 +295,7 @@ class PartyEditor(tkinter.Toplevel):
                         os.unlink(p)
                     except Exception:
                         pass
-            messagebox.showerror("エラー", f"画像の保存に失敗しました:\n{e}")
+            messagebox.showerror("エラー", f"画像の保存に失敗しました:\n{e}", parent=self)
             return
 
         self._run_image_import(img1_path, img2_path, cleanup_temps=True)
@@ -352,7 +356,7 @@ class PartyEditor(tkinter.Toplevel):
         self.wait_window(progress_win)
 
         if error_holder:
-            messagebox.showerror("解析エラー", str(error_holder[0]))
+            messagebox.showerror("解析エラー", str(error_holder[0]), parent=self)
             return
 
         data_list: list[CardData] = result_holder[0]
@@ -403,6 +407,7 @@ class PartyEditor(tkinter.Toplevel):
         messagebox.showinfo(
             "完了",
             f"{len(data_list)}体のデータを読み込みました。\n内容を確認・修正してから保存してください。",
+            parent=self,
         )
 
     def open(self, location=tuple[int, int]):
@@ -890,7 +895,7 @@ class PokemonEditor(ttk.LabelFrame):
         self._teras_button.set_type(type)
 
     def select_type(self) -> Types:
-        dialog = TypeSelectDialog()
+        dialog = TypeSelectDialog(self.winfo_toplevel())
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
         return dialog.selected_type
@@ -961,6 +966,7 @@ class PokemonEditor(ttk.LabelFrame):
         ret = messagebox.askyesno(
             "確認",
             "ポケモンを登録しますか？",
+            parent=self.winfo_toplevel(),
         )
         if ret is False:
             return
@@ -969,7 +975,7 @@ class PokemonEditor(ttk.LabelFrame):
             reader = csv.reader(box_csv)
             for lines in reader:
                 if lines == row:
-                    messagebox.showinfo("警告", "すでに全く同じ個体が登録されています")
+                    messagebox.showinfo("警告", "すでに全く同じ個体が登録されています", parent=self.winfo_toplevel())
                     return
             writer = csv.writer(box_csv, lineterminator="\n")
             writer.writerow(row)
@@ -1299,7 +1305,7 @@ class PokemonFromBoxDialog(ttk.Frame):
         self.set_pokemon_list()
 
     def show_pokemon_memo(self, memo: str):
-        dialog = PokemonMemoLabelDialog()
+        dialog = PokemonMemoLabelDialog(self.winfo_toplevel())
         dialog.open(memo, location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 

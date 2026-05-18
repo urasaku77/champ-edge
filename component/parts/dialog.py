@@ -24,8 +24,10 @@ from recog.recog import get_recog_value
 
 # パーティ入力ダイアログ
 class PartyInputDialog(tkinter.Toplevel):
-    def __init__(self, title: str = "", width: int = 400, height: int = 300):
-        super().__init__()
+    def __init__(self, master=None, title: str = "", width: int = 400, height: int = 300):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title("パーティ入力")
 
         self._selected = tkinter.IntVar()
@@ -120,8 +122,10 @@ class PartyInputDialog(tkinter.Toplevel):
 
 # タイプ指定ダイアログ
 class TypeSelectDialog(tkinter.Toplevel):
-    def __init__(self, title: str = "タイプ選択", width: int = 400, height: int = 300):
-        super().__init__()
+    def __init__(self, master=None, title: str = "タイプ選択", width: int = 400, height: int = 300):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self._selected_type = None
 
@@ -147,8 +151,10 @@ class TypeSelectDialog(tkinter.Toplevel):
 
 # ポケモンメモ表示ダイアログ
 class PokemonMemoLabelDialog(tkinter.Toplevel):
-    def __init__(self, title: str = "", width: int = 400, height: int = 300):
-        super().__init__()
+    def __init__(self, master=None, title: str = "", width: int = 400, height: int = 300):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title("ポケモンメモ")
 
         # ウィジェットの配置
@@ -185,8 +191,10 @@ class SpeedComparing(tkinter.Toplevel):
         else:
             return False
 
-    def __init__(self, title: str = "素早さ比較", width: int = 600, height: int = 500):
-        super().__init__()
+    def __init__(self, master=None, title: str = "素早さ比較", width: int = 600, height: int = 500):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.pokemons: list[Pokemon] = [Pokemon(), Pokemon()]
         self.tailwind = [1.0, 1.0]
@@ -615,9 +623,11 @@ class SpeedComparing(tkinter.Toplevel):
 # フォーム選択画面
 class FormSelect(tkinter.Toplevel):
     def __init__(
-        self, title: str = "フォーム選択", width: int = 400, height: int = 300
+        self, master=None, title: str = "フォーム選択", width: int = 400, height: int = 300
     ):
-        super().__init__()
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.form_num = -1
 
@@ -647,6 +657,7 @@ class FormSelect(tkinter.Toplevel):
 class SimilarParty(tkinter.Toplevel):
     def __init__(
         self,
+        master=None,
         title: str = "類似パーティ検索結果",
         width: int = 400,
         height: int = 300,
@@ -657,7 +668,9 @@ class SimilarParty(tkinter.Toplevel):
             current_party = []
         if party_list is None:
             party_list = []
-        super().__init__()
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
 
         result_all_label = ttk.Label(
@@ -724,8 +737,10 @@ class SimilarParty(tkinter.Toplevel):
 
 # 重さ比較画面
 class WeightComparing(tkinter.Toplevel):
-    def __init__(self, title: str = "重さ比較", width: int = 600, height: int = 500):
-        super().__init__()
+    def __init__(self, master=None, title: str = "重さ比較", width: int = 600, height: int = 500):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.pokemons: list[Pokemon] = [Pokemon(), Pokemon()]
 
@@ -832,8 +847,10 @@ class WeightComparing(tkinter.Toplevel):
 
 
 class BoxDialog(tkinter.Toplevel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, master=None):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title("ボックス管理")
         tera_enabled = get_recog_value("terastal_enabled")
         self.geometry(f"{'1400' if tera_enabled else '1250'}x900")
@@ -991,7 +1008,7 @@ class BoxDialog(tkinter.Toplevel):
         self.set_pokemon_list()
 
     def show_pokemon_memo(self, memo: str):
-        dialog = PokemonMemoLabelDialog()
+        dialog = PokemonMemoLabelDialog(self)
         dialog.open(memo, location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
@@ -999,6 +1016,7 @@ class BoxDialog(tkinter.Toplevel):
         ret = messagebox.askyesno(
             "確認",
             "選択したポケモンを削除しますか？(この操作は元に戻せません)",
+            parent=self,
         )
         if ret is True:
             with open(self.file_path, "w") as box_csv:

@@ -28,9 +28,11 @@ _SETTING_DEFAULTS = {
 
 class CaptureSetting(tkinter.Toplevel):
     def __init__(
-        self, title: str = "キャプチャ設定", width: int = 400, height: int = 300
+        self, master=None, title: str = "キャプチャ設定", width: int = 400, height: int = 300
     ):
-        super().__init__()
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.path = "recog/capture.json"
 
@@ -109,8 +111,10 @@ class CaptureSetting(tkinter.Toplevel):
 
 # モード切替画面
 class ModeSetting(tkinter.Toplevel):
-    def __init__(self, title: str = "モード切替", width: int = 400, height: int = 480):
-        super().__init__()
+    def __init__(self, master=None, title: str = "モード切替", width: int = 400, height: int = 480):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.path = "recog/setting.json"
 
@@ -306,8 +310,10 @@ class ModeSetting(tkinter.Toplevel):
 
 
 class BgmSetting(tkinter.Toplevel):
-    def __init__(self, title: str = "BGM設定"):
-        super().__init__()
+    def __init__(self, master=None, title: str = "BGM設定"):
+        super().__init__(master)
+        if master is not None:
+            self.transient(master)
         self.title(title)
         self.path = "recog/bgm.json"
 

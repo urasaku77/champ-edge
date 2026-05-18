@@ -126,8 +126,8 @@ class EditBattleDialog(tkinter.Toplevel):
 
 
 class Record(tkinter.Toplevel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, master=None):
+        super().__init__(master)
         self.title("対戦履歴")
 
         self.page_num_var = tkinter.IntVar(value=1)
@@ -621,7 +621,7 @@ class Record(tkinter.Toplevel):
         import csv
         from tkinter import filedialog
         if not hasattr(self, "battle_data_list") or len(self.battle_data_list) == 0:
-            messagebox.showinfo("情報", "エクスポートするデータがありません。先に検索してください。")
+            messagebox.showinfo("情報", "エクスポートするデータがありません。先に検索してください。", parent=self)
             return
         path = filedialog.asksaveasfilename(
             title="エクスポート先を選択",
@@ -647,9 +647,9 @@ class Record(tkinter.Toplevel):
                     dt = datetime.datetime.fromtimestamp(row[1]).strftime("%Y/%m/%d %H:%M")
                     result_str = "勝ち" if row[3] == 1 else ("引き分け" if row[3] == -1 else "負け")
                     writer.writerow([row[0], dt, row[2], result_str] + list(row[4:]))
-            messagebox.showinfo("完了", f"{len(self.battle_data_list)}件をエクスポートしました。\n{path}")
+            messagebox.showinfo("完了", f"{len(self.battle_data_list)}件をエクスポートしました。\n{path}", parent=self)
         except Exception as e:
-            messagebox.showerror("エラー", f"エクスポートに失敗しました。\n{e}")
+            messagebox.showerror("エラー", f"エクスポートに失敗しました。\n{e}", parent=self)
 
     def _on_canvas_right_click(self, event):
         row_index = (event.y - Const.imageStartY) // Const.battleDataDY
@@ -670,15 +670,16 @@ class Record(tkinter.Toplevel):
 
     def delete_range_data(self):
         if not hasattr(self, "from_date") or not hasattr(self, "to_date"):
-            messagebox.showwarning("警告", "先に検索ボタンで絞り込んでください。")
+            messagebox.showwarning("警告", "先に検索ボタンで絞り込んでください。", parent=self)
             return
         count = len(self.battle_data_list)
         if count == 0:
-            messagebox.showinfo("情報", "削除対象のデータがありません。")
+            messagebox.showinfo("情報", "削除対象のデータがありません。", parent=self)
             return
         if not messagebox.askokcancel(
             "削除確認",
             f"この操作は元に戻せません。\n現在の絞り込み範囲（{count}件）のデータを全て削除しますか？",
+            parent=self,
         ):
             return
         DB_battle.delete_by_date_range(
@@ -687,7 +688,7 @@ class Record(tkinter.Toplevel):
         self.battle_data_list = []
         self.page_num_var.set(1)
         self.update_result()
-        messagebox.showinfo("完了", f"{count}件のデータを削除しました。")
+        messagebox.showinfo("完了", f"{count}件のデータを削除しました。", parent=self)
 
     def filter_favorites(self):
         if self.favorite_var.get():
@@ -713,8 +714,8 @@ class Record(tkinter.Toplevel):
 
 # 類似パーティ検索結果画面
 class ListRecord(tkinter.Toplevel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, master=None):
+        super().__init__(master)
         self.title("対戦履歴検索")
         self.full_frame = SearchRecord(
             master=self, source="full", height=290, width=1780

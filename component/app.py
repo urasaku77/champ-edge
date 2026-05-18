@@ -207,7 +207,7 @@ class MainApp(ThemedTk):
             except Exception:
                 pass
             try:
-                messagebox.showerror("エラー", f"{val}")
+                messagebox.showerror("エラー", f"{val}", parent=self)
             except Exception:
                 pass
 
@@ -590,6 +590,7 @@ class MainApp(ThemedTk):
             "アップデート確認",
             f"新しいバージョンがあります\n\n現在: v{current}  →  最新: v{latest}\n\n"
             "アップデートしますか？\n（パーティやDBのデータは保持されます）",
+            parent=self,
         ):
             self._auto_update_battle_data()
             return
@@ -715,14 +716,14 @@ class MainApp(ThemedTk):
 
     # タイプ選択
     def select_type(self, player: int) -> Types:
-        dialog = TypeSelectDialog()
+        dialog = TypeSelectDialog(self)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
         return dialog.selected_type
 
     # パーティ編集
     def edit_party(self, party) -> list[Pokemon]:
-        dialog = PartyInputDialog()
+        dialog = PartyInputDialog(self)
         dialog.party = party
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
@@ -732,7 +733,7 @@ class MainApp(ThemedTk):
     def speed_comparing(self):
         pokemons = self.speed_button.get_active_pokemons()
         if pokemons[0].no != -1 and pokemons[1].no != -1:
-            dialog = SpeedComparing()
+            dialog = SpeedComparing(self)
             dialog.set_pokemon(pokemons)
             dialog.open(location=(self.winfo_x(), self.winfo_y()))
             self.wait_window(dialog)
@@ -741,7 +742,7 @@ class MainApp(ThemedTk):
     def weight_comparing(self):
         pokemons = self.weight_button.get_active_pokemons()
         if pokemons[0].no != -1 and pokemons[1].no != -1:
-            dialog = WeightComparing()
+            dialog = WeightComparing(self)
             dialog.set_pokemon(pokemons)
             dialog.open(location=(self.winfo_x(), self.winfo_y()))
             self.wait_window(dialog)
@@ -757,6 +758,7 @@ class MainApp(ThemedTk):
         ret = messagebox.askyesno(
             "確認",
             "データを登録しました\n次の対戦へ移りますか?",
+            parent=self,
         )
         if ret is False:
             return
@@ -781,19 +783,19 @@ class MainApp(ThemedTk):
 
     # キャプチャ設定画面
     def capture_setting(self):
-        dialog = CaptureSetting()
+        dialog = CaptureSetting(self)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
     # BGM設定画面
     def bgm_setting(self):
-        dialog = BgmSetting()
+        dialog = BgmSetting(self)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
     # モード切替画面
     def mode_setting(self):
-        dialog = ModeSetting()
+        dialog = ModeSetting(self)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
@@ -975,13 +977,13 @@ class MainApp(ThemedTk):
         current_party = [pokemon.pid for pokemon in self.party_frames[1].pokemon_list]
         party_list = get_similar_party(self.party_frames[1].pokemon_list)
         if isOpen or party_list:
-            dialog = SimilarParty(current_party=current_party, party_list=party_list)
+            dialog = SimilarParty(master=self, current_party=current_party, party_list=party_list)
             dialog.open(location=(self.winfo_x(), self.winfo_y()))
 
     # 対戦履歴から検索
     def search_record(self, isOpen: bool = True):
         current_party = [pokemon.pid for pokemon in self.party_frames[1].pokemon_list]
-        dialog = record.ListRecord()
+        dialog = record.ListRecord(self)
         if (
             isOpen
             or len(dialog.full_frame.get_battle_data(current_party)) > 0
@@ -1068,7 +1070,7 @@ class MainApp(ThemedTk):
                 if remote_date == local_date:
                     self.after(0, progress_win.destroy)
                     self.after(
-                        0, lambda: messagebox.showinfo("HOME情報更新", "最新データです")
+                        0, lambda: messagebox.showinfo("HOME情報更新", "最新データです", parent=self)
                     )
                     return
                 self._download_stats_files(self._HOME_FILES, _update)
@@ -1093,19 +1095,19 @@ class MainApp(ThemedTk):
         if success:
             with open(self._LAST_UPDATE_FILE, "w", encoding="utf-8") as f:
                 f.write(remote_date)
-            messagebox.showinfo("HOME情報更新", "更新が完了しました")
+            messagebox.showinfo("HOME情報更新", "更新が完了しました", parent=self)
         else:
             messagebox.showerror(
-                "HOME情報更新", f"更新中にエラーが発生しました\n{(error or '')[:300]}"
+                "HOME情報更新", f"更新中にエラーが発生しました\n{(error or '')[:300]}", parent=self
             )
 
     def show_last_update_date(self):
         try:
             with open(self._LAST_UPDATE_FILE, encoding="utf-8") as f:
                 date = f.read().strip()
-            messagebox.showinfo("HOME情報更新日", f"最終更新日: {date}")
+            messagebox.showinfo("HOME情報更新日", f"最終更新日: {date}", parent=self)
         except FileNotFoundError:
-            messagebox.showinfo("HOME情報更新日", "まだ更新されていません")
+            messagebox.showinfo("HOME情報更新日", "まだ更新されていません", parent=self)
 
     def update_battle_data(self):
         try:
@@ -1145,7 +1147,7 @@ class MainApp(ThemedTk):
                 if remote_date == local_date:
                     self.after(0, progress_win.destroy)
                     self.after(
-                        0, lambda: messagebox.showinfo("構築記事取得", "最新データです")
+                        0, lambda: messagebox.showinfo("構築記事取得", "最新データです", parent=self)
                     )
                     return
                 self._download_stats_files(self._BATTLE_FILES, _update)
@@ -1170,19 +1172,19 @@ class MainApp(ThemedTk):
         if success:
             with open(self._LAST_BATTLE_UPDATE_FILE, "w", encoding="utf-8") as f:
                 f.write(remote_date)
-            messagebox.showinfo("構築記事取得", "更新が完了しました")
+            messagebox.showinfo("構築記事取得", "更新が完了しました", parent=self)
         else:
             messagebox.showerror(
-                "構築記事取得", f"更新中にエラーが発生しました\n{(error or '')[:300]}"
+                "構築記事取得", f"更新中にエラーが発生しました\n{(error or '')[:300]}", parent=self
             )
 
     def show_last_battle_update_date(self):
         try:
             with open(self._LAST_BATTLE_UPDATE_FILE, encoding="utf-8") as f:
                 date = f.read().strip()
-            messagebox.showinfo("構築記事取得日", f"最終更新日: {date}")
+            messagebox.showinfo("構築記事取得日", f"最終更新日: {date}", parent=self)
         except FileNotFoundError:
-            messagebox.showinfo("構築記事取得日", "まだ更新されていません")
+            messagebox.showinfo("構築記事取得日", "まだ更新されていません", parent=self)
 
     # アップデート確認
     def _get_current_version(self) -> str:
@@ -1216,14 +1218,14 @@ class MainApp(ThemedTk):
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception as e:
             messagebox.showerror(
-                "アップデート確認", f"確認中にエラーが発生しました\n{e}"
+                "アップデート確認", f"確認中にエラーが発生しました\n{e}", parent=self
             )
             return
 
         latest = data["tag_name"].lstrip("v")
 
         if self._parse_version(latest) <= self._parse_version(current):
-            messagebox.showinfo("アップデート確認", f"最新バージョンです（v{current}）")
+            messagebox.showinfo("アップデート確認", f"最新バージョンです（v{current}）", parent=self)
             return
 
         assets = [
@@ -1233,7 +1235,7 @@ class MainApp(ThemedTk):
         ]
         if not assets:
             messagebox.showerror(
-                "アップデート確認", "ダウンロードファイルが見つかりませんでした"
+                "アップデート確認", "ダウンロードファイルが見つかりませんでした", parent=self
             )
             return
 
@@ -1241,6 +1243,7 @@ class MainApp(ThemedTk):
             "アップデート確認",
             f"新しいバージョンがあります\n\n現在: v{current}  →  最新: v{latest}\n\n"
             "アップデートしますか？\n（パーティやDBのデータは保持されます）",
+            parent=self,
         ):
             return
 
@@ -1250,7 +1253,7 @@ class MainApp(ThemedTk):
         import urllib.request
 
         if not getattr(sys, "frozen", False):
-            messagebox.showinfo("アップデート", "開発環境ではアップデートできません")
+            messagebox.showinfo("アップデート", "開発環境ではアップデートできません", parent=self)
             return
 
         app_dir = os.path.dirname(sys.executable)
@@ -1360,7 +1363,7 @@ class MainApp(ThemedTk):
                     lambda: (
                         progress_win.destroy(),
                         messagebox.showerror(
-                            "アップデート", f"ダウンロードエラー\n{err}"
+                            "アップデート", f"ダウンロードエラー\n{err}", parent=self
                         ),
                     ),
                 )
@@ -1379,7 +1382,7 @@ class MainApp(ThemedTk):
 
     # フォーム選択画面
     def form_select(self, no: int):
-        dialog = FormSelect()
+        dialog = FormSelect(self)
         dialog.set_pokemon(no)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
@@ -1387,17 +1390,17 @@ class MainApp(ThemedTk):
 
     # 個体管理画面
     def open_box(self):
-        dialog = BoxDialog()
+        dialog = BoxDialog(self)
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
 
     # 対戦履歴画面
     def open_records(self):
-        dialog = record.Record()
+        dialog = record.Record(self)
         dialog.open()
 
     # 対戦分析画面
     def open_analytics(self):
-        dialog = analytics.Analytics()
+        dialog = analytics.Analytics(self)
         dialog.open()
 
     # DBバックアップ
@@ -1415,9 +1418,9 @@ class MainApp(ThemedTk):
             return
         try:
             shutil.copy2("database/battle.db", path)
-            messagebox.showinfo("完了", f"バックアップを保存しました。\n{path}")
+            messagebox.showinfo("完了", f"バックアップを保存しました。\n{path}", parent=self)
         except Exception as e:
-            messagebox.showerror("エラー", f"バックアップに失敗しました。\n{e}")
+            messagebox.showerror("エラー", f"バックアップに失敗しました。\n{e}", parent=self)
 
     def on_change_transport(self, event):
         # -transparentcolor は Windows 専用の Tk 属性

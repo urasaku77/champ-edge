@@ -125,6 +125,8 @@ def _download_file(url: str, dest: str, label: str, log_fn) -> None:
 class TesseractSetupDialog(tkinter.Toplevel):
     def __init__(self, parent=None):
         super().__init__(parent)
+        if parent is not None:
+            self.transient(parent)
         self.title("Tesseract セットアップ")
         self.resizable(False, False)
         self._build_ui()

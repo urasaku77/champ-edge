@@ -147,7 +147,7 @@ class PartyFrame(ttk.LabelFrame):
         except Exception:
             import traceback
             from tkinter import messagebox
-            messagebox.showerror("エラー", f"パーティ編集画面を開けませんでした:\n{traceback.format_exc()}")
+            messagebox.showerror("エラー", f"パーティ編集画面を開けませんでした:\n{traceback.format_exc()}", parent=self)
 
     def on_push_load_button(self):
         self._stage.load_party(self._player)
@@ -519,6 +519,8 @@ class ActivePokemonFrame(ttk.LabelFrame):
         win = tkinter.Toplevel(self)
         win.title("定数ダメージ一覧")
         win.resizable(False, False)
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
         content = (
             "■ 状態異常\n"
             "─────────────────────────────────────────────\n"
@@ -636,6 +638,8 @@ class ActivePokemonFrame(ttk.LabelFrame):
         import math
         popup = tkinter.Toplevel(self)
         popup.title(title)
+        popup.transient(self.winfo_toplevel())
+        popup.grab_set()
         width = 350
         text = effect if effect else "効果情報なし"
         height = 80 + math.ceil(len(text) * 7.5 / (width - 40)) * 20
@@ -865,7 +869,7 @@ class StatusFrame(ttk.LabelFrame):
             )
 
     def show_pokemon_memo(self):
-        dialog = PokemonMemoLabelDialog()
+        dialog = PokemonMemoLabelDialog(self.winfo_toplevel())
         dialog.open(self._pokemon.memo, location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
@@ -880,7 +884,7 @@ class StatusFrame(ttk.LabelFrame):
         except FileNotFoundError:
             pass
 
-        dialog = PokemonMemoLabelDialog()
+        dialog = PokemonMemoLabelDialog(self.winfo_toplevel())
         dialog.open(memo, location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 

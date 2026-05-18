@@ -11,8 +11,8 @@ from recog.recog import get_recog_value
 
 
 class Analytics(tkinter.Toplevel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, master=None):
+        super().__init__(master)
         self.title("対戦分析")
 
         before_recent_date = DB_battle.get_recent_date()[0]
