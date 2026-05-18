@@ -42,7 +42,7 @@ from pokedata.const import Types
 from pokedata.pokemon import Pokemon
 from pokedata.stats import StatsKey
 from recog.capture import Capture
-from recog.recog import CaptureSetting, ModeSetting, get_recog_value
+from recog.recog import BgmSetting, CaptureSetting, ModeSetting, get_recog_value
 from stats.search import get_similar_party
 
 _IS_MAC = sys.platform == "darwin"
@@ -251,6 +251,7 @@ class MainApp(ThemedTk):
         )
         menu.add_cascade(label="アプリ設定", command=self.mode_setting)
         menu.add_cascade(label="キャプチャ設定", command=self.capture_setting)
+        menu.add_cascade(label="BGM設定", command=self.bgm_setting)
         menu.add_cascade(label="パーティ編集", command=self.edit_party_csv)
         menu.add_cascade(label="ボックス編集", command=self.open_box)
         menu.add_cascade(label="対戦履歴", command=self.open_records)
@@ -777,6 +778,12 @@ class MainApp(ThemedTk):
         dialog.open(location=(self.winfo_x(), self.winfo_y()))
         self.wait_window(dialog)
 
+    # BGM設定画面
+    def bgm_setting(self):
+        dialog = BgmSetting()
+        dialog.open(location=(self.winfo_x(), self.winfo_y()))
+        self.wait_window(dialog)
+
     # モード切替画面
     def mode_setting(self):
         dialog = ModeSetting()
@@ -817,6 +824,8 @@ class MainApp(ThemedTk):
         else:
             self.capture.phase = "sensyutu"
             self.capture.party_recognized = False
+            self.capture._sensyutu_end_disappeared_time = None
+            self.capture.start_bgm1()
             self.party_frames[0].on_push_load_button()
             self.after(2000, self.loop_image_recognize)
 
@@ -865,8 +874,10 @@ class MainApp(ThemedTk):
                     self.timer_frame.reset_button_clicked()
                     self.timer_frame.start_button_clicked()
                     self.party_frames[0].set_first_chosen_to_active()
-                    self.stop_image_recognize()
-                    return
+                    # ループ継続（in_battleフェーズで勝敗検知）
+            case "win":
+                self.stop_image_recognize()
+                return
             case int() | float():
                 if result != -1:
                     self.record_frame.rank.delete(0, tkinter.END)

@@ -38,7 +38,9 @@ class Obs(object):
             },
         )
         ret = await self.ws.call(request)
-        if ret.ok():  # Check if the request succeeded
+        if ret.ok():
             return ret
         else:
             return
+
+

@@ -1,15 +1,19 @@
 import asyncio
 import base64
 import glob
+import json
 import os
+import random
 import re
 import threading
+import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
 import numpy as np
+import pygame
 import pyocr
 import pyocr.builders
 from PIL import Image
@@ -26,7 +30,12 @@ class Capture:
         self.coords = ConfCoordinate()
         self.path_tesseract = get_tesseract_path()
 
-        # sensyutu(選出画面)→rate(レート確認)→battle(対戦開始待ち)
+        # フェーズ遷移:
+        #   sensyutu(選出画面) BGM①
+        #     → rate(レート確認) BGM①→②(選出終了3秒後)
+        #     → battle(対戦開始待ち) BGM②
+        #     → in_battle(対戦中) BGM②
+        #     → wait(勝敗確定後) BGM①
         self.phase = "sensyutu"
         self.banme = 0
         self.sensyutu_num = 3 if get_recog_value("rule") == 1 else 4
@@ -35,6 +44,60 @@ class Capture:
         self.pokecrop_imgs: list[Image.Image] = []
         self.on_party_start_progress = None  # callback(total: int)
         self.on_party_progress = None  # callback(current: int, total: int)
+
+        self._bgm_enabled: bool = False
+        self._bgm1_folder: str = ""
+        self._bgm2_folder: str = ""
+        self._bgm_playing: str = ""
+        self._sensyutu_end_disappeared_time: float | None = None
+        self._load_bgm_config()
+        try:
+            pygame.mixer.init()
+        except Exception:
+            pass
+
+    _AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"}
+
+    def _load_bgm_config(self):
+        try:
+            with open("recog/bgm.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._bgm_enabled = data.get("bgm_enabled", False)
+            self._bgm1_folder = data.get("bgm1_folder", "")
+            self._bgm2_folder = data.get("bgm2_folder", "")
+        except Exception:
+            pass
+
+    def _pick_random_bgm(self, folder: str) -> str:
+        try:
+            if not folder or not os.path.isdir(folder):
+                return ""
+            files = [
+                f
+                for f in os.listdir(folder)
+                if os.path.splitext(f)[1].lower() in self._AUDIO_EXTENSIONS
+            ]
+            return os.path.join(folder, random.choice(files)) if files else ""
+        except Exception:
+            return ""
+
+    def _switch_bgm(self, bgm_num: int):
+        if not self._bgm_enabled:
+            return
+        folder = self._bgm1_folder if bgm_num == 1 else self._bgm2_folder
+        path = self._pick_random_bgm(folder)
+        if not path:
+            return
+        try:
+            pygame.mixer.music.load(path)
+            pygame.mixer.music.play(-1)
+            self._bgm_playing = f"bgm{bgm_num}"
+            print(f"[BGM] playing bgm{bgm_num}: {path}")
+        except Exception as e:
+            print(f"[BGM] error: {e}")
+
+    def start_bgm1(self):
+        self._switch_bgm(1)
 
     # Websocket接続
     def connect_websocket(self):
@@ -45,6 +108,8 @@ class Capture:
             )
             self.phase = "sensyutu"
             self.party_recognized = False
+            self._sensyutu_end_disappeared_time = None
+            self._load_bgm_config()
             return True
         except Exception:
             return False
@@ -52,7 +117,13 @@ class Capture:
     # Websocket切断
     def disconnect_websocket(self):
         try:
+            if self._bgm_enabled:
+                try:
+                    pygame.mixer.music.stop()
+                except Exception:
+                    pass
             self.loop.run_until_complete(self.obs.break_request())
+            self._bgm_playing = ""
             return True
         except Exception:
             return False
@@ -73,7 +144,6 @@ class Capture:
         img1 = self.img[coord.top : coord.bottom, coord.left : coord.right]
         cv2.imwrite(savePath, img1)
 
-    # フェーズに応じて画像認識処理
     def image_recognize(self):
         match self.phase:
             case "sensyutu":
@@ -82,14 +152,17 @@ class Capture:
                 return self.recognize_rate()
             case "battle":
                 return self.recognize_battle()
+            case "in_battle":
+                return self.recognize_in_battle()
+            case "wait":
+                return self.recognize_wait()
 
-    # 選出画面検知
     def chose_pokemon(self):
         return self.is_exist_image(
             "image/recogImg/situation/recogSensyutu.jpg", 0.8, "sensyutu"
         )
 
-    # ①選出フェーズ: 相手パーティ解析＋選出番号取得、対戦準備中画面を検知したらrateへ移行
+    # ①sensyutu: 相手パーティ解析・選出番号取得 → 対戦準備中画面でrateへ
     def recognize_sensyutu(self):
         self.get_screenshot()
         if self.chose_pokemon():
@@ -114,10 +187,24 @@ class Capture:
                 self.phase = "rate"
             return None
 
-    # ②レートフェーズ: oporate1座標からOCRでレート取得を毎回試みる、battleへ移行
-    # rate.jpgテンプレート検出に頼らず常にOCRを実行（テンプレート不一致でスキップされる問題を回避）
+    # ②rate: OCRでレート取得 → レート確認またはbattle画像検知でbattleへ / 選出終了3秒後にBGM②へ切り替え
     def recognize_rate(self):
         self.get_screenshot()
+
+        # sensyutu_end が消えてから5秒後にBGM②へ切り替え
+        if self.is_exist_image(
+            "image/recogImg/situation/recogSensyutu.jpg", 0.55, "sensyutu_end"
+        ):
+            self._sensyutu_end_disappeared_time = None
+        else:
+            if self._sensyutu_end_disappeared_time is None:
+                self._sensyutu_end_disappeared_time = time.time()
+            elif (
+                self._bgm_playing != "bgm2"
+                and time.time() - self._sensyutu_end_disappeared_time >= 3.0
+            ):
+                self._switch_bgm(2)
+
         coord = self.coords.dicCoord["oporate1"]
         img = self.img[coord.top : coord.bottom, coord.left : coord.right]
         try:
@@ -131,9 +218,13 @@ class Capture:
                 tools = pyocr.get_available_tools()
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 gray = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-                _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                _, binary = cv2.threshold(
+                    gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+                )
                 binary = cv2.bitwise_not(binary)
-                padded = cv2.copyMakeBorder(binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+                padded = cv2.copyMakeBorder(
+                    binary, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255
+                )
                 builder = pyocr.builders.TextBuilder(tesseract_layout=7)
                 rate_str = tools[0].image_to_string(
                     Image.fromarray(padded), lang="eng", builder=builder
@@ -145,23 +236,44 @@ class Capture:
         m = re.search(r"\d{3,5}(?:\.\d+)?", rate_clean)
         if m:
             self.phase = "battle"
+            if self._bgm_playing != "bgm2":
+                self._switch_bgm(2)
             return float(m.group())
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
             self.phase = "battle"
+            if self._bgm_playing != "bgm2":
+                self._switch_bgm(2)
         return None
 
-    # ③バトルフェーズ: recogBattle.jpgをbattle座標から検知、タイマー起動トリガー
+    # ③battle: recogBattle.jpg検知でin_battleへ → タイマー起動トリガー
     def recognize_battle(self):
         self.get_screenshot()
         if self.is_exist_image(
             "image/recogImg/situation/recogBattle.jpg", 0.8, "battle"
         ):
-            self.phase = "sensyutu"
+            self.phase = "in_battle"
             self.party_recognized = False
+            if self._bgm_playing != "bgm2":
+                self._switch_bgm(2)
             return True
         return False
+
+    # ④in_battle: win.jpg検知でwaitへ → BGM①へ切り替え
+    def recognize_in_battle(self):
+        self.get_screenshot()
+        if self.is_exist_image(
+            "image/recogImg/situation/win.jpg", 0.7, "winleft"
+        ) or self.is_exist_image("image/recogImg/situation/win.jpg", 0.7, "winright"):
+            self.phase = "wait"
+            self._switch_bgm(1)
+            return "win"
+        return None
+
+    # ⑤wait: BGM①再生中、次の選出画面を待機
+    def recognize_wait(self):
+        return "wait"
 
     # 選出取得（手動キャプチャ用）
     def recognize_chosen_capture(self):

@@ -18,6 +18,8 @@ _SETTING_DEFAULTS = {
     "panipani_auto": True,
     "terastal_enabled": True,
     "mega_enabled": True,
+    "dynamax_enabled": True,
+    "zmove_enabled": True,
     "tesseract_path": "",
 }
 
@@ -197,56 +199,52 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.panipani_auto_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
 
-        # チェックボックス7
+        # チェックボックス7〜10（4つ横並び）
+        mode_frame = tkinter.Frame(self)
+        mode_frame.grid(row=8, column=0, columnspan=2, pady=5)
+
         self.terastal_enabled_var = tkinter.BooleanVar()
         self.terastal_enabled_var.set(self.initial_data.get("terastal_enabled", True))
-        self.terastal_enabled_checkbox = tkinter.Checkbutton(
-            self,
-            text="テラスタル有効",
-            variable=self.terastal_enabled_var,
-        )
-        self.terastal_enabled_checkbox.grid(row=8, column=0, columnspan=2, pady=5)
+        tkinter.Checkbutton(
+            mode_frame, text="テラスタル", variable=self.terastal_enabled_var
+        ).pack(side="left", padx=5)
 
-        # チェックボックス8
         self.mega_enabled_var = tkinter.BooleanVar()
         self.mega_enabled_var.set(self.initial_data.get("mega_enabled", True))
-        self.mega_enabled_checkbox = tkinter.Checkbutton(
-            self,
-            text="メガシンカ有効",
-            variable=self.mega_enabled_var,
-        )
-        self.mega_enabled_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
-
-        # Tesseractセットアップ
-        tess_frame = ttk.Frame(self)
-        MyButton(
-            tess_frame, text="Tesseract セットアップ", command=self.open_tesseract_setup
+        tkinter.Checkbutton(
+            mode_frame, text="メガシンカ", variable=self.mega_enabled_var
         ).pack(side="left", padx=5)
-        tess_frame.grid(row=10, column=0, columnspan=2, pady=5)
+
+        self.dynamax_enabled_var = tkinter.BooleanVar()
+        self.dynamax_enabled_var.set(self.initial_data.get("dynamax_enabled", True))
+        tkinter.Checkbutton(
+            mode_frame, text="ダイマックス", variable=self.dynamax_enabled_var
+        ).pack(side="left", padx=5)
+
+        self.zmove_enabled_var = tkinter.BooleanVar()
+        self.zmove_enabled_var.set(self.initial_data.get("zmove_enabled", True))
+        tkinter.Checkbutton(
+            mode_frame, text="Z技", variable=self.zmove_enabled_var
+        ).pack(side="left", padx=5)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=11, column=0, pady=10)
+        self.submit_button.grid(row=10, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=11, column=1, pady=10)
+        self.cancel_button.grid(row=10, column=1, pady=10)
         caution = ttk.Label(
             self,
-            text="※ルール・テラスタル・メガシンカの変更は再起動が必要です。",
+            text="※ルール・テラスタル・メガシンカ・ダイマックス・Z技の変更は再起動が必要です。",
             foreground="red",
             padding=10,
         )
-        caution.grid(row=12, column=0, columnspan=2, pady=5)
+        caution.grid(row=11, column=0, columnspan=2, pady=5)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
         self.focus_set()
         self.geometry("+{0}+{1}".format(location[0], location[1]))
-
-    def open_tesseract_setup(self):
-        from recog.tesseract_setup import TesseractSetupDialog
-        dialog = TesseractSetupDialog(self)
-        self.wait_window(dialog)
 
     def submit_form(self):
         # 入力された値をJSONファイルに保存
@@ -261,6 +259,8 @@ class ModeSetting(tkinter.Toplevel):
             "panipani_auto": self.panipani_auto_var.get(),
             "terastal_enabled": self.terastal_enabled_var.get(),
             "mega_enabled": self.mega_enabled_var.get(),
+            "dynamax_enabled": self.dynamax_enabled_var.get(),
+            "zmove_enabled": self.zmove_enabled_var.get(),
         }
 
         # tesseract_path は TesseractSetupDialog が直接保存するため、
@@ -278,6 +278,68 @@ class ModeSetting(tkinter.Toplevel):
         self.destroy()
 
     def on_push_button(self):
+        self.destroy()
+
+
+class BgmSetting(tkinter.Toplevel):
+    def __init__(self, title: str = "BGM設定"):
+        super().__init__()
+        self.title(title)
+        self.path = "recog/bgm.json"
+
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                self.initial_data = json.load(f)
+        except FileNotFoundError:
+            self.initial_data = {"bgm_enabled": False, "bgm1_folder": "", "bgm2_folder": ""}
+
+        self.bgm_enabled_var = tkinter.BooleanVar(value=self.initial_data.get("bgm_enabled", False))
+        tkinter.Checkbutton(self, text="BGM有効", variable=self.bgm_enabled_var).grid(
+            row=0, column=0, columnspan=3, padx=10, pady=5, sticky="w"
+        )
+
+        tkinter.Label(self, text="BGM①フォルダ\n(選出・待機中):").grid(row=2, column=0, padx=10, pady=5, sticky="e")
+        self.bgm1_var = tkinter.StringVar(value=self.initial_data.get("bgm1_folder", ""))
+        self.bgm1_entry = tkinter.Entry(self, textvariable=self.bgm1_var, width=45)
+        self.bgm1_entry.grid(row=2, column=1, padx=10, pady=5)
+        MyButton(self, text="参照", command=self._browse_bgm1).grid(row=2, column=2, padx=5)
+
+        tkinter.Label(self, text="BGM②フォルダ\n(対戦中):").grid(row=3, column=0, padx=10, pady=5, sticky="e")
+        self.bgm2_var = tkinter.StringVar(value=self.initial_data.get("bgm2_folder", ""))
+        self.bgm2_entry = tkinter.Entry(self, textvariable=self.bgm2_var, width=45)
+        self.bgm2_entry.grid(row=3, column=1, padx=10, pady=5)
+        MyButton(self, text="参照", command=self._browse_bgm2).grid(row=3, column=2, padx=5)
+
+        btn_frame = tkinter.Frame(self)
+        btn_frame.grid(row=4, column=0, columnspan=3, pady=10)
+        MyButton(btn_frame, text="保存", command=self.submit_form).pack(side="left", padx=10)
+        MyButton(btn_frame, text="キャンセル", command=self.destroy).pack(side="left", padx=10)
+
+    def open(self, location=tuple[int, int]):
+        self.grab_set()
+        self.focus_set()
+        self.geometry("+{0}+{1}".format(location[0], location[1]))
+
+    def _browse_bgm1(self):
+        from tkinter import filedialog
+        folder = filedialog.askdirectory(title="BGM①フォルダを選択")
+        if folder:
+            self.bgm1_var.set(folder)
+
+    def _browse_bgm2(self):
+        from tkinter import filedialog
+        folder = filedialog.askdirectory(title="BGM②フォルダを選択")
+        if folder:
+            self.bgm2_var.set(folder)
+
+    def submit_form(self):
+        data = {
+            "bgm_enabled": self.bgm_enabled_var.get(),
+            "bgm1_folder": self.bgm1_var.get(),
+            "bgm2_folder": self.bgm2_var.get(),
+        }
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
         self.destroy()
 
 
@@ -299,6 +361,8 @@ def get_recog_value(key: str):
         "panipani_auto",
         "terastal_enabled",
         "mega_enabled",
+        "dynamax_enabled",
+        "zmove_enabled",
         "tesseract_path",
         "source_name",
         "host_name",
