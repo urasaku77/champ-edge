@@ -988,8 +988,6 @@ class EvEditors(ttk.Frame):
     def init_all_value(self):
         for i in range(6):
             self.ev_list[i]._ev_entry.value.set(0)
-            self.ev_list[i]._ev_entry.delete(0, tkinter.END)
-            self.ev_list[i]._ev_entry.insert(0, 0)
 
     def get_all_ev(self):
         status_list = ["H", "A", "B", "C", "D", "S"]
@@ -1029,7 +1027,6 @@ class EvEditor(ttk.Frame):
             width=3,
             validatecommand=(self.validate_cmd_2, "%P", "%V"),
         )
-        self._ev_entry.insert(0, 0)
         self._ev_entry.pack(side="left")
 
         self._ev_count_up = tkinter.Button(
@@ -1046,11 +1043,9 @@ class EvEditor(ttk.Frame):
 
     def set_value(self, value: int, override: bool):
         if override:
-            self._ev_entry.delete(0, tkinter.END)
             self._ev_entry.value.set(value)
         else:
             new_val = max(0, min(32, self._ev_entry.value.get() + value))
-            self._ev_entry.delete(0, tkinter.END)
             self._ev_entry.value.set(new_val)
 
     def setCallback(self, func):
