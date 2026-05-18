@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """配布用zipを作成する。
 
---full : setup.bat 付きの配布用（既存フォルダに上書き展開して使う）
-引数なし: アップデート用（setup.bat なし）
-
-どちらもユーザーデータ（battle.db / setting.json 等）は除外するため、
-既存の ChampEdge フォルダに上書き展開してもデータが消えない。
+--full : 新規インストール用（全ファイル含む）
+引数なし: アップデート用（ユーザーデータ除外）
 
 zip構造:
   champedge.exe        ← exeファイル
   _internal/           ← Pythonライブラリ群（PyInstallerが生成）
   image/               ← ポケモン画像
-  database/            ← DBスキーマ等（battle.db は除外）
+  database/            ← DBファイル
   stats/               ← 統計データ
-  recog/               ← テンプレート画像（setting.json は除外）
-  party/               ← パーティ設定（csv/txt は除外）
+  recog/               ← テンプレート画像・設定
+  party/               ← パーティ設定
   version.txt
 """
 import os
@@ -31,7 +28,6 @@ BUILD_DIR = os.path.join("dist", "champedge")
 _DATA_ROOTS = [
     "version.txt",
     "README.pdf",
-    "setup.bat",
     "image",
     "database",
     "stats",
@@ -39,13 +35,13 @@ _DATA_ROOTS = [
     "party",
 ]
 
-# 常に除外するパス
+# フルインストール・アップデート共通で除外するパス
 _ALWAYS_EXCLUDE = {
     "image/readme",
 }
 
-# ユーザーデータ（フル・アップデート共通で除外）
-_USER_DATA_EXCLUDE = {
+# アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
+_UPDATE_EXCLUDE = {
     "database/battle.db",
     "stats",
     "party/csv",
@@ -58,11 +54,6 @@ _USER_DATA_EXCLUDE = {
     "tessdata",
 }
 
-# アップデートzipのみ除外（フルzipには含める）
-_UPDATE_ONLY_EXCLUDE = {
-    "setup.bat",
-}
-
 
 def _excluded(arc: str, full: bool) -> bool:
     path = arc.replace("\\", "/")
@@ -71,11 +62,9 @@ def _excluded(arc: str, full: bool) -> bool:
         return True
     if any(path == e or path.startswith(e + "/") for e in _ALWAYS_EXCLUDE):
         return True
-    if any(path == e or path.startswith(e + "/") for e in _USER_DATA_EXCLUDE):
-        return True
-    if not full and any(path == e or path.startswith(e + "/") for e in _UPDATE_ONLY_EXCLUDE):
-        return True
-    return False
+    if full:
+        return False
+    return any(path == e or path.startswith(e + "/") for e in _UPDATE_EXCLUDE)
 
 
 def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:
