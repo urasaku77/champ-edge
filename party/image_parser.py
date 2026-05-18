@@ -384,28 +384,25 @@ def _identify_pokemon(
     moves: list[str],
     used_names: set[str] | None = None,
 ) -> str:
-    """①〜⑦のシグナルを順に適用してポケモン名を確定する。
+    """② OCR名前を③特性・HOME技で保証してから確定。即確定は⑤メガストーンのみ。
+    ① スプライトマッチングはランキング上位候補の再評価に使う最終保険。
 
-    ① image/pokemon/ テンプレートマッチ → スコア順候補リスト
-    ② ポケモン名OCR 完全一致 → 即確定
-    ③ 特性フィルタ
-    ④ タイプアイコン（テンプレートマッチ）
-       ①-④ で候補が1件 → 確定
+    ② OCR名前 → ③特性 + HOME技で保証 → 確定
     ⑤ メガストーン → 即確定
+    ③ 特性フィルタ
+    ④ タイプアイコンフィルタ
     ⑥ HOME技フィルタ
-    ⑦ HOMEランキング順で最終選択
+    ⑦ HOMEランキング順
+    ① スプライトマッチング（保険・最終手段）
+    ⑧ 技ゼロマッチ検証
+    ⑨ 重複排除
     """
     from database.pokemon import DB_pokemon
 
     _load_reference_lists()
-
-    # ① スプライトテンプレートマッチング → スコア順候補リスト
-    sprite_matches = _match_pokemon_sprite(card)
-    img_pids = set(_load_pokemon_sprite_templates().keys())
-    candidates: list[str] = [pid for _, pid in sprite_matches] if sprite_matches else list(img_pids)
+    ocr_moves = {m for m in moves if m}
 
     # ② ポケモン名OCR（タイプアイコン等のノイズをカタカナ・漢字のみ抽出して除去）
-    # + 特性クロスバリデーション（ニックネーム衝突防止）
     _name_norm = _normalize(name_raw)
     name_clean = "".join(
         ch for ch in _name_norm
@@ -414,8 +411,25 @@ def _identify_pokemon(
         or ch in "♂♀（）"
     )
     ocr_name = _closest_match(name_clean, _pokemon_names, cutoff=0.85) if name_clean else ""
-    if ocr_name and (name_clean == ocr_name or _ability_matches_pokemon(ocr_name, abil)):
-        return ocr_name
+
+    # ⑤ メガストーン → 即確定（最優先）
+    if item and "ナイト" in item:
+        stem = re.sub(r"ナイト[XYＸＹxy]?$", "", item).strip()
+        if stem:
+            mega_name = _closest_match(stem, _pokemon_names, cutoff=0.45)
+            if mega_name:
+                return mega_name
+
+    # ② OCR名前 → ③特性 + HOME技で保証 → 確定
+    if ocr_name:
+        abil_ok = not abil or _ability_matches_pokemon(ocr_name, abil)
+        move_ok = not ocr_moves or bool(ocr_moves & _load_home_waza().get(ocr_name, set()))
+        if abil_ok and move_ok:
+            return ocr_name
+
+    # 候補リスト：画像ファイルのある全PIDから開始
+    img_pids = set(_load_pokemon_sprite_templates().keys())
+    candidates: list[str] = list(img_pids)
 
     # ③ 特性フィルタ（空になる場合は無視）
     if abil:
@@ -431,22 +445,9 @@ def _identify_pokemon(
         if type_filtered:
             candidates = type_filtered
 
-    # ①-④ で1候補に絞れたら確定
-    if len(candidates) == 1:
-        return DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or ""
-
-    # ⑤ メガストーン → 直接特定
-    if item and "ナイト" in item:
-        stem = re.sub(r"ナイト[XYＸＹxy]?$", "", item).strip()
-        if stem:
-            mega_name = _closest_match(stem, _pokemon_names, cutoff=0.45)
-            if mega_name:
-                return mega_name
-
     # ⑥ HOME技フィルタ（空になる場合は無視）
-    ocr_moves = {m for m in moves if m}
+    home_waza = _load_home_waza()
     if ocr_moves:
-        home_waza = _load_home_waza()
         move_filtered = [
             pid for pid in candidates
             if ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(pid) or "", set())
@@ -454,18 +455,26 @@ def _identify_pokemon(
         if move_filtered:
             candidates = move_filtered
 
-    # ⑦ HOMEランキング順で最終選択
+    # ⑦ HOMEランキング順ソート
     ranking = _load_ranking()
     if ranking:
         ranking_idx = {pid: i for i, pid in enumerate(ranking)}
         candidates.sort(key=lambda p: ranking_idx.get(p, len(ranking)))
 
+    # ① スプライトマッチング（保険：ランキング上位10件をスプライトスコアで再評価）
+    sprite_matches = _match_pokemon_sprite(card)
+    if sprite_matches and len(candidates) > 1:
+        sprite_score = {pid: score for score, pid in sprite_matches}
+        top_n = min(10, len(candidates))
+        top = sorted(candidates[:top_n], key=lambda p: -sprite_score.get(p, 0.0))
+        candidates = top + candidates[top_n:]
+
     # ⑧ 技ゼロマッチ検証（candidates[0]の技が全滅かつ合致する別候補があれば差し替え）
     if ocr_moves and len(candidates) > 1:
-        home_waza = _load_home_waza()
         if not (ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "", set())):
             alt = next(
-                (p for p in candidates[1:] if ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(p) or "", set())),
+                (p for p in candidates[1:]
+                 if ocr_moves & home_waza.get(DB_pokemon.get_pokemon_name_by_pid(p) or "", set())),
                 None,
             )
             if alt is not None:
