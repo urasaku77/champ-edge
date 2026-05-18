@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """配布用zipを作成する。
 
---full : 新規インストール用（全ファイル含む）
-引数なし: アップデート用（ユーザーデータ除外）
+--full : setup.bat 付きの配布用（既存フォルダに上書き展開して使う）
+引数なし: アップデート用（setup.bat なし）
+
+どちらもユーザーデータ（battle.db / setting.json 等）は除外するため、
+既存の ChampEdge フォルダに上書き展開してもデータが消えない。
 
 zip構造:
   champedge.exe        ← exeファイル
   _internal/           ← Pythonライブラリ群（PyInstallerが生成）
   image/               ← ポケモン画像
-  database/            ← DBファイル
+  database/            ← DBスキーマ等（battle.db は除外）
   stats/               ← 統計データ
-  recog/               ← テンプレート画像・設定
-  party/               ← パーティ設定
+  recog/               ← テンプレート画像（setting.json は除外）
+  party/               ← パーティ設定（csv/txt は除外）
   version.txt
 """
 import os
@@ -36,14 +39,13 @@ _DATA_ROOTS = [
     "party",
 ]
 
-# フルインストール・アップデート共通で除外するパス
+# 常に除外するパス
 _ALWAYS_EXCLUDE = {
     "image/readme",
 }
 
-# アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
-_UPDATE_EXCLUDE = {
-    "setup.bat",
+# ユーザーデータ（フル・アップデート共通で除外）
+_USER_DATA_EXCLUDE = {
     "database/battle.db",
     "stats",
     "party/csv",
@@ -56,6 +58,11 @@ _UPDATE_EXCLUDE = {
     "tessdata",
 }
 
+# アップデートzipのみ除外（フルzipには含める）
+_UPDATE_ONLY_EXCLUDE = {
+    "setup.bat",
+}
+
 
 def _excluded(arc: str, full: bool) -> bool:
     path = arc.replace("\\", "/")
@@ -64,9 +71,11 @@ def _excluded(arc: str, full: bool) -> bool:
         return True
     if any(path == e or path.startswith(e + "/") for e in _ALWAYS_EXCLUDE):
         return True
-    if full:
-        return False
-    return any(path == e or path.startswith(e + "/") for e in _UPDATE_EXCLUDE)
+    if any(path == e or path.startswith(e + "/") for e in _USER_DATA_EXCLUDE):
+        return True
+    if not full and any(path == e or path.startswith(e + "/") for e in _UPDATE_ONLY_EXCLUDE):
+        return True
+    return False
 
 
 def _add_entry(zf: zipfile.ZipFile, src: str, arc_base: str, full: bool) -> int:

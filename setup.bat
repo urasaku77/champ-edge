@@ -6,18 +6,13 @@ echo ========================================
 echo  ChampEdge セットアップ
 echo ========================================
 echo.
-
-REM 既にデータがある場合はそのまま起動
-if exist "database\battle.db" (
-    if exist "recog\setting.json" (
-        goto launch
-    )
-)
-
-echo 旧バージョンのフォルダパスを入力してください。
-echo （旧データを引き継がない場合はそのまま Enter）
+echo このファイルがある場所に ChampEdge をインストールします。
 echo.
-set /p OLD_DIR="旧バージョンのフォルダ: "
+echo すでに別フォルダに旧バージョンがある場合は、
+echo そのフォルダパスを入力すると対戦履歴・パーティ等を引き継げます。
+echo （引き継がない場合はそのまま Enter を押してください）
+echo.
+set /p OLD_DIR="旧バージョンのフォルダ（不要なら Enter）: "
 
 if "!OLD_DIR!"=="" goto launch
 if not exist "!OLD_DIR!\champedge.exe" (
