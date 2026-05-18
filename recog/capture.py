@@ -11,6 +11,8 @@ import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+
 import cv2
 import numpy as np
 import pygame
