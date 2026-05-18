@@ -111,7 +111,7 @@ class CaptureSetting(tkinter.Toplevel):
 
 # モード切替画面
 class ModeSetting(tkinter.Toplevel):
-    def __init__(self, master=None, title: str = "モード切替", width: int = 400, height: int = 480):
+    def __init__(self, master=None, title: str = "アプリ設定", width: int = 400, height: int = 480):
         super().__init__(master)
         if master is not None:
             self.transient(master)
@@ -125,21 +125,24 @@ class ModeSetting(tkinter.Toplevel):
         except FileNotFoundError:
             self.initial_data = dict(_SETTING_DEFAULTS)
 
-        # ルールの選択
+        # ── ルール セクション ──
+        tkinter.Label(self, text="ルール", font=("", 10, "bold")).grid(
+            row=0, column=0, columnspan=2, pady=(10, 2)
+        )
+
         self.rule_var = tkinter.IntVar()
         self.rule_var.set(self.initial_data["rule"])
         self.rule_button1 = tkinter.Radiobutton(
             self, text="シングル", variable=self.rule_var, value=1
         )
-        self.rule_button1.grid(row=0, column=0, pady=5)
+        self.rule_button1.grid(row=1, column=0, pady=5)
         self.rule_button2 = tkinter.Radiobutton(
             self, text="ダブル", variable=self.rule_var, value=2
         )
-        self.rule_button2.grid(row=0, column=1, pady=5)
+        self.rule_button2.grid(row=1, column=1, pady=5)
 
-        # メガシンカ・Z技・ダイマックス・テラスタル（ルールの直下、横並び）
         mode_frame = tkinter.Frame(self)
-        mode_frame.grid(row=1, column=0, columnspan=2, pady=5)
+        mode_frame.grid(row=2, column=0, columnspan=2, pady=5)
 
         self.mega_enabled_var = tkinter.BooleanVar()
         self.mega_enabled_var.set(self.initial_data.get("mega_enabled", True))
@@ -165,10 +168,21 @@ class ModeSetting(tkinter.Toplevel):
             mode_frame, text="テラスタル", variable=self.terastal_enabled_var
         ).pack(side="left", padx=5)
 
-        # 水平線（区切り）
-        ttk.Separator(self, orient="horizontal").grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
+        ttk.Label(
+            self,
+            text="※ルールの変更は再起動が必要です。",
+            foreground="red",
+            padding=(10, 2),
+        ).grid(row=3, column=0, columnspan=2, pady=(2, 5))
 
-        # チェックボックス0（起動時バトルデータ自動更新）
+        # 水平線（区切り）
+        ttk.Separator(self, orient="horizontal").grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
+
+        # ── 自動実行 セクション ──
+        tkinter.Label(self, text="自動実行", font=("", 10, "bold")).grid(
+            row=5, column=0, columnspan=2, pady=(2, 5)
+        )
+
         self.battle_data_auto_update_var = tkinter.BooleanVar()
         self.battle_data_auto_update_var.set(self.initial_data.get("battle_data_auto_update", True))
         self.battle_data_auto_update_checkbox = tkinter.Checkbutton(
@@ -176,17 +190,15 @@ class ModeSetting(tkinter.Toplevel):
             text="起動時バトルデータ自動更新",
             variable=self.battle_data_auto_update_var,
         )
-        self.battle_data_auto_update_checkbox.grid(row=3, column=0, columnspan=2, pady=5)
+        self.battle_data_auto_update_checkbox.grid(row=6, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス1
         self.active_chosen_auto_var = tkinter.BooleanVar()
         self.active_chosen_auto_var.set(self.initial_data["active_chosen_auto"])
         self.active_chosen_auto_checkbox = tkinter.Checkbutton(
             self, text="相手選出自動登録モード", variable=self.active_chosen_auto_var
         )
-        self.active_chosen_auto_checkbox.grid(row=4, column=0, columnspan=2, pady=5)
+        self.active_chosen_auto_checkbox.grid(row=7, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス2
         self.capture_monitor_auto_var = tkinter.BooleanVar()
         self.capture_monitor_auto_var.set(self.initial_data["capture_monitor_auto"])
         self.capture_monitor_auto_checkbox = tkinter.Checkbutton(
@@ -194,9 +206,8 @@ class ModeSetting(tkinter.Toplevel):
             text="キャプチャ監視自動開始モード",
             variable=self.capture_monitor_auto_var,
         )
-        self.capture_monitor_auto_checkbox.grid(row=5, column=0, columnspan=2, pady=5)
+        self.capture_monitor_auto_checkbox.grid(row=8, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス3
         self.doryoku_reset_auto_var = tkinter.BooleanVar()
         self.doryoku_reset_auto_var.set(self.initial_data["doryoku_reset_auto"])
         self.doryoku_reset_auto_checkbox = tkinter.Checkbutton(
@@ -204,9 +215,8 @@ class ModeSetting(tkinter.Toplevel):
             text="相手性格変更時自動努力値変更モード",
             variable=self.doryoku_reset_auto_var,
         )
-        self.doryoku_reset_auto_checkbox.grid(row=6, column=0, columnspan=2, pady=5)
+        self.doryoku_reset_auto_checkbox.grid(row=9, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス4
         self.similar_party_auto_var = tkinter.BooleanVar()
         self.similar_party_auto_var.set(self.initial_data["similar_party_auto"])
         self.similar_party_auto_checkbox = tkinter.Checkbutton(
@@ -214,9 +224,8 @@ class ModeSetting(tkinter.Toplevel):
             text="類似パーティ自動検索モード（構築記事）",
             variable=self.similar_party_auto_var,
         )
-        self.similar_party_auto_checkbox.grid(row=7, column=0, columnspan=2, pady=5)
+        self.similar_party_auto_checkbox.grid(row=10, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス5
         self.search_record_auto_var = tkinter.BooleanVar()
         self.search_record_auto_var.set(self.initial_data["search_record_auto"])
         self.search_record_auto_checkbox = tkinter.Checkbutton(
@@ -224,9 +233,8 @@ class ModeSetting(tkinter.Toplevel):
             text="類似パーティ自動検索モード（対戦履歴）",
             variable=self.search_record_auto_var,
         )
-        self.search_record_auto_checkbox.grid(row=8, column=0, columnspan=2, pady=5)
+        self.search_record_auto_checkbox.grid(row=11, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス6
         self.panipani_auto_var = tkinter.BooleanVar()
         self.panipani_auto_var.set(self.initial_data["panipani_auto"])
         self.panipani_auto_checkbox = tkinter.Checkbutton(
@@ -234,19 +242,17 @@ class ModeSetting(tkinter.Toplevel):
             text="ぱにぱにツール自動起動モード",
             variable=self.panipani_auto_var,
         )
-        self.panipani_auto_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
+        self.panipani_auto_checkbox.grid(row=12, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス: TN OCR読み込み
         self.tn_ocr_enabled_var = tkinter.BooleanVar()
         self.tn_ocr_enabled_var.set(self.initial_data.get("tn_ocr_enabled", False))
         self.tn_ocr_enabled_checkbox = tkinter.Checkbutton(
             self,
-            text="相手TN OCR読み込み（精度が低いため推奨しません）",
+            text="相手TN OCR自動読み込み（非推奨）",
             variable=self.tn_ocr_enabled_var,
         )
-        self.tn_ocr_enabled_checkbox.grid(row=10, column=0, columnspan=2, pady=5)
+        self.tn_ocr_enabled_checkbox.grid(row=13, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
-        # チェックボックス: 対戦結果自動登録
         self.battle_record_auto_var = tkinter.BooleanVar()
         self.battle_record_auto_var.set(self.initial_data.get("battle_record_auto", False))
         self.battle_record_auto_checkbox = tkinter.Checkbutton(
@@ -254,21 +260,14 @@ class ModeSetting(tkinter.Toplevel):
             text="対戦結果自動登録（勝敗検知時に自動で記録）",
             variable=self.battle_record_auto_var,
         )
-        self.battle_record_auto_checkbox.grid(row=11, column=0, columnspan=2, pady=5)
+        self.battle_record_auto_checkbox.grid(row=14, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=12, column=0, pady=10)
+        self.submit_button.grid(row=15, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=12, column=1, pady=10)
-        caution = ttk.Label(
-            self,
-            text="※ルール・テラスタル・メガシンカ・ダイマックス・Z技の変更は再起動が必要です。",
-            foreground="red",
-            padding=10,
-        )
-        caution.grid(row=13, column=0, columnspan=2, pady=5)
+        self.cancel_button.grid(row=15, column=1, pady=10)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()

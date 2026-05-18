@@ -299,7 +299,7 @@
 
 - OBSのWebsocket情報を記載する
 
-### モード切り替え
+### アプリ設定
 
 ![モード切り替え](/image/readme/setting_mode.png)
 
