@@ -22,6 +22,7 @@ _SETTING_DEFAULTS = {
     "zmove_enabled": True,
     "tesseract_path": "",
     "tn_ocr_enabled": False,
+    "battle_record_auto": False,
 }
 
 
@@ -238,19 +239,29 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.tn_ocr_enabled_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
 
+        # チェックボックス: 対戦結果自動登録
+        self.battle_record_auto_var = tkinter.BooleanVar()
+        self.battle_record_auto_var.set(self.initial_data.get("battle_record_auto", False))
+        self.battle_record_auto_checkbox = tkinter.Checkbutton(
+            self,
+            text="対戦結果自動登録（勝敗検知時に自動で記録）",
+            variable=self.battle_record_auto_var,
+        )
+        self.battle_record_auto_checkbox.grid(row=10, column=0, columnspan=2, pady=5)
+
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=10, column=0, pady=10)
+        self.submit_button.grid(row=11, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=10, column=1, pady=10)
+        self.cancel_button.grid(row=11, column=1, pady=10)
         caution = ttk.Label(
             self,
             text="※ルール・テラスタル・メガシンカ・ダイマックス・Z技の変更は再起動が必要です。",
             foreground="red",
             padding=10,
         )
-        caution.grid(row=11, column=0, columnspan=2, pady=5)
+        caution.grid(row=12, column=0, columnspan=2, pady=5)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -273,6 +284,7 @@ class ModeSetting(tkinter.Toplevel):
             "dynamax_enabled": self.dynamax_enabled_var.get(),
             "zmove_enabled": self.zmove_enabled_var.get(),
             "tn_ocr_enabled": self.tn_ocr_enabled_var.get(),
+            "battle_record_auto": self.battle_record_auto_var.get(),
         }
 
         # tesseract_path は TesseractSetupDialog が直接保存するため、
@@ -377,6 +389,7 @@ def get_recog_value(key: str):
         "zmove_enabled",
         "tesseract_path",
         "tn_ocr_enabled",
+        "battle_record_auto",
         "source_name",
         "host_name",
         "port",

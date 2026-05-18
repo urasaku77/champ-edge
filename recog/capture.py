@@ -264,12 +264,14 @@ class Capture:
     # ④in_battle: win.jpg検知でwaitへ → BGM①へ切り替え
     def recognize_in_battle(self):
         self.get_screenshot()
-        if self.is_exist_image(
-            "image/recogImg/situation/win.jpg", 0.7, "winleft"
-        ) or self.is_exist_image("image/recogImg/situation/win.jpg", 0.7, "winright"):
+        if self.is_exist_image("image/recogImg/situation/win.jpg", 0.7, "winleft"):
             self.phase = "wait"
             self._switch_bgm(1)
-            return "win"
+            return "winleft"
+        if self.is_exist_image("image/recogImg/situation/win.jpg", 0.7, "winright"):
+            self.phase = "wait"
+            self._switch_bgm(1)
+            return "winright"
         return None
 
     # ⑤wait: BGM①再生中、次の選出画面を待機

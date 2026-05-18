@@ -762,6 +762,13 @@ class MainApp(ThemedTk):
             return
         self.image_recognize()
 
+    def _auto_record_battle(self, result: int):
+        self.record_frame.result = result
+        battle = Battle.set_battle(self.record_frame, self.party_frames, self.chosen_frames)
+        DB_battle.register_battle(dataclasses.astuple(battle))
+        self.record_frame.clear()
+        self.image_recognize()
+
     # 対戦記録情報クリア
     def clear_battle(self):
         self.party_frames[1].on_push_clear_button()
@@ -875,8 +882,10 @@ class MainApp(ThemedTk):
                     self.timer_frame.start_button_clicked()
                     self.party_frames[0].set_first_chosen_to_active()
                     # ループ継続（in_battleフェーズで勝敗検知）
-            case "win":
+            case "winleft" | "winright":
                 self.stop_image_recognize()
+                if get_recog_value("battle_record_auto"):
+                    self._auto_record_battle(1 if result == "winleft" else 0)
                 return
             case int() | float():
                 if result != -1:
