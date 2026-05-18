@@ -91,6 +91,7 @@ class Capture:
         try:
             pygame.mixer.music.load(path)
             pygame.mixer.music.play(-1)
+            pygame.mixer.music.set_volume(0.7)
             self._bgm_playing = f"bgm{bgm_num}"
             print(f"[BGM] playing bgm{bgm_num}: {path}")
         except Exception as e:
@@ -335,6 +336,8 @@ class Capture:
 
     # 相手のTN解析
     def recognize_oppo_tn(self):
+        if not get_recog_value("tn_ocr_enabled"):
+            return ""
         coord = self.coords.dicCoord["opoTn"]
         img = self.img[coord.top : coord.bottom, coord.left : coord.right]
         tn = self.ocr_tn(img)

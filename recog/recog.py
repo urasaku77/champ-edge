@@ -21,6 +21,7 @@ _SETTING_DEFAULTS = {
     "dynamax_enabled": True,
     "zmove_enabled": True,
     "tesseract_path": "",
+    "tn_ocr_enabled": False,
 }
 
 
@@ -227,6 +228,16 @@ class ModeSetting(tkinter.Toplevel):
             mode_frame, text="Z技", variable=self.zmove_enabled_var
         ).pack(side="left", padx=5)
 
+        # チェックボックス: TN OCR読み込み
+        self.tn_ocr_enabled_var = tkinter.BooleanVar()
+        self.tn_ocr_enabled_var.set(self.initial_data.get("tn_ocr_enabled", False))
+        self.tn_ocr_enabled_checkbox = tkinter.Checkbutton(
+            self,
+            text="相手TN OCR読み込み（精度が低いため推奨しません）",
+            variable=self.tn_ocr_enabled_var,
+        )
+        self.tn_ocr_enabled_checkbox.grid(row=9, column=0, columnspan=2, pady=5)
+
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
         self.submit_button.grid(row=10, column=0, pady=10)
         self.cancel_button = MyButton(
@@ -261,6 +272,7 @@ class ModeSetting(tkinter.Toplevel):
             "mega_enabled": self.mega_enabled_var.get(),
             "dynamax_enabled": self.dynamax_enabled_var.get(),
             "zmove_enabled": self.zmove_enabled_var.get(),
+            "tn_ocr_enabled": self.tn_ocr_enabled_var.get(),
         }
 
         # tesseract_path は TesseractSetupDialog が直接保存するため、
@@ -364,6 +376,7 @@ def get_recog_value(key: str):
         "dynamax_enabled",
         "zmove_enabled",
         "tesseract_path",
+        "tn_ocr_enabled",
         "source_name",
         "host_name",
         "port",
