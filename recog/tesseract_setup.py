@@ -4,9 +4,10 @@
 ダウンロード・インストール・日本語パック取得・パス指定を一括で行う。
 tessdata (jpn/eng/osd) はアプリフォルダ直下の tessdata/ に保存する。
 """
+import ctypes
+import ctypes.wintypes as _wt
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import threading
@@ -25,6 +26,57 @@ _WIN_DEFAULT_PATHS = [
     r"C:\Program Files\Tesseract-OCR",
     r"C:\Program Files (x86)\Tesseract-OCR",
 ]
+
+
+class _SHELLEXECUTEINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", _wt.DWORD),
+        ("fMask", _wt.ULONG),
+        ("hwnd", _wt.HWND),
+        ("lpVerb", _wt.LPCWSTR),
+        ("lpFile", _wt.LPCWSTR),
+        ("lpParameters", _wt.LPCWSTR),
+        ("lpDirectory", _wt.LPCWSTR),
+        ("nShow", ctypes.c_int),
+        ("hInstApp", _wt.HINSTANCE),
+        ("lpIDList", ctypes.c_void_p),
+        ("lpClass", _wt.LPCWSTR),
+        ("hkeyClass", _wt.HKEY),
+        ("dwHotKey", _wt.DWORD),
+        ("hIconOrMonitor", ctypes.c_void_p),
+        ("hProcess", _wt.HANDLE),
+    ]
+
+
+def _run_elevated(exe_path: str, args: str, timeout_ms: int = 180_000) -> int:
+    """UAC 昇格（runas）でインストーラを実行し終了コードを返す。"""
+    _SEE_MASK_NOCLOSEPROCESS = 0x00000040
+    _WAIT_TIMEOUT = 0x00000102
+
+    sei = _SHELLEXECUTEINFO()
+    sei.cbSize = ctypes.sizeof(sei)
+    sei.fMask = _SEE_MASK_NOCLOSEPROCESS
+    sei.lpVerb = "runas"
+    sei.lpFile = exe_path
+    sei.lpParameters = args
+    sei.nShow = 1  # SW_SHOWNORMAL
+
+    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+        err = ctypes.get_last_error()
+        if err == 1223:  # ERROR_CANCELLED
+            raise OSError("UAC ダイアログがキャンセルされました")
+        raise OSError(f"ShellExecuteExW 失敗 (error={err})")
+
+    wait_result = ctypes.windll.kernel32.WaitForSingleObject(sei.hProcess, timeout_ms)
+    if wait_result == _WAIT_TIMEOUT:
+        ctypes.windll.kernel32.TerminateProcess(sei.hProcess, 1)
+        ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+        raise TimeoutError(f"インストーラが {timeout_ms // 1000} 秒以内に終了しませんでした")
+
+    exit_code = _wt.DWORD()
+    ctypes.windll.kernel32.GetExitCodeProcess(sei.hProcess, ctypes.byref(exit_code))
+    ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+    return exit_code.value
 
 
 def detect_tesseract() -> str:
@@ -258,15 +310,23 @@ class TesseractSetupDialog(tkinter.Toplevel):
                     tmp_path = tmp.name
                 _download_file(asset["browser_download_url"], tmp_path, "installer", self._log)
 
-                # 2. サイレントインストール（UAC が必要な場合はダイアログが表示される）
-                self._log("インストール中（UAC ダイアログが表示される場合があります）...")
-                result = subprocess.run([tmp_path, "/S"], timeout=180)
+                # 2. サイレントインストール（UAC 昇格が必要）
+                self._log("インストール中（管理者権限の確認ダイアログが表示されます）...")
                 try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-                if result.returncode != 0:
-                    self._log(f"WARNING: インストーラが終了コード {result.returncode} で終了しました。")
+                    exit_code = _run_elevated(tmp_path, "/S")
+                except OSError as _e:
+                    self._log(f"ERROR: {_e}")
+                    return
+                except TimeoutError as _e:
+                    self._log(f"WARNING: {_e}")
+                    exit_code = -1
+                finally:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                if exit_code != 0:
+                    self._log(f"WARNING: インストーラが終了コード {exit_code} で終了しました。")
                 else:
                     self._log("Tesseract インストール完了。")
 
