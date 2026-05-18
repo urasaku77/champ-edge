@@ -8,4 +8,5 @@ pyocr
 pytesseract
 selenium
 simpleobsws
+pygame
 manga-ocr
