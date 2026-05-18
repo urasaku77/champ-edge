@@ -48,8 +48,11 @@ class Capture:
         self.on_party_progress = None  # callback(current: int, total: int)
 
         self._bgm_enabled: bool = False
+        self._bgm_mode: str = "file"
         self._bgm1_folder: str = ""
         self._bgm2_folder: str = ""
+        self._obs_audio_source1: str = ""
+        self._obs_audio_source2: str = ""
         self._bgm_playing: str = ""
         self._sensyutu_end_disappeared_time: float | None = None
         self._load_bgm_config()
@@ -65,8 +68,11 @@ class Capture:
             with open("recog/bgm.json", "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._bgm_enabled = data.get("bgm_enabled", False)
+            self._bgm_mode = data.get("bgm_mode", "file")
             self._bgm1_folder = data.get("bgm1_folder", "")
             self._bgm2_folder = data.get("bgm2_folder", "")
+            self._obs_audio_source1 = data.get("obs_audio_source1", "")
+            self._obs_audio_source2 = data.get("obs_audio_source2", "")
         except Exception:
             pass
 
@@ -83,8 +89,30 @@ class Capture:
         except Exception:
             return ""
 
+    def _switch_obs_audio(self, bgm_num: int):
+        source1 = self._obs_audio_source1
+        source2 = self._obs_audio_source2
+        try:
+            if bgm_num == 1:
+                if source1:
+                    self.loop.run_until_complete(self.obs.set_input_mute(source1, False))
+                if source2 and source2 != source1:
+                    self.loop.run_until_complete(self.obs.set_input_mute(source2, True))
+            else:
+                if source1 and source1 != source2:
+                    self.loop.run_until_complete(self.obs.set_input_mute(source1, True))
+                if source2:
+                    self.loop.run_until_complete(self.obs.set_input_mute(source2, False))
+            self._bgm_playing = f"bgm{bgm_num}"
+            print(f"[BGM/OBS] switched to bgm{bgm_num}")
+        except Exception as e:
+            print(f"[BGM/OBS] error: {e}")
+
     def _switch_bgm(self, bgm_num: int):
         if not self._bgm_enabled:
+            return
+        if self._bgm_mode == "obs":
+            self._switch_obs_audio(bgm_num)
             return
         folder = self._bgm1_folder if bgm_num == 1 else self._bgm2_folder
         path = self._pick_random_bgm(folder)
@@ -121,10 +149,18 @@ class Capture:
     def disconnect_websocket(self):
         try:
             if self._bgm_enabled:
-                try:
-                    pygame.mixer.music.stop()
-                except Exception:
-                    pass
+                if self._bgm_mode == "obs":
+                    for src in {self._obs_audio_source1, self._obs_audio_source2}:
+                        if src:
+                            try:
+                                self.loop.run_until_complete(self.obs.set_input_mute(src, True))
+                            except Exception:
+                                pass
+                else:
+                    try:
+                        pygame.mixer.music.stop()
+                    except Exception:
+                        pass
             self.loop.run_until_complete(self.obs.break_request())
             self._bgm_playing = ""
             return True

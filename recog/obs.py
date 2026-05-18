@@ -43,4 +43,15 @@ class Obs(object):
         else:
             return
 
+    async def set_input_mute(self, source: str, muted: bool):
+        request = simpleobsws.Request(
+            "SetInputMute",
+            {
+                "inputName": source,
+                "inputMuted": muted,
+            },
+        )
+        ret = await self.ws.call(request)
+        return ret.ok() if ret else False
+
 

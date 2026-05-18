@@ -323,29 +323,69 @@ class BgmSetting(tkinter.Toplevel):
             with open(self.path, "r", encoding="utf-8") as f:
                 self.initial_data = json.load(f)
         except FileNotFoundError:
-            self.initial_data = {"bgm_enabled": False, "bgm1_folder": "", "bgm2_folder": ""}
+            self.initial_data = {
+                "bgm_enabled": False,
+                "bgm_mode": "file",
+                "bgm1_folder": "",
+                "bgm2_folder": "",
+                "obs_audio_source1": "",
+                "obs_audio_source2": "",
+            }
 
         self.bgm_enabled_var = tkinter.BooleanVar(value=self.initial_data.get("bgm_enabled", False))
         tkinter.Checkbutton(self, text="BGM有効", variable=self.bgm_enabled_var).grid(
             row=0, column=0, columnspan=3, padx=10, pady=5, sticky="w"
         )
 
-        tkinter.Label(self, text="BGM①フォルダ\n(選出・待機中):").grid(row=2, column=0, padx=10, pady=5, sticky="e")
-        self.bgm1_var = tkinter.StringVar(value=self.initial_data.get("bgm1_folder", ""))
-        self.bgm1_entry = tkinter.Entry(self, textvariable=self.bgm1_var, width=45)
-        self.bgm1_entry.grid(row=2, column=1, padx=10, pady=5)
-        MyButton(self, text="参照", command=self._browse_bgm1).grid(row=2, column=2, padx=5)
+        self.bgm_mode_var = tkinter.StringVar(value=self.initial_data.get("bgm_mode", "file"))
+        mode_frame = tkinter.Frame(self)
+        mode_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=2, sticky="w")
+        tkinter.Radiobutton(
+            mode_frame, text="ファイル再生", variable=self.bgm_mode_var, value="file",
+            command=self._on_mode_change,
+        ).pack(side="left")
+        tkinter.Radiobutton(
+            mode_frame, text="OBS音声ソース", variable=self.bgm_mode_var, value="obs",
+            command=self._on_mode_change,
+        ).pack(side="left", padx=(10, 0))
 
-        tkinter.Label(self, text="BGM②フォルダ\n(対戦中):").grid(row=3, column=0, padx=10, pady=5, sticky="e")
+        self._content_frame = tkinter.Frame(self)
+        self._content_frame.grid(row=2, column=0, columnspan=3, sticky="ew")
+
+        self._file_frame = tkinter.Frame(self._content_frame)
+        self.bgm1_var = tkinter.StringVar(value=self.initial_data.get("bgm1_folder", ""))
         self.bgm2_var = tkinter.StringVar(value=self.initial_data.get("bgm2_folder", ""))
-        self.bgm2_entry = tkinter.Entry(self, textvariable=self.bgm2_var, width=45)
-        self.bgm2_entry.grid(row=3, column=1, padx=10, pady=5)
-        MyButton(self, text="参照", command=self._browse_bgm2).grid(row=3, column=2, padx=5)
+        tkinter.Label(self._file_frame, text="BGM①フォルダ\n(選出・待機中):").grid(row=0, column=0, padx=10, pady=5, sticky="e")
+        self.bgm1_entry = tkinter.Entry(self._file_frame, textvariable=self.bgm1_var, width=45)
+        self.bgm1_entry.grid(row=0, column=1, padx=10, pady=5)
+        MyButton(self._file_frame, text="参照", command=self._browse_bgm1).grid(row=0, column=2, padx=5)
+        tkinter.Label(self._file_frame, text="BGM②フォルダ\n(対戦中):").grid(row=1, column=0, padx=10, pady=5, sticky="e")
+        self.bgm2_entry = tkinter.Entry(self._file_frame, textvariable=self.bgm2_var, width=45)
+        self.bgm2_entry.grid(row=1, column=1, padx=10, pady=5)
+        MyButton(self._file_frame, text="参照", command=self._browse_bgm2).grid(row=1, column=2, padx=5)
+
+        self._obs_frame = tkinter.Frame(self._content_frame)
+        self.obs_source1_var = tkinter.StringVar(value=self.initial_data.get("obs_audio_source1", ""))
+        self.obs_source2_var = tkinter.StringVar(value=self.initial_data.get("obs_audio_source2", ""))
+        tkinter.Label(self._obs_frame, text="BGM①音声ソース名\n(選出・待機中):").grid(row=0, column=0, padx=10, pady=5, sticky="e")
+        tkinter.Entry(self._obs_frame, textvariable=self.obs_source1_var, width=45).grid(row=0, column=1, padx=10, pady=5)
+        tkinter.Label(self._obs_frame, text="BGM②音声ソース名\n(対戦中):").grid(row=1, column=0, padx=10, pady=5, sticky="e")
+        tkinter.Entry(self._obs_frame, textvariable=self.obs_source2_var, width=45).grid(row=1, column=1, padx=10, pady=5)
+
+        self._on_mode_change()
 
         btn_frame = tkinter.Frame(self)
-        btn_frame.grid(row=4, column=0, columnspan=3, pady=10)
+        btn_frame.grid(row=3, column=0, columnspan=3, pady=10)
         MyButton(btn_frame, text="保存", command=self.submit_form).pack(side="left", padx=10)
         MyButton(btn_frame, text="キャンセル", command=self.destroy).pack(side="left", padx=10)
+
+    def _on_mode_change(self):
+        if self.bgm_mode_var.get() == "file":
+            self._obs_frame.pack_forget()
+            self._file_frame.pack(fill="x")
+        else:
+            self._file_frame.pack_forget()
+            self._obs_frame.pack(fill="x")
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -367,8 +407,11 @@ class BgmSetting(tkinter.Toplevel):
     def submit_form(self):
         data = {
             "bgm_enabled": self.bgm_enabled_var.get(),
+            "bgm_mode": self.bgm_mode_var.get(),
             "bgm1_folder": self.bgm1_var.get(),
             "bgm2_folder": self.bgm2_var.get(),
+            "obs_audio_source1": self.obs_source1_var.get(),
+            "obs_audio_source2": self.obs_source2_var.get(),
         }
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
