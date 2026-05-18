@@ -28,6 +28,7 @@ BUILD_DIR = os.path.join("dist", "champedge")
 _DATA_ROOTS = [
     "version.txt",
     "README.pdf",
+    "setup.bat",
     "image",
     "database",
     "stats",
@@ -42,6 +43,7 @@ _ALWAYS_EXCLUDE = {
 
 # アップデート時に除外するユーザーデータ（zip内パスのプレフィックス）
 _UPDATE_EXCLUDE = {
+    "setup.bat",
     "database/battle.db",
     "stats",
     "party/csv",
