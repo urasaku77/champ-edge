@@ -902,6 +902,7 @@ class WazaDamageListFrame(ttk.LabelFrame):
         self._lbl_list: list[MyLabel] = []
         self._btn_list: list[MyButton] = []
         self._dmgframe_list = []
+        self._waza_list: list[WazaBase] = []
 
         num = 5 if self._index == 0 else 10
         self._current_results: list = [None] * num
@@ -936,28 +937,39 @@ class WazaDamageListFrame(ttk.LabelFrame):
         self._stage.set_value_to_active_pokemon(self._index, waza=(index, waza))
 
     def on_push_waza_button(self, index: int):
+        if (
+            index < len(self._waza_list)
+            and self._waza_list[index] is not None
+            and self._waza_list[index].name == "みずびたし"
+        ):
+            self._stage.apply_mizubitashi(self._index)
+            return
         self._stage.set_value_to_active_pokemon(self._index, waza_effect=index)
 
     def set_waza_info(self, lst: list[WazaBase]):
+        self._waza_list = lst
         for i in range(len(self._cbx_list)):
             wazabase = lst[i]
             if wazabase is not None:
                 self._cbx_list[i].set(wazabase.name)
-                match wazabase.type:
-                    case (
-                        wazabase.TYPE_ADD_POWER
-                        | wazabase.TYPE_MULTI_HIT
-                        | wazabase.TYPE_POWER_HOSEI
-                    ):
-                        self._btn_list[i].text = "x" + str(wazabase.value)
-                    case wazabase.TYPE_SELF_BUFF | wazabase.TYPE_OPPONENT_BUFF:
-                        self._btn_list[i].text = "+"
-                    case wazabase.TYPE_SELF_DEBUFF | wazabase.TYPE_OPPONENT_DEBUFF:
-                        self._btn_list[i].text = "-"
-                    case wazabase.TYPE_OTHER_EFFECT:
-                        self._btn_list[i].text = str(wazabase.value)
-                    case _:
-                        self._btn_list[i].text = ""
+                if wazabase.name == "みずびたし":
+                    self._btn_list[i].text = "水"
+                else:
+                    match wazabase.type:
+                        case (
+                            wazabase.TYPE_ADD_POWER
+                            | wazabase.TYPE_MULTI_HIT
+                            | wazabase.TYPE_POWER_HOSEI
+                        ):
+                            self._btn_list[i].text = "x" + str(wazabase.value)
+                        case wazabase.TYPE_SELF_BUFF | wazabase.TYPE_OPPONENT_BUFF:
+                            self._btn_list[i].text = "+"
+                        case wazabase.TYPE_SELF_DEBUFF | wazabase.TYPE_OPPONENT_DEBUFF:
+                            self._btn_list[i].text = "-"
+                        case wazabase.TYPE_OTHER_EFFECT:
+                            self._btn_list[i].text = str(wazabase.value)
+                        case _:
+                            self._btn_list[i].text = ""
             else:
                 self._cbx_list[i].set("")
                 self._btn_list[i].text = ""
@@ -1344,8 +1356,6 @@ class InfoFrame(ttk.LabelFrame):
     def _on_click_type(self):
         if self._stage is None or self._pokemon.is_empty:
             return
-        if self._pokemon.ability not in ("へんげんじざい", "リベロ"):
-            return
         self._stage.select_battle_type(self._player)
 
     def set_info(self, pokemon: Pokemon):
@@ -1354,10 +1364,8 @@ class InfoFrame(ttk.LabelFrame):
             self._no = pokemon.no
             self._form = pokemon.form
             self.name.set(pokemon.name)
-            is_protean = pokemon.ability in ("へんげんじざい", "リベロ")
-            cursor = "hand2" if is_protean else ""
-            self.type1_icon.configure(cursor=cursor)
-            self.type2_icon.configure(cursor=cursor)
+            self.type1_icon.configure(cursor="hand2")
+            self.type2_icon.configure(cursor="hand2")
             if pokemon.battle_type is not None:
                 display_type1 = pokemon.battle_type[0]
                 display_type2 = None

@@ -231,7 +231,7 @@ class Stage:
         self._app.set_active_pokemon(player, pokemon)
         self.calc_damage()
 
-    # 変化後タイプ（battle_type）の設定（へんげんじざい/リベロ用）
+    # 変化後タイプ（battle_type）の設定
     def select_battle_type(self, player: int):
         pokemon = self._app.active_poke_frames[player]._pokemon
         if pokemon.is_empty:
@@ -241,6 +241,16 @@ class Stage:
             return
         pokemon.battle_type = None if selected == Types.なし else [selected]
         self._app.set_info(player, pokemon)
+        self.calc_damage()
+
+    # みずびたし：相手をみずタイプに変更
+    def apply_mizubitashi(self, player: int):
+        non_player = 0 if player == 1 else 1
+        pokemon = self._app.active_poke_frames[non_player]._pokemon
+        if pokemon.is_empty:
+            return
+        pokemon.battle_type = [Types.みず]
+        self._app.set_info(non_player, pokemon)
         self.calc_damage()
 
     # 技追加効果の分岐処理
