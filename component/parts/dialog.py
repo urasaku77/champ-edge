@@ -673,61 +673,28 @@ class SimilarParty(tkinter.Toplevel):
             self.transient(master)
         self.title(title)
 
-        result_all_label = ttk.Label(
-            self, text=f"検索結果：{len(party_list)}件", padding=10
-        )
-        result_all_label.pack(side="top")
         if len(party_list) != 0:
-            result_perfect = [
-                party_list[i]
-                for i in range(len(party_list))
-                if party_list[i]["icons"] == current_party
-            ]
-            result_part = list(filter(lambda x: x not in result_perfect, party_list))
-
-            result_perfect_label = ttk.Label(
-                self, text=f"並びまで完全一致：{len(result_perfect)}件", padding=10
+            result_label = ttk.Label(
+                self, text=f"一致したパーティ：{len(party_list)}件", padding=10
             )
-            result_perfect_label.pack(side="top")
-            if len(result_perfect) != 0:
-                for i in range(len(result_perfect)):
-                    icons_frame = ttk.Frame(self, padding=10)
-                    for j in range(6):
-                        icon = MyLabel(
-                            icons_frame,
-                        )
-                        icon.set_pokemon_icon(
-                            result_perfect[i]["icons"][j], size=(30, 30)
-                        )
-                        icon.pack(side="left", padx=20, pady=10)
-                    link_button = MyButton(
+            result_label.pack(side="top")
+            for i in range(len(party_list)):
+                icons_frame = ttk.Frame(self, padding=10)
+                for j in range(6):
+                    icon = MyLabel(
                         icons_frame,
-                        text="構築記事",
-                        command=lambda url=result_perfect[i]["url"]: _open_url(url),
                     )
-                    link_button.pack(side="left", padx=50)
-                    icons_frame.pack(side="top")
-
-            result_part_label = ttk.Label(
-                self, text=f"6匹同じポケモン：{len(result_part)}件", padding=10
-            )
-            result_part_label.pack(side="top")
-            if len(result_part) != 0:
-                for i in range(len(result_part)):
-                    icons_frame = ttk.Frame(self)
-                    for j in range(6):
-                        icon = MyLabel(
-                            icons_frame,
-                        )
-                        icon.set_pokemon_icon(result_part[i]["icons"][j], size=(30, 30))
-                        icon.pack(side="left", padx=20, pady=10)
-                    link_button = MyButton(
-                        icons_frame,
-                        text="構築記事",
-                        command=lambda url=result_part[i]["url"]: _open_url(url),
+                    icon.set_pokemon_icon(
+                        party_list[i]["icons"][j], size=(30, 30)
                     )
-                    link_button.pack(side="left", padx=50)
-                    icons_frame.pack(side="top")
+                    icon.pack(side="left", padx=20, pady=10)
+                link_button = MyButton(
+                    icons_frame,
+                    text="構築記事",
+                    command=lambda url=party_list[i]["url"]: _open_url(url),
+                )
+                link_button.pack(side="left", padx=50)
+                icons_frame.pack(side="top")
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
