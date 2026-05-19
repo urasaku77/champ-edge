@@ -11,6 +11,7 @@
 CSV フォーマット: ポケモン名, 値, パーセント
 """
 import csv
+import gzip
 import os
 import re
 import ssl
@@ -82,7 +83,10 @@ def _fetch_tokens(pid: str, season: str) -> list[str]:
     url = f"https://champs.pokedb.tokyo/pokemon/show/{pid}?season={season}&rule=0"
     req = urllib.request.Request(url, headers=_HEADERS)
     with urllib.request.urlopen(req, context=_SSL_CTX) as resp:
-        html = resp.read().decode("utf-8")
+        data = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip":
+            data = gzip.decompress(data)
+        html = data.decode("utf-8")
     p = _TextExtractor()
     p.feed(html)
     return p.tokens
@@ -255,7 +259,10 @@ def _fetch_ranking() -> tuple[list[str], str]:
     """ランキングページから (pid リスト, シーズン番号) を取得する"""
     req = urllib.request.Request(_LIST_URL, headers=_HEADERS)
     with urllib.request.urlopen(req, context=_SSL_CTX) as resp:
-        html = resp.read().decode("utf-8")
+        data = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip":
+            data = gzip.decompress(data)
+        html = data.decode("utf-8")
     pids = _PID_RE.findall(html)
     m = _SEASON_RE.search(html)
     season = m.group(1) if m else "1"
