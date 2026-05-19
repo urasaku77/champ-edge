@@ -43,6 +43,9 @@ class Analytics(tkinter.Toplevel):
 
         self.sort_condition_options = [("KP（選出/初手）", 0), ("勝率", 1)]
         self.sort_line_options = [("降順", False), ("昇順", True)]
+        self.merge_mega_var = tkinter.BooleanVar()
+        self.merge_mega_var.set(False)
+        self._mega_groups: dict = {}
 
         self.display_gui(self.recent_date)
         self.update_result()
@@ -268,6 +271,13 @@ class Analytics(tkinter.Toplevel):
             )
             rb.grid(sticky="w")
         sort_line_frame.place(x=Const.searchX + 270, y=Const.kpStartY - 60)
+        merge_mega_check = tkinter.Checkbutton(
+            self,
+            text="メガ統合",
+            variable=self.merge_mega_var,
+            command=self.update_result,
+        )
+        merge_mega_check.place(x=Const.searchX + 390, y=Const.kpStartY - 60)
         self.main_title_label.place(x=Const.kpStartX, y=Const.kpStartY - 60)
         self.subtitle_var = tkinter.StringVar()
         self.subtitle_var.set("直近使用したパーティ")
@@ -328,10 +338,14 @@ class Analytics(tkinter.Toplevel):
             if self.regend_num.get() != "0"
             else "0",
         )
+        if self.merge_mega_var.get():
+            _kp_result = self._merge_kp_results(_kp_result)
+        else:
+            self._mega_groups = {}
         self.pokemon_list = [item[0] for item in _kp_result]
         self.result_1_list = [item[1] for item in _kp_result]
         self.result_2_list = DB_battle.get_win_rate(
-            self.pokemon_list,
+            self._get_query_groups(),
             self.from_date,
             self.to_date,
             self.rule.get(),
@@ -445,6 +459,31 @@ class Analytics(tkinter.Toplevel):
             if i > 49:
                 break
 
+    def _merge_kp_results(self, kp_result):
+        """メガシンカフォーム（form 10-19）のKPを基本フォームに統合する。"""
+        merged_kp: dict[str, int] = {}
+        mega_groups: dict[str, list[str]] = {}
+        for pid, kp in kp_result:
+            parts = pid.split("-")
+            try:
+                form = int(parts[-1]) if len(parts) >= 2 else -1
+                base_id = f"{parts[0]}-0" if 10 <= form <= 19 else pid
+            except ValueError:
+                base_id = pid
+            if base_id not in merged_kp:
+                merged_kp[base_id] = 0
+                mega_groups[base_id] = []
+            merged_kp[base_id] += kp
+            mega_groups[base_id].append(pid)
+        self._mega_groups = mega_groups
+        return sorted(merged_kp.items(), key=lambda x: x[1], reverse=True)
+
+    def _get_query_groups(self):
+        """DB クエリ用のポケモンリストを返す。メガ統合 ON 時はグループ（リスト）に展開する。"""
+        if self.merge_mega_var.get() and self._mega_groups:
+            return [self._mega_groups.get(pid, [pid]) for pid in self.pokemon_list]
+        return list(self.pokemon_list)
+
     def change_sort_condition(self):
         self.delete_result()
         new_result_list = list(
@@ -477,54 +516,48 @@ class Analytics(tkinter.Toplevel):
         self.display_image()
 
     def change_mode(self):
+        _regend = self.regends_dict[self.regend_num.get()] if self.regend_num.get() != "0" else "0"
+        _qgroups = self._get_query_groups()
         if self.title_var.get() == "ＫＰと勝率":
             self.title_var.set("選出と勝率")
             self.result_1_list = DB_battle.get_oppo_chosen_rate(
-                self.pokemon_list,
+                _qgroups,
                 self.from_date,
                 self.to_date,
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
             self.result_2_list = DB_battle.get_oppo_chosen_and_win_rate(
-                self.pokemon_list,
+                _qgroups,
                 self.from_date,
                 self.to_date,
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
 
         elif self.title_var.get() == "選出と勝率":
             self.title_var.set("初手と勝率")
             self.result_1_list = DB_battle.get_oppo_first_chosen_rate(
-                self.pokemon_list,
+                _qgroups,
                 self.from_date,
                 self.to_date,
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
             self.result_2_list = DB_battle.get_oppo_first_chosen_and_win_rate(
-                self.pokemon_list,
+                _qgroups,
                 self.from_date,
                 self.to_date,
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
 
         elif self.title_var.get() == "初手と勝率":
@@ -535,23 +568,21 @@ class Analytics(tkinter.Toplevel):
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
+            if self.merge_mega_var.get():
+                _kp_result = self._merge_kp_results(_kp_result)
             self.pokemon_list = [item[0] for item in _kp_result]
             self.result_1_list = [item[1] for item in _kp_result]
 
             self.result_2_list = DB_battle.get_win_rate(
-                self.pokemon_list,
+                self._get_query_groups(),
                 self.from_date,
                 self.to_date,
                 self.rule.get(),
                 self.party_num,
                 self.party_subnum,
-                self.regends_dict[self.regend_num.get()]
-                if self.regend_num.get() != "0"
-                else "0",
+                _regend,
             )
         self.change_sort_condition()
 

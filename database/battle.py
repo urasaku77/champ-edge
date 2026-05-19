@@ -143,6 +143,24 @@ class DB_battle:
         "opponent_pokemon5 = ? OR opponent_pokemon6 = ?)"
     )
 
+    @staticmethod
+    def _build_oppo_poke_clause(ids) -> tuple[str, list]:
+        """相手パーティ6枠のいずれかに ids のいずれかが一致する WHERE 句を生成する。"""
+        if isinstance(ids, str):
+            ids = [ids]
+        ph = ",".join("?" * len(ids))
+        clause = " OR ".join(f"opponent_pokemon{i} IN ({ph})" for i in range(1, 7))
+        return f"({clause})", list(ids) * 6
+
+    @staticmethod
+    def _build_oppo_choice_clause(ids, n_slots: int = 4) -> tuple[str, list]:
+        """相手選出 n_slots 枠のいずれかに ids のいずれかが一致する WHERE 句を生成する。"""
+        if isinstance(ids, str):
+            ids = [ids]
+        ph = ",".join("?" * len(ids))
+        clause = " OR ".join(f"opponent_choice{i} IN ({ph})" for i in range(1, n_slots + 1))
+        return f"({clause})", list(ids) * n_slots
+
     def register_battle(battle):
         cur = DB_battle.__db.cursor()
 
@@ -339,15 +357,16 @@ class DB_battle:
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
         winRateList = []
-        for pokeName in pokemonList:
+        for poke in pokemonList:
+            poke_clause, poke_params = DB_battle._build_oppo_poke_clause(poke)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {DB_battle._OPPO_POKE_ANY}",
-                tuple(base_params + [pokeName] * 6),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {poke_clause}",
+                tuple(base_params + poke_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {DB_battle._OPPO_POKE_ANY}",
-                tuple(base_params + [1] + [pokeName] * 6),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {poke_clause}",
+                tuple(base_params + [1] + poke_params),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
@@ -367,20 +386,18 @@ class DB_battle:
         base_where, base_params = DB_battle._build_base_where(
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
-        _OPPO_CHOICE_ANY = (
-            "(opponent_choice1 = ? OR opponent_choice2 = ? OR "
-            "opponent_choice3 = ? OR opponent_choice4 = ?)"
-        )
         sensyutuRateList = []
-        for pokeName in pokemonList:
+        for poke in pokemonList:
+            poke_clause, poke_params = DB_battle._build_oppo_poke_clause(poke)
+            choice_clause, choice_params = DB_battle._build_oppo_choice_clause(poke)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {DB_battle._OPPO_POKE_ANY}",
-                tuple(base_params + [pokeName] * 6),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {poke_clause}",
+                tuple(base_params + poke_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {_OPPO_CHOICE_ANY}",
-                tuple(base_params + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {choice_clause}",
+                tuple(base_params + choice_params),
             )
             winNum = cur.fetchone()
             sensyutuRateList.append(
@@ -403,15 +420,17 @@ class DB_battle:
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
         sensyutuRateList = []
-        for pokeName in pokemonList:
+        for poke in pokemonList:
+            poke_clause, poke_params = DB_battle._build_oppo_poke_clause(poke)
+            first_clause, first_params = DB_battle._build_oppo_choice_clause(poke, n_slots=1)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {DB_battle._OPPO_POKE_ANY}",
-                tuple(base_params + [pokeName] * 6),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {poke_clause}",
+                tuple(base_params + poke_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND opponent_choice1 = ?",
-                tuple(base_params + [pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {first_clause}",
+                tuple(base_params + first_params),
             )
             firstNum = cur.fetchone()
             sensyutuRateList.append(
@@ -433,20 +452,17 @@ class DB_battle:
         base_where, base_params = DB_battle._build_base_where(
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
-        _OPPO_CHOICE_ANY = (
-            "(opponent_choice1 = ? OR opponent_choice2 = ? OR "
-            "opponent_choice3 = ? OR opponent_choice4 = ?)"
-        )
         winRateList = []
-        for pokeName in pokemonList:
+        for poke in pokemonList:
+            choice_clause, choice_params = DB_battle._build_oppo_choice_clause(poke)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {_OPPO_CHOICE_ANY}",
-                tuple(base_params + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {choice_clause}",
+                tuple(base_params + choice_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {_OPPO_CHOICE_ANY}",
-                tuple(base_params + [1] + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {choice_clause}",
+                tuple(base_params + [1] + choice_params),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
@@ -467,15 +483,16 @@ class DB_battle:
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
         winRateList = []
-        for pokeName in pokemonList:
+        for poke in pokemonList:
+            first_clause, first_params = DB_battle._build_oppo_choice_clause(poke, n_slots=1)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND opponent_choice1 = ?",
-                tuple(base_params + [pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {first_clause}",
+                tuple(base_params + first_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND opponent_choice1 = ?",
-                tuple(base_params + [1, pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {first_clause}",
+                tuple(base_params + [1] + first_params),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
