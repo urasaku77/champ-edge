@@ -944,6 +944,13 @@ class WazaDamageListFrame(ttk.LabelFrame):
         ):
             self._stage.apply_mizubitashi(self._index)
             return
+        if (
+            index < len(self._waza_list)
+            and self._waza_list[index] is not None
+            and self._waza_list[index].name in ("もえつきる", "でんこうそうげき")
+        ):
+            self._stage.apply_type_loss(self._index)
+            return
         self._stage.set_value_to_active_pokemon(self._index, waza_effect=index)
 
     def set_waza_info(self, lst: list[WazaBase]):
@@ -954,6 +961,8 @@ class WazaDamageListFrame(ttk.LabelFrame):
                 self._cbx_list[i].set(wazabase.name)
                 if wazabase.name == "みずびたし":
                     self._btn_list[i].text = "水"
+                elif wazabase.name in ("もえつきる", "でんこうそうげき"):
+                    self._btn_list[i].text = "無"
                 else:
                     match wazabase.type:
                         case (
@@ -1366,8 +1375,11 @@ class InfoFrame(ttk.LabelFrame):
             self.name.set(pokemon.name)
             self.type1_icon.configure(cursor="hand2")
             self.type2_icon.configure(cursor="hand2")
-            if pokemon.battle_type is not None:
+            if pokemon.battle_type is not None and len(pokemon.battle_type) > 0:
                 display_type1 = pokemon.battle_type[0]
+                display_type2 = None
+            elif pokemon.battle_type is not None:
+                display_type1 = Types.なし
                 display_type2 = None
             else:
                 display_types = pokemon.type

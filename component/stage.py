@@ -239,17 +239,29 @@ class Stage:
         selected: Types = self._app.select_type(player=player)
         if selected is None:
             return
-        pokemon.battle_type = None if selected == Types.なし else [selected]
+        if selected == Types.なし:
+            pokemon.battle_type = None if pokemon.battle_type == [] else []
+        else:
+            pokemon.battle_type = [selected]
         self._app.set_info(player, pokemon)
         self.calc_damage()
 
-    # みずびたし：相手をみずタイプに変更
+    # もえつきる・でんこうそうげき：自分をタイプなしに変更（再押下でリセット）
+    def apply_type_loss(self, player: int):
+        pokemon = self._app.active_poke_frames[player]._pokemon
+        if pokemon.is_empty:
+            return
+        pokemon.battle_type = None if pokemon.battle_type == [] else []
+        self._app.set_info(player, pokemon)
+        self.calc_damage()
+
+    # みずびたし：相手をみずタイプに変更（再押下でリセット）
     def apply_mizubitashi(self, player: int):
         non_player = 0 if player == 1 else 1
         pokemon = self._app.active_poke_frames[non_player]._pokemon
         if pokemon.is_empty:
             return
-        pokemon.battle_type = [Types.みず]
+        pokemon.battle_type = None if pokemon.battle_type == [Types.みず] else [Types.みず]
         self._app.set_info(non_player, pokemon)
         self.calc_damage()
 

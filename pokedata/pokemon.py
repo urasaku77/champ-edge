@@ -413,9 +413,7 @@ class Pokemon:
 
     def get_stealth_rock_damage(self) -> float:
         from decimal import Decimal
-        if self.__battle_type is not None:
-            types = self.__battle_type
-        elif self.__battle_terastype not in (Types.なし, Types.ステラ):
+        if self.__battle_terastype not in (Types.なし, Types.ステラ):
             types = [self.__battle_terastype]
         else:
             types = self.__type
@@ -814,8 +812,9 @@ class Pokemon:
     def has_type(self, _type: Types) -> bool:
         if self.battle_terastype is not None and self.battle_terastype != Types.なし:
             return _type == self.__battle_terastype
-        else:
-            return _type in self.__type
+        if self.__battle_type is not None:
+            return _type in self.__battle_type
+        return _type in self.__type
 
     # 値が変化した時の通知
     def statechanged(self):
