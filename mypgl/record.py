@@ -58,13 +58,25 @@ class EditBattleDialog(tkinter.Toplevel):
             AutoCompleteCombobox.pokemons(o_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
             self.opponent_pokemon_vars.append(var)
 
+        player_party_names = [""] + [
+            self._pid_to_name(battle_data[col])
+            for col in range(10, 16)
+            if battle_data[col] and battle_data[col] != "-1"
+        ]
+        opponent_party_names = [""] + [
+            self._pid_to_name(battle_data[col])
+            for col in range(16, 22)
+            if battle_data[col] and battle_data[col] != "-1"
+        ]
+
         tkinter.Label(self, text="自分選:").grid(row=6, column=0, sticky="e", padx=5, pady=3)
         pc_frame = tkinter.Frame(self)
         pc_frame.grid(row=6, column=1, columnspan=3, sticky="w", padx=5)
         self.player_choice_vars = []
         for col in range(22, 26):
             var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            AutoCompleteCombobox.pokemons(pc_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            cb = tkinter.ttk.Combobox(pc_frame, textvariable=var, values=player_party_names, width=10, state="readonly")
+            cb.pack(side=tkinter.LEFT, padx=2)
             self.player_choice_vars.append(var)
 
         tkinter.Label(self, text="相手選:").grid(row=7, column=0, sticky="e", padx=5, pady=3)
@@ -73,7 +85,8 @@ class EditBattleDialog(tkinter.Toplevel):
         self.opponent_choice_vars = []
         for col in range(26, 30):
             var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            AutoCompleteCombobox.pokemons(oc_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            cb = tkinter.ttk.Combobox(oc_frame, textvariable=var, values=opponent_party_names, width=10, state="readonly")
+            cb.pack(side=tkinter.LEFT, padx=2)
             self.opponent_choice_vars.append(var)
 
         tkinter.Button(self, text="保存", command=self._save).grid(row=8, column=1, pady=10)
