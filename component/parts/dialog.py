@@ -673,11 +673,11 @@ class SimilarParty(tkinter.Toplevel):
             self.transient(master)
         self.title(title)
 
+        result_label = ttk.Label(
+            self, text=f"一致したパーティ：{len(party_list)}件", padding=10
+        )
+        result_label.pack(side="top")
         if len(party_list) != 0:
-            result_label = ttk.Label(
-                self, text=f"一致したパーティ：{len(party_list)}件", padding=10
-            )
-            result_label.pack(side="top")
             for i in range(len(party_list)):
                 icons_frame = ttk.Frame(self, padding=10)
                 for j in range(6):
