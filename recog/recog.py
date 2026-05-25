@@ -23,6 +23,7 @@ _SETTING_DEFAULTS = {
     "tesseract_path": "",
     "tn_ocr_enabled": False,
     "battle_record_auto": False,
+    "field_name_ocr_enabled": False,
 }
 
 
@@ -253,6 +254,15 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.tn_ocr_enabled_checkbox.grid(row=13, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
+        self.field_name_ocr_enabled_var = tkinter.BooleanVar()
+        self.field_name_ocr_enabled_var.set(self.initial_data.get("field_name_ocr_enabled", False))
+        self.field_name_ocr_enabled_checkbox = tkinter.Checkbutton(
+            self,
+            text="選出ポケモン OCR自動読込み（要バトルネーム非表示設定）",
+            variable=self.field_name_ocr_enabled_var,
+        )
+        self.field_name_ocr_enabled_checkbox.grid(row=14, column=0, columnspan=2, pady=2, sticky="w", padx=20)
+
         self.battle_record_auto_var = tkinter.BooleanVar()
         self.battle_record_auto_var.set(self.initial_data.get("battle_record_auto", False))
         self.battle_record_auto_checkbox = tkinter.Checkbutton(
@@ -260,14 +270,14 @@ class ModeSetting(tkinter.Toplevel):
             text="対戦結果自動登録（勝敗検知時に自動で記録）",
             variable=self.battle_record_auto_var,
         )
-        self.battle_record_auto_checkbox.grid(row=14, column=0, columnspan=2, pady=2, sticky="w", padx=20)
+        self.battle_record_auto_checkbox.grid(row=15, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=15, column=0, pady=10)
+        self.submit_button.grid(row=16, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=15, column=1, pady=10)
+        self.cancel_button.grid(row=16, column=1, pady=10)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -291,6 +301,7 @@ class ModeSetting(tkinter.Toplevel):
             "zmove_enabled": self.zmove_enabled_var.get(),
             "tn_ocr_enabled": self.tn_ocr_enabled_var.get(),
             "battle_record_auto": self.battle_record_auto_var.get(),
+            "field_name_ocr_enabled": self.field_name_ocr_enabled_var.get(),
         }
 
         # tesseract_path は TesseractSetupDialog が直接保存するため、
@@ -441,6 +452,7 @@ def get_recog_value(key: str):
         "tesseract_path",
         "tn_ocr_enabled",
         "battle_record_auto",
+        "field_name_ocr_enabled",
         "source_name",
         "host_name",
         "port",

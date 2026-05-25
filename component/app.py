@@ -836,6 +836,9 @@ class MainApp(ThemedTk):
             self.capture._sensyutu_end_disappeared_time = None
             self.capture.start_bgm1()
             self.party_frames[0].on_push_load_button()
+            self.capture.my_party_pids = [
+                p.pid for p in self.party_frames[0].pokemon_list if not p.is_empty
+            ]
             self.after(2000, self.loop_image_recognize)
 
     # 画像認識ループ開始
@@ -867,6 +870,22 @@ class MainApp(ThemedTk):
         if not self.monitor:
             return
         match result:
+            case ("field_pokemon", str() as pid):
+                if self._stage is not None:
+                    party = self.party_frames[1].pokemon_list
+                    base_no = pid.split("-")[0]
+                    for i, p in enumerate(party):
+                        if p.pid == pid or p.pid.split("-")[0] == base_no:
+                            self._stage.set_active_pokemon_from_index(1, i)
+                            break
+            case ("my_field_pokemon", str() as pid):
+                if self._stage is not None:
+                    party = self.party_frames[0].pokemon_list
+                    base_no = pid.split("-")[0]
+                    for i, p in enumerate(party):
+                        if p.pid == pid or p.pid.split("-")[0] == base_no:
+                            self._stage.set_active_pokemon_from_index(0, i)
+                            break
             case tuple():
                 self.party_frames[1].set_party_from_capture(result[0])
                 self.record_frame.tn.delete(0, tkinter.END)

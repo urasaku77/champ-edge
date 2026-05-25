@@ -27,5 +27,9 @@
   "pokecrop5":   { "top": 666, "bottom": 766, "left":  130, "right":  590 },
   "pokecrop6":   { "top": 792, "bottom": 892, "left":  130, "right":  590 },
   "rate":        { "top": 990, "bottom":1040, "left":   25, "right":  155 },
-  "oporate1":    { "top": 995, "bottom":1030, "left": 1744, "right": 1884 }
+  "oporate1":    { "top": 995, "bottom":1030, "left": 1744, "right": 1884 },
+  "opoFieldIcon": { "top":  20, "bottom": 110, "left": 1380, "right": 1495 },
+  "myFieldIcon":  { "top": 925, "bottom":1045, "left":   5, "right":  100 },
+  "opoFieldName": { "top":  33, "bottom":  78, "left": 1580, "right": 1875 },
+  "myFieldName":  { "top": 928, "bottom": 988, "left": 155, "right":  365 }
 }

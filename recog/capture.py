@@ -55,6 +55,10 @@ class Capture:
         self._obs_audio_source2: str = ""
         self._bgm_playing: str = ""
         self._sensyutu_end_disappeared_time: float | None = None
+        self.oppo_party_pids: list[str] = []
+        self.my_party_pids: list[str] = []
+        self._last_field_pid: str = ""
+        self._last_my_field_pid: str = ""
         self._load_bgm_config()
         try:
             pygame.mixer.init()
@@ -294,12 +298,14 @@ class Capture:
         ):
             self.phase = "in_battle"
             self.party_recognized = False
+            self._last_field_pid = ""
+            self._last_my_field_pid = ""
             if self._bgm_playing != "bgm2":
                 self._switch_bgm(2)
             return True
         return False
 
-    # ④in_battle: win.jpg検知でwaitへ → BGM①へ切り替え
+    # ④in_battle: win.jpg検知でwaitへ → BGM①へ切り替え / フィールドポケモン認識
     def recognize_in_battle(self):
         self.get_screenshot()
         if self.is_exist_image("image/recogImg/situation/win.jpg", 0.7, "winleft"):
@@ -310,6 +316,21 @@ class Capture:
             self.phase = "wait"
             self._switch_bgm(1)
             return "winright"
+        # コマンド選択画面かつOCR有効時のみフィールドポケモン認識を実行
+        ocr_enabled = get_recog_value("field_name_ocr_enabled")
+        battle_detected = self.is_exist_image("image/recogImg/situation/recogBattle.jpg", 0.8, "battle")
+        print(f"[FIELD] ocr_enabled={ocr_enabled} battle={battle_detected} oppo_pids={self.oppo_party_pids} my_pids={self.my_party_pids}")
+        if ocr_enabled and battle_detected:
+            if self.oppo_party_pids:
+                field_pid = self._recognize_field_by_name("opoFieldName", self.oppo_party_pids)
+                if field_pid and field_pid != self._last_field_pid:
+                    self._last_field_pid = field_pid
+                    return ("field_pokemon", field_pid)
+            if self.my_party_pids:
+                my_field_pid = self._recognize_field_by_name("myFieldName", self.my_party_pids)
+                if my_field_pid and my_field_pid != self._last_my_field_pid:
+                    self._last_my_field_pid = my_field_pid
+                    return ("my_field_pokemon", my_field_pid)
         return None
 
     # ⑤wait: BGM①再生中、次の選出画面を待機
@@ -372,6 +393,7 @@ class Capture:
         with ThreadPoolExecutor(max_workers=6) as executor:
             pokemonlist = list(executor.map(recognize_one, range(6)))
 
+        self.oppo_party_pids = [p.pid for p in pokemonlist if not p.is_empty]
         return pokemonlist
 
     # 相手のTN解析
@@ -503,6 +525,56 @@ class Capture:
                     cls._clahe.apply(resized),
                 )
         return cls._pokemon_template_cache[image_path]
+
+    @staticmethod
+    def _preprocess_field_name(img: np.ndarray, v_thr: int = 240) -> Image.Image:
+        """ゲームUIのポケモン名テキスト画像を前処理してmanga_ocr向けに変換する。
+        白テキスト(V>v_thr,S<60)抽出 → 斜体補正(shear=-0.15) → 4x拡大 → 白地黒文字
+        相手HPバー(明るい桃背景): v_thr=240、自分HPバー(暗い青背景): v_thr=180"""
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, (0, 0, v_thr), (180, 60, 255))
+        h, w = mask.shape
+        shear = -0.15
+        M = np.float32([[1, shear, max(0, -shear * h)], [0, 1, 0]])
+        deskewed = cv2.warpAffine(mask, M, (int(w + abs(shear) * h), h), borderValue=0)
+        large = cv2.resize(deskewed, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+        inverted = cv2.bitwise_not(large)
+        padded = cv2.copyMakeBorder(inverted, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+        return Image.fromarray(padded)
+
+    def _recognize_field_by_name(self, coord_name: str, party_pids: list[str]) -> str:
+        """HPバーのポケモン名テキストをOCRで読み取りパーティ候補と照合する。
+        ニックネーム非表示設定が前提。"""
+        import difflib
+        if not party_pids:
+            return ""
+        coord = self.coords.dicCoord[coord_name]
+        img = self.img[coord.top : coord.bottom, coord.left : coord.right]
+        v_thr = 180 if coord_name == "myFieldName" else 240
+        text = ""
+        try:
+            pil = self._preprocess_field_name(img, v_thr)
+            text = self._manga_ocr(pil).strip()
+        except Exception:
+            pass
+        if not text:
+            print(f"[FIELD OCR] {coord_name}: OCR結果なし")
+            return ""
+        print(f"[FIELD OCR] {coord_name}: OCR読み取り={text!r}")
+        best_ratio = 0.0
+        best_pid = ""
+        for pid in party_pids:
+            try:
+                poke_name = Pokemon.by_pid(pid).name
+                ratio = difflib.SequenceMatcher(None, text, poke_name).ratio()
+                print(f"[FIELD OCR]   {poke_name}: ratio={ratio:.3f}")
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_pid = pid
+            except Exception:
+                continue
+        print(f"[FIELD OCR] {coord_name}: best={best_pid} ratio={best_ratio:.3f} {'→採用' if best_ratio >= 0.5 else '→不採用(0.5未満)'}")
+        return best_pid if best_ratio >= 0.5 else ""
 
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
         coord = self.coords.dicCoord[coord_name]

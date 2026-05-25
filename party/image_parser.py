@@ -58,30 +58,41 @@ _pokemon_names: list[str] = []
 _waza_names: list[str] = []
 _ability_names: list[str] = []
 _item_names: list[str] = []
+# パーティ選出画面に存在しないPID（バトル中フォルム等）のキャッシュ
+_exclude_pids_cache: set[str] | None = None
+# True にすると _identify_pokemon の各ステップをコンソール出力する
+DEBUG_IDENTIFY = False
 
 
 def _load_reference_lists() -> None:
-    global _pokemon_names, _waza_names, _ability_names, _item_names
+    global _pokemon_names, _waza_names, _ability_names, _item_names, _exclude_pids_cache
     if _pokemon_names:
         return
 
     from component.parts.const import ALL_ITEM_COMBOBOX_VALUES
     from database.pokemon import DB_pokemon
+    from pokedata.exception import remove_pokemon_name_from_party
 
     # メガフォーム(form=11)を除いた全ポケモン名をDBから取得
     # image/pokemon/ に画像がなくても認識対象とする（フラエッテ等）
+    # バトル中フォルム（イルカマン(マイティ)等）はパーティ選出画面に存在しないため除外
     conn = sqlite3.connect("database/pokemon.db")
     conn.row_factory = sqlite3.Row
+    _exclude_names: set[str] = set(remove_pokemon_name_from_party)
     seen: set[str] = set()
     all_names: list[str] = []
     for row in conn.execute(
         "SELECT name FROM pokemon_data WHERE form != 11 ORDER BY no, form"
     ):
         name = row["name"]
-        if name and name not in seen:
+        if name and name not in seen and name not in _exclude_names:
             all_names.append(name)
             seen.add(name)
     _pokemon_names = all_names
+    _exclude_pids_cache = {
+        pid for n in remove_pokemon_name_from_party
+        if (pid := DB_pokemon.get_pokemon_pid_by_name(n))
+    }
 
     _waza_names = list(DB_pokemon.get_waza_namedict().values())
     _item_names = list(ALL_ITEM_COMBOBOX_VALUES)
@@ -412,12 +423,18 @@ def _identify_pokemon(
     )
     ocr_name = _closest_match(name_clean, _pokemon_names, cutoff=0.85) if name_clean else ""
 
+    if DEBUG_IDENTIFY:
+        print(f"[IDENTIFY] name_raw={name_raw!r}  name_clean={name_clean!r}  ocr_name={ocr_name!r}")
+        print(f"[IDENTIFY] abil={abil!r}  item={item!r}  moves={list(ocr_moves)}")
+
     # ⑤ メガストーン → 即確定（最優先）
     if item and "ナイト" in item:
         stem = re.sub(r"ナイト[XYＸＹxy]?$", "", item).strip()
         if stem:
             mega_name = _closest_match(stem, _pokemon_names, cutoff=0.45)
             if mega_name:
+                if DEBUG_IDENTIFY:
+                    print(f"[IDENTIFY] ⑤メガストーン確定: {mega_name}")
                 return mega_name
 
     # ② OCR名前 → ③特性 + HOME技で保証 → 確定
@@ -425,10 +442,13 @@ def _identify_pokemon(
         abil_ok = not abil or _ability_matches_pokemon(ocr_name, abil)
         move_ok = not ocr_moves or bool(ocr_moves & _load_home_waza().get(ocr_name, set()))
         if abil_ok and move_ok:
+            if DEBUG_IDENTIFY:
+                print(f"[IDENTIFY] ②OCR名前確定: {ocr_name}  (abil_ok={abil_ok}, move_ok={move_ok})")
             return ocr_name
 
     # 候補リスト：画像ファイルのある全PIDから開始
-    img_pids = set(_load_pokemon_sprite_templates().keys())
+    # バトル中フォルム（イルカマン(マイティ)等）はパーティ選出画面に存在しないため除外
+    img_pids = set(_load_pokemon_sprite_templates().keys()) - (_exclude_pids_cache or set())
     candidates: list[str] = list(img_pids)
 
     # ③ 特性フィルタ（空になる場合は無視）
@@ -437,6 +457,8 @@ def _identify_pokemon(
         filtered = [p for p in candidates if p in abil_pids]
         if filtered:
             candidates = filtered
+    if DEBUG_IDENTIFY:
+        print(f"[IDENTIFY] ③特性フィルタ後: {len(candidates)}件")
 
     # ④ タイプアイコンフィルタ（空になる場合は無視）
     detected_types = _detect_types_from_card(card)
@@ -444,6 +466,8 @@ def _identify_pokemon(
         type_filtered = _filter_by_types(candidates, detected_types)
         if type_filtered:
             candidates = type_filtered
+    if DEBUG_IDENTIFY:
+        print(f"[IDENTIFY] ④タイプフィルタ後: {len(candidates)}件  detected={detected_types}")
 
     # ⑥ HOME技フィルタ（空になる場合は無視）
     home_waza = _load_home_waza()
@@ -454,6 +478,8 @@ def _identify_pokemon(
         ]
         if move_filtered:
             candidates = move_filtered
+    if DEBUG_IDENTIFY:
+        print(f"[IDENTIFY] ⑥HOME技フィルタ後: {len(candidates)}件")
 
     # ⑦ HOMEランキング順ソート
     ranking = _load_ranking()
@@ -468,6 +494,9 @@ def _identify_pokemon(
         top_n = min(10, len(candidates))
         top = sorted(candidates[:top_n], key=lambda p: -sprite_score.get(p, 0.0))
         candidates = top + candidates[top_n:]
+    if DEBUG_IDENTIFY:
+        top3 = [f"{p}({DB_pokemon.get_pokemon_name_by_pid(p)})" for p in candidates[:3]]
+        print(f"[IDENTIFY] ①スプライト後 top3: {top3}")
 
     # ⑧ 技ゼロマッチ検証（candidates[0]の技が全滅かつ合致する別候補があれば差し替え）
     if ocr_moves and len(candidates) > 1:
@@ -483,10 +512,16 @@ def _identify_pokemon(
     # ⑨ 重複排除: 同じパーティに同一ポケモンは入れられないので既出名を除外
     if used_names and candidates:
         deduped = [p for p in candidates if (DB_pokemon.get_pokemon_name_by_pid(p) or "") not in used_names]
+        if DEBUG_IDENTIFY:
+            removed = [p for p in candidates if (DB_pokemon.get_pokemon_name_by_pid(p) or "") in used_names]
+            print(f"[IDENTIFY] ⑨重複排除: used_names={used_names}  除外={[DB_pokemon.get_pokemon_name_by_pid(p) for p in removed]}")
         if deduped:
             candidates = deduped
 
-    return DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "" if candidates else ""
+    result = DB_pokemon.get_pokemon_name_by_pid(candidates[0]) or "" if candidates else ""
+    if DEBUG_IDENTIFY:
+        print(f"[IDENTIFY] → 最終結果: {result!r}")
+    return result
 
 
 # ---------------------------------------------------------------------------
