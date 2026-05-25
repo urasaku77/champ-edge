@@ -552,13 +552,8 @@ class MainApp(ThemedTk):
 
         current = self._get_current_version()
         api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
-        _headers = {
-            "User-Agent": "champedge-updater/1.0",
-            "Authorization": f"token {self._RELEASE_TOKEN}",
-        }
-
         try:
-            req = urllib.request.Request(api_url, headers=_headers)
+            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception:
@@ -1029,7 +1024,6 @@ class MainApp(ThemedTk):
 
     # アップデート
     _RELEASES_REPO = "urasaku77/champ-edge"
-    _RELEASE_TOKEN = "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"
     _VERSION_FILE = "version.txt"
 
     def _fetch_text(self, url: str) -> str:
@@ -1037,11 +1031,7 @@ class MainApp(ThemedTk):
         import urllib.request
 
         ctx = ssl._create_unverified_context()
-        headers = {
-            "User-Agent": "champedge/1.0",
-            "Authorization": f"token {self._RELEASE_TOKEN}",
-        }
-        req = urllib.request.Request(url, headers=headers)
+        req = urllib.request.Request(url, headers={"User-Agent": "champedge/1.0"})
         with urllib.request.urlopen(req, context=ctx) as r:
             return r.read().decode("utf-8")
 
@@ -1226,13 +1216,9 @@ class MainApp(ThemedTk):
 
         current = self._get_current_version()
         api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
-        _headers = {
-            "User-Agent": "champedge-updater/1.0",
-            "Authorization": f"token {self._RELEASE_TOKEN}",
-        }
 
         try:
-            req = urllib.request.Request(api_url, headers=_headers)
+            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception as e:
@@ -1303,7 +1289,6 @@ class MainApp(ThemedTk):
                     asset_url,
                     headers={
                         "User-Agent": "champedge-updater/1.0",
-                        "Authorization": f"token {self._RELEASE_TOKEN}",
                         "Accept": "application/octet-stream",
                     },
                 )
