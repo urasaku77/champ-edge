@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import json
 import math
@@ -7,94 +8,158 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 
 from component.parts.combobox import AutoCompleteCombobox
-from database.battle import DB_battle
+from database.battle import Battle, DB_battle
 from database.pokemon import DB_pokemon
 from mypgl.const import Const
 from recog.recog import get_recog_value
 
 
 class EditBattleDialog(tkinter.Toplevel):
-    def __init__(self, master, battle_data):
+    def __init__(
+        self,
+        master,
+        battle_data=None,
+        default_rule: int = 1,
+        default_party_num: str = "",
+        default_party_subnum: str = "",
+    ):
         super().__init__(master)
-        self.title("対戦記録の編集")
+        self.is_new = battle_data is None
+        self.title("対戦記録の新規追加" if self.is_new else "対戦記録の編集")
         self.saved = False
         self.deleted = False
-        self.battle_id = battle_data[0]
+        self.battle_id = None if self.is_new else battle_data[0]
 
-        tkinter.Label(self, text="TN:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-        self.tn_var = tkinter.StringVar(value=battle_data[5] or "")
-        tkinter.Entry(self, textvariable=self.tn_var, width=20).grid(row=0, column=1, columnspan=3, sticky="w", padx=5)
+        row = 0
 
-        tkinter.Label(self, text="レート:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-        self.rate_var = tkinter.StringVar(value=battle_data[6] or "")
-        tkinter.Entry(self, textvariable=self.rate_var, width=20).grid(row=1, column=1, columnspan=3, sticky="w", padx=5)
+        if self.is_new:
+            now = datetime.datetime.now()
+            tkinter.Label(self, text="日時:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+            dt_frame = tkinter.Frame(self)
+            dt_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+            self.date_var = tkinter.StringVar(value=now.strftime("%Y/%m/%d"))
+            tkinter.Entry(dt_frame, textvariable=self.date_var, width=12).pack(side=tkinter.LEFT)
+            self.time_var = tkinter.StringVar(value=now.strftime("%H:%M"))
+            tkinter.Entry(dt_frame, textvariable=self.time_var, width=8).pack(side=tkinter.LEFT, padx=(4, 0))
+            row += 1
 
-        tkinter.Label(self, text="メモ:").grid(row=2, column=0, sticky="ne", padx=5, pady=5)
+            tkinter.Label(self, text="ルール:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+            rule_frame = tkinter.Frame(self)
+            rule_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+            self.rule_var = tkinter.IntVar(value=default_rule if default_rule in (1, 2) else 1)
+            tkinter.Radiobutton(rule_frame, text="シングル", variable=self.rule_var, value=1).pack(side=tkinter.LEFT)
+            tkinter.Radiobutton(rule_frame, text="ダブル", variable=self.rule_var, value=2).pack(side=tkinter.LEFT)
+            row += 1
+
+            tkinter.Label(self, text="P番号:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+            pn_frame = tkinter.Frame(self)
+            pn_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+            self.party_num_var = tkinter.StringVar(value=str(default_party_num or ""))
+            tkinter.Entry(pn_frame, textvariable=self.party_num_var, width=6).pack(side=tkinter.LEFT)
+            tkinter.Label(pn_frame, text="連番:").pack(side=tkinter.LEFT, padx=(10, 2))
+            self.party_subnum_var = tkinter.StringVar(value=str(default_party_subnum or ""))
+            tkinter.Entry(pn_frame, textvariable=self.party_subnum_var, width=6).pack(side=tkinter.LEFT)
+            row += 1
+
+        tkinter.Label(self, text="TN:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        self.tn_var = tkinter.StringVar(value="" if self.is_new else (battle_data[5] or ""))
+        tkinter.Entry(self, textvariable=self.tn_var, width=20).grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        row += 1
+
+        tkinter.Label(self, text="レート:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        self.rate_var = tkinter.StringVar(value="" if self.is_new else (battle_data[6] or ""))
+        tkinter.Entry(self, textvariable=self.rate_var, width=20).grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        row += 1
+
+        tkinter.Label(self, text="メモ:").grid(row=row, column=0, sticky="ne", padx=5, pady=5)
         self.memo_text = tkinter.Text(self, width=30, height=4)
-        self.memo_text.insert("1.0", battle_data[7] or "")
-        self.memo_text.grid(row=2, column=1, columnspan=3, sticky="w", padx=5)
+        self.memo_text.insert("1.0", "" if self.is_new else (battle_data[7] or ""))
+        self.memo_text.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        row += 1
 
-        tkinter.Label(self, text="勝敗:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-        self.result_var = tkinter.IntVar(value=battle_data[3])
-        tkinter.Radiobutton(self, text="勝ち", variable=self.result_var, value=1).grid(row=3, column=1)
-        tkinter.Radiobutton(self, text="負け", variable=self.result_var, value=0).grid(row=3, column=2)
-        tkinter.Radiobutton(self, text="引き分け", variable=self.result_var, value=-1).grid(row=3, column=3)
+        tkinter.Label(self, text="勝敗:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        self.result_var = tkinter.IntVar(value=1 if self.is_new else battle_data[3])
+        tkinter.Radiobutton(self, text="勝ち", variable=self.result_var, value=1).grid(row=row, column=1)
+        tkinter.Radiobutton(self, text="負け", variable=self.result_var, value=0).grid(row=row, column=2)
+        tkinter.Radiobutton(self, text="引き分け", variable=self.result_var, value=-1).grid(row=row, column=3)
+        row += 1
 
-        tkinter.Label(self, text="自分P:").grid(row=4, column=0, sticky="e", padx=5, pady=3)
+        tkinter.Label(self, text="自分P:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
         p_frame = tkinter.Frame(self)
-        p_frame.grid(row=4, column=1, columnspan=3, sticky="w", padx=5)
+        p_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.player_pokemon_vars = []
         for col in range(10, 16):
-            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            AutoCompleteCombobox.pokemons(p_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
+            var = tkinter.StringVar(value=initial)
+            cb = AutoCompleteCombobox.pokemons(p_frame, textvariable=var, width=10)
+            cb.pack(side=tkinter.LEFT, padx=2)
+            cb.bind("<<ComboboxSelected>>", self._refresh_player_choices, add="+")
+            cb.bind("<FocusOut>", self._refresh_player_choices, add="+")
             self.player_pokemon_vars.append(var)
+        row += 1
 
-        tkinter.Label(self, text="相手P:").grid(row=5, column=0, sticky="e", padx=5, pady=3)
+        tkinter.Label(self, text="相手P:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
         o_frame = tkinter.Frame(self)
-        o_frame.grid(row=5, column=1, columnspan=3, sticky="w", padx=5)
+        o_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.opponent_pokemon_vars = []
         for col in range(16, 22):
-            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            AutoCompleteCombobox.pokemons(o_frame, textvariable=var, width=10).pack(side=tkinter.LEFT, padx=2)
+            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
+            var = tkinter.StringVar(value=initial)
+            cb = AutoCompleteCombobox.pokemons(o_frame, textvariable=var, width=10)
+            cb.pack(side=tkinter.LEFT, padx=2)
+            cb.bind("<<ComboboxSelected>>", self._refresh_opponent_choices, add="+")
+            cb.bind("<FocusOut>", self._refresh_opponent_choices, add="+")
             self.opponent_pokemon_vars.append(var)
+        row += 1
 
-        player_party_names = [""] + [
-            self._pid_to_name(battle_data[col])
-            for col in range(10, 16)
-            if battle_data[col] and battle_data[col] != "-1"
-        ]
-        opponent_party_names = [""] + [
-            self._pid_to_name(battle_data[col])
-            for col in range(16, 22)
-            if battle_data[col] and battle_data[col] != "-1"
-        ]
-
-        tkinter.Label(self, text="自分選:").grid(row=6, column=0, sticky="e", padx=5, pady=3)
+        tkinter.Label(self, text="自分選:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
         pc_frame = tkinter.Frame(self)
-        pc_frame.grid(row=6, column=1, columnspan=3, sticky="w", padx=5)
+        pc_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.player_choice_vars = []
+        self.player_choice_cbs = []
         for col in range(22, 26):
-            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            cb = tkinter.ttk.Combobox(pc_frame, textvariable=var, values=player_party_names, width=10, state="readonly")
+            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
+            var = tkinter.StringVar(value=initial)
+            cb = tkinter.ttk.Combobox(pc_frame, textvariable=var, values=[""], width=10, state="readonly")
             cb.pack(side=tkinter.LEFT, padx=2)
             self.player_choice_vars.append(var)
+            self.player_choice_cbs.append(cb)
+        row += 1
 
-        tkinter.Label(self, text="相手選:").grid(row=7, column=0, sticky="e", padx=5, pady=3)
+        tkinter.Label(self, text="相手選:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
         oc_frame = tkinter.Frame(self)
-        oc_frame.grid(row=7, column=1, columnspan=3, sticky="w", padx=5)
+        oc_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.opponent_choice_vars = []
+        self.opponent_choice_cbs = []
         for col in range(26, 30):
-            var = tkinter.StringVar(value=self._pid_to_name(battle_data[col]))
-            cb = tkinter.ttk.Combobox(oc_frame, textvariable=var, values=opponent_party_names, width=10, state="readonly")
+            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
+            var = tkinter.StringVar(value=initial)
+            cb = tkinter.ttk.Combobox(oc_frame, textvariable=var, values=[""], width=10, state="readonly")
             cb.pack(side=tkinter.LEFT, padx=2)
             self.opponent_choice_vars.append(var)
+            self.opponent_choice_cbs.append(cb)
+        row += 1
 
-        tkinter.Button(self, text="保存", command=self._save).grid(row=8, column=1, pady=10)
-        tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=8, column=2, pady=10)
-        tkinter.Button(self, text="削除", fg="red", command=self._delete).grid(row=8, column=3, pady=10)
+        self._refresh_player_choices()
+        self._refresh_opponent_choices()
+
+        tkinter.Button(self, text="保存", command=self._save).grid(row=row, column=1, pady=10)
+        tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=row, column=2, pady=10)
+        if not self.is_new:
+            tkinter.Button(self, text="削除", fg="red", command=self._delete).grid(row=row, column=3, pady=10)
 
         self.grab_set()
         self.focus_set()
+
+    def _refresh_player_choices(self, *args):
+        names = [""] + [v.get() for v in self.player_pokemon_vars if v.get().strip()]
+        for cb in self.player_choice_cbs:
+            cb["values"] = names
+
+    def _refresh_opponent_choices(self, *args):
+        names = [""] + [v.get() for v in self.opponent_pokemon_vars if v.get().strip()]
+        for cb in self.opponent_choice_cbs:
+            cb["values"] = names
 
     @staticmethod
     def _pid_to_name(pid: str) -> str:
@@ -116,17 +181,53 @@ class EditBattleDialog(tkinter.Toplevel):
             return "-1"
 
     def _save(self):
-        DB_battle.update_battle_full(
-            self.battle_id,
-            self.result_var.get(),
-            self.tn_var.get(),
-            self.rate_var.get(),
-            self.memo_text.get("1.0", "end-1c"),
-            [self._name_to_pid(v.get()) for v in self.player_pokemon_vars],
-            [self._name_to_pid(v.get()) for v in self.opponent_pokemon_vars],
-            [self._name_to_pid(v.get()) for v in self.player_choice_vars],
-            [self._name_to_pid(v.get()) for v in self.opponent_choice_vars],
-        )
+        player_pokemons = [self._name_to_pid(v.get()) for v in self.player_pokemon_vars]
+        opponent_pokemons = [self._name_to_pid(v.get()) for v in self.opponent_pokemon_vars]
+        player_choices = [self._name_to_pid(v.get()) for v in self.player_choice_vars]
+        opponent_choices = [self._name_to_pid(v.get()) for v in self.opponent_choice_vars]
+
+        if self.is_new:
+            try:
+                dt = datetime.datetime.strptime(
+                    f"{self.date_var.get().strip()} {self.time_var.get().strip()}",
+                    "%Y/%m/%d %H:%M",
+                )
+            except ValueError:
+                messagebox.showerror(
+                    "入力エラー",
+                    "日時は YYYY/MM/DD HH:MM 形式で入力してください。",
+                    parent=self,
+                )
+                return
+            battle = Battle(
+                None,
+                int(dt.timestamp()),
+                self.rule_var.get(),
+                self.result_var.get(),
+                0,
+                self.tn_var.get(),
+                self.rate_var.get(),
+                self.memo_text.get("1.0", "end-1c"),
+                self.party_num_var.get().strip(),
+                self.party_subnum_var.get().strip(),
+                *player_pokemons,
+                *opponent_pokemons,
+                *player_choices,
+                *opponent_choices,
+            )
+            DB_battle.register_battle(dataclasses.astuple(battle))
+        else:
+            DB_battle.update_battle_full(
+                self.battle_id,
+                self.result_var.get(),
+                self.tn_var.get(),
+                self.rate_var.get(),
+                self.memo_text.get("1.0", "end-1c"),
+                player_pokemons,
+                opponent_pokemons,
+                player_choices,
+                opponent_choices,
+            )
         self.saved = True
         self.destroy()
 
@@ -433,6 +534,14 @@ class Record(tkinter.Toplevel):
         favorite_check.place(
             x=Const.searchX + 450, y=Const.searchY + Const.searchDY * 2.7
         )
+        add_button = tkinter.Button(
+            self,
+            text="新規追加",
+            command=self._open_add_dialog,
+        )
+        add_button.place(
+            x=Const.searchX + 340, y=Const.searchY + Const.searchDY * 2.7
+        )
 
         koumoku_label0 = tkinter.Label(
             self,
@@ -720,6 +829,18 @@ class Record(tkinter.Toplevel):
             self.wait_window(dialog)
             if dialog.saved or dialog.deleted:
                 self.get_battle_data()
+
+    def _open_add_dialog(self):
+        dialog = EditBattleDialog(
+            self,
+            battle_data=None,
+            default_rule=self.rule.get(),
+            default_party_num=self.num_txt.get(),
+            default_party_subnum=self.sub_num_txt.get(),
+        )
+        self.wait_window(dialog)
+        if dialog.saved and hasattr(self, "from_date"):
+            self.get_battle_data()
 
     def _delete_single(self, battle_id: int):
         if not messagebox.askyesno("削除確認", "この対戦記録を削除しますか？\nこの操作は元に戻せません。", parent=self):
