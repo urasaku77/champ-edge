@@ -538,17 +538,16 @@ class Capture:
         return cls._pokemon_template_cache[image_path]
 
     @staticmethod
-    def _preprocess_field_name(img: np.ndarray, v_thr: int = 240) -> Image.Image:
+    def _preprocess_field_name(img: np.ndarray, v_thr: int = 220, upscale: int = 4) -> Image.Image:
         """ゲームUIのポケモン名テキスト画像を前処理してmanga_ocr向けに変換する。
-        白テキスト(V>v_thr,S<60)抽出 → 斜体補正(shear=-0.15) → 4x拡大 → 白地黒文字
-        相手HPバー(明るい桃背景): v_thr=240、自分HPバー(暗い青背景): v_thr=180"""
+        白テキスト(V>v_thr,S<60)抽出 → upscale倍拡大 → 白地黒文字反転。
+        斜体補正(shear)は opo 側で誤読を誘発するため不適用。
+        相手HPバー(明るい桃背景): v_thr=220、自分HPバー(暗い青背景): v_thr=180。
+        upscale は 4x が小書き仮名で字形を保ちやすいシンプル名前向け、6x は
+        ジュ/シュ等の濁点+小書きで字形が潰れがちな名前向け（_recognize_field_by_name 内で両方試す）。"""
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, (0, 0, v_thr), (180, 60, 255))
-        h, w = mask.shape
-        shear = -0.15
-        M = np.float32([[1, shear, max(0, -shear * h)], [0, 1, 0]])
-        deskewed = cv2.warpAffine(mask, M, (int(w + abs(shear) * h), h), borderValue=0)
-        large = cv2.resize(deskewed, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+        large = cv2.resize(mask, None, fx=upscale, fy=upscale, interpolation=cv2.INTER_CUBIC)
         inverted = cv2.bitwise_not(large)
         padded = cv2.copyMakeBorder(inverted, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
         return Image.fromarray(padded)
@@ -622,36 +621,44 @@ class Capture:
 
     def _recognize_field_by_name(self, coord_name: str, party_pids: list[str]) -> str:
         """HPバーのポケモン名テキストをOCRで読み取りパーティ候補と照合する。
-        ニックネーム非表示設定が前提。"""
+        ニックネーム非表示設定が前提。4x と 6x の2パスでOCRし、最良の照合 ratio を採用する。"""
         import difflib
         if not party_pids:
             return ""
         coord = self.coords.dicCoord[coord_name]
         img = self.img[coord.top : coord.bottom, coord.left : coord.right]
-        v_thr = 180 if coord_name == "myFieldName" else 240
-        text = ""
-        try:
-            pil = self._preprocess_field_name(img, v_thr)
-            text = self._manga_ocr(pil).strip()
-        except Exception:
-            pass
-        if not text:
-            print(f"[FIELD OCR] {coord_name}: OCR結果なし")
-            return ""
-        print(f"[FIELD OCR] {coord_name}: OCR読み取り={text!r}")
-        best_ratio = 0.0
-        best_pid = ""
-        for pid in party_pids:
+        v_thr = 180 if coord_name == "myFieldName" else 220
+        ocr_texts: list[tuple[int, str]] = []
+        for upscale in (4, 6):
             try:
-                poke_name = Pokemon.by_pid(pid).name
-                ratio = difflib.SequenceMatcher(None, text, poke_name).ratio()
-                print(f"[FIELD OCR]   {poke_name}: ratio={ratio:.3f}")
-                if ratio > best_ratio:
-                    best_ratio = ratio
-                    best_pid = pid
+                pil = self._preprocess_field_name(img, v_thr, upscale=upscale)
+                t = self._manga_ocr(pil).strip()
+                if t:
+                    ocr_texts.append((upscale, t))
             except Exception:
                 continue
-        print(f"[FIELD OCR] {coord_name}: best={best_pid} ratio={best_ratio:.3f} {'→採用' if best_ratio >= 0.5 else '→不採用(0.5未満)'}")
+        if not ocr_texts:
+            print(f"[FIELD OCR] {coord_name}: OCR結果なし")
+            return ""
+        for up, t in ocr_texts:
+            print(f"[FIELD OCR] {coord_name}: OCR読み取り(up={up})={t!r}")
+        best_ratio = 0.0
+        best_pid = ""
+        best_up = 0
+        best_text = ""
+        for up, text in ocr_texts:
+            for pid in party_pids:
+                try:
+                    poke_name = Pokemon.by_pid(pid).name
+                    ratio = difflib.SequenceMatcher(None, text, poke_name).ratio()
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_pid = pid
+                        best_up = up
+                        best_text = text
+                except Exception:
+                    continue
+        print(f"[FIELD OCR] {coord_name}: best up={best_up} text={best_text!r} pid={best_pid} ratio={best_ratio:.3f} {'→採用' if best_ratio >= 0.5 else '→不採用(0.5未満)'}")
         return best_pid if best_ratio >= 0.5 else ""
 
     def is_exist_image_max(self, temp_imgge_name, accuracy, coord_name):
