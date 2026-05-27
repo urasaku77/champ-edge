@@ -42,10 +42,11 @@ class Analytics(tkinter.Toplevel):
         self.whole_win_rate_label = None
 
         self.sort_condition_options = [("KP（選出/初手）", 0), ("勝率", 1)]
-        self.sort_line_options = [("降順", False), ("昇順", True)]
+        self.sort_line_options = [("降順", 0), ("昇順", 1)]
         self.merge_mega_var = tkinter.BooleanVar()
         self.merge_mega_var.set(False)
         self._mega_groups: dict = {}
+        self._ranking_index = self._load_ranking_index()
 
         self.display_gui(self.recent_date)
         self.update_result()
@@ -64,6 +65,37 @@ class Analytics(tkinter.Toplevel):
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             return []
+
+    @staticmethod
+    def _load_ranking_index() -> dict[str, int]:
+        ranking: dict[str, int] = {}
+        try:
+            with open("stats/ranking.txt", encoding="utf-8") as f:
+                for i, line in enumerate(f):
+                    pid = line.strip()
+                    if pid:
+                        ranking[pid] = i + 1
+        except FileNotFoundError:
+            pass
+        return ranking
+
+    @staticmethod
+    def _to_ranking_key(pid: str) -> str:
+        if not pid:
+            return pid
+        parts = pid.split("-")
+        if len(parts) < 2:
+            return pid
+        return f"{parts[0].zfill(4)}-{parts[-1].zfill(2)}"
+
+    @staticmethod
+    def _from_ranking_key(key: str) -> str:
+        parts = key.split("-")
+        if len(parts) < 2:
+            return key
+        no = parts[0].lstrip("0") or "0"
+        form = parts[-1].lstrip("0") or "0"
+        return f"{no}-{form}"
 
     def _on_season_select(self, name: str):
         is_custom = name == "カスタム"
@@ -260,8 +292,8 @@ class Analytics(tkinter.Toplevel):
             rb.grid(sticky="w")
         sort_condition_frame.place(x=Const.searchX + 130, y=Const.kpStartY - 60)
         sort_line_frame = tkinter.Frame(self)
-        self.sort_line_var = tkinter.BooleanVar()
-        self.sort_line_var.set(True)
+        self.sort_line_var = tkinter.IntVar()
+        self.sort_line_var.set(1)
         for text, value in self.sort_line_options:
             rb = tkinter.Radiobutton(
                 sort_line_frame,
@@ -272,13 +304,21 @@ class Analytics(tkinter.Toplevel):
             )
             rb.grid(sticky="w")
         sort_line_frame.place(x=Const.searchX + 270, y=Const.kpStartY - 60)
-        merge_mega_check = tkinter.Checkbutton(
+        ranking_sort_rb = tkinter.Radiobutton(
+            self,
+            text="使用率順",
+            variable=self.sort_line_var,
+            value=2,
+            command=self.change_sort_condition,
+        )
+        ranking_sort_rb.place(x=Const.searchX + 390, y=Const.kpStartY - 60)
+        self.merge_mega_check = tkinter.Checkbutton(
             self,
             text="メガ統合",
             variable=self.merge_mega_var,
             command=self.update_result,
         )
-        merge_mega_check.place(x=Const.searchX + 390, y=Const.kpStartY - 60)
+        self.merge_mega_check.place(x=Const.searchX + 390, y=Const.kpStartY - 35)
         self.main_title_label.place(x=Const.kpStartX, y=Const.kpStartY - 60)
         self.subtitle_var = tkinter.StringVar()
         self.subtitle_var.set("直近使用したパーティ")
@@ -314,7 +354,7 @@ class Analytics(tkinter.Toplevel):
         )
         self.delete_result_page()
         self.sort_condition_var.set(0)
-        self.sort_line_var.set(True)
+        self.sort_line_var.set(1)
         self.party_num = (
             int(self.num_txt.get())
             if self.num_txt.get() is not None and self.num_txt.get() != ""
@@ -487,6 +527,17 @@ class Analytics(tkinter.Toplevel):
 
     def change_sort_condition(self):
         self.delete_result()
+        sort_line = self.sort_line_var.get()
+        self.merge_mega_check.config(
+            state="disabled" if sort_line == 2 else "normal"
+        )
+        if sort_line == 2:
+            self._apply_ranking_order()
+            self.display_result_1()
+            self.display_result_2()
+            self.display_image()
+            return
+
         new_result_list = list(
             zip(
                 self.pokemon_list,
@@ -500,12 +551,12 @@ class Analytics(tkinter.Toplevel):
         if self.sort_condition_var.get() == 0:
             new_result_list.sort(
                 key=lambda x: (x[1], x[2], name_order_dict[x[0]]),
-                reverse=self.sort_line_var.get(),
+                reverse=bool(sort_line),
             )
         elif self.sort_condition_var.get() == 1:
             new_result_list.sort(
                 key=lambda x: (x[2], x[1], name_order_dict[x[0]]),
-                reverse=self.sort_line_var.get(),
+                reverse=bool(sort_line),
             )
 
         self.pokemon_list = [item[0] for item in new_result_list]
@@ -515,6 +566,52 @@ class Analytics(tkinter.Toplevel):
         self.display_result_1()
         self.display_result_2()
         self.display_image()
+
+    def _apply_ranking_order(self):
+        ranked = sorted(self._ranking_index.items(), key=lambda x: x[1])[:50]
+        pokemon_list = [self._from_ranking_key(k) for k, _ in ranked]
+        query_groups = [DB_battle._expand_mega_forms(p) for p in pokemon_list]
+        _regend = (
+            self.regends_dict[self.regend_num.get()]
+            if self.regend_num.get() != "0"
+            else "0"
+        )
+        title = self.title_var.get()
+        if title == "選出と勝率":
+            result_1_list = DB_battle.get_oppo_chosen_rate(
+                query_groups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            result_2_list = DB_battle.get_oppo_chosen_and_win_rate(
+                query_groups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+        elif title == "初手と勝率":
+            result_1_list = DB_battle.get_oppo_first_chosen_rate(
+                query_groups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            result_2_list = DB_battle.get_oppo_first_chosen_and_win_rate(
+                query_groups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+        else:
+            kp_result = DB_battle.calc_kp(
+                self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            kp_map: dict[str, int] = {}
+            for pid, kp in kp_result:
+                base_id = DB_battle._normalize_mega_form(pid)
+                kp_map[base_id] = kp_map.get(base_id, 0) + kp
+            result_1_list = [kp_map.get(p, 0) for p in pokemon_list]
+            result_2_list = DB_battle.get_win_rate(
+                query_groups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+        self.pokemon_list = pokemon_list
+        self.result_1_list = result_1_list
+        self.result_2_list = result_2_list
 
     def change_mode(self):
         _regend = self.regends_dict[self.regend_num.get()] if self.regend_num.get() != "0" else "0"
