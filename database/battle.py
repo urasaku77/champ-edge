@@ -183,14 +183,18 @@ class DB_battle:
 
     @staticmethod
     def update_battle_full(
-        battle_id: int, result: int, opponent_tn: str, opponent_rate: str, battle_memo: str,
+        battle_id: int, date: int, rule: int, result: int,
+        opponent_tn: str, opponent_rate: str, battle_memo: str,
+        player_party_num: str, player_party_subnum: str,
         player_pokemons: list, opponent_pokemons: list,
         player_choices: list, opponent_choices: list,
     ):
         cur = DB_battle.__db.cursor()
         cur.execute(
             """UPDATE battle SET
-               result = ?, opponent_tn = ?, opponent_rate = ?, battle_memo = ?,
+               date = ?, rule = ?, result = ?,
+               opponent_tn = ?, opponent_rate = ?, battle_memo = ?,
+               player_party_num = ?, player_party_subnum = ?,
                player_pokemon1 = ?, player_pokemon2 = ?, player_pokemon3 = ?,
                player_pokemon4 = ?, player_pokemon5 = ?, player_pokemon6 = ?,
                opponent_pokemon1 = ?, opponent_pokemon2 = ?, opponent_pokemon3 = ?,
@@ -198,7 +202,8 @@ class DB_battle:
                player_choice1 = ?, player_choice2 = ?, player_choice3 = ?, player_choice4 = ?,
                opponent_choice1 = ?, opponent_choice2 = ?, opponent_choice3 = ?, opponent_choice4 = ?
                WHERE id = ?""",
-            (result, opponent_tn, opponent_rate, battle_memo,
+            (date, rule, result, opponent_tn, opponent_rate, battle_memo,
+             player_party_num, player_party_subnum,
              *player_pokemons, *opponent_pokemons, *player_choices, *opponent_choices,
              battle_id),
         )
@@ -236,11 +241,19 @@ class DB_battle:
         party_subnum=0,
         regend_num="0",
         keyword: str = "",
+        sort_field: str = "date",
+        sort_asc: bool = True,
     ):
         where, params = DB_battle._build_base_where(
             from_date, to_date, rule, party_num, party_subnum, regend_num, keyword
         )
-        return DB_battle.__select(f"SELECT * FROM battle WHERE {where}", tuple(params))
+        if sort_field not in ("date", "id"):
+            sort_field = "date"
+        direction = "ASC" if sort_asc else "DESC"
+        return DB_battle.__select(
+            f"SELECT * FROM battle WHERE {where} ORDER BY {sort_field} {direction}",
+            tuple(params),
+        )
 
     @staticmethod
     def calc_kp(
@@ -313,15 +326,54 @@ class DB_battle:
             "select player_pokemon1, player_pokemon2, player_pokemon3, "
             "player_pokemon4, player_pokemon5, player_pokemon6, "
             "player_party_num, player_party_subnum "
-            "from battle where date in("
-            "select MAX(date) from battle group by "
-            "player_pokemon1, player_pokemon2, player_pokemon3, "
-            "player_pokemon4, player_pokemon5, player_pokemon6"
-            ") order by date desc"
+            "from battle order by date desc"
         )
-        result = DB_battle.__select(sql)
-        del result[9:]
+        rows = DB_battle.__select(sql)
+        result = []
+        seen: set = set()
+        for row in rows:
+            normalized_pokes = tuple(
+                DB_battle._normalize_mega_form(p) for p in row[:6]
+            )
+            key = tuple(sorted(normalized_pokes))
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append((*normalized_pokes, row[6], row[7]))
+            if len(result) >= 9:
+                break
         return result
+
+    @staticmethod
+    def _normalize_mega_form(pid: str) -> str:
+        if not pid:
+            return pid
+        parts = pid.split("-")
+        if len(parts) < 2:
+            return pid
+        try:
+            form = int(parts[-1])
+        except ValueError:
+            return pid
+        if 10 <= form <= 19:
+            return f"{parts[0]}-0"
+        return pid
+
+    @staticmethod
+    def _expand_mega_forms(pid: str) -> list[str]:
+        if not pid:
+            return [pid]
+        parts = pid.split("-")
+        if len(parts) < 2:
+            return [pid]
+        try:
+            form = int(parts[-1])
+        except ValueError:
+            return [pid]
+        if form == 0 or 10 <= form <= 19:
+            no = parts[0]
+            return [f"{no}-0"] + [f"{no}-{f}" for f in range(10, 20)]
+        return [pid]
 
     @staticmethod
     def get_my_party(party_num=0, party_subnum=0, regend_num="0"):
@@ -341,11 +393,19 @@ class DB_battle:
             "SELECT player_pokemon1, player_pokemon2, player_pokemon3, "
             "player_pokemon4, player_pokemon5, player_pokemon6 "
             "FROM battle WHERE " + " AND ".join(parts)
+            + " ORDER BY date DESC"
         )
         result = DB_battle.__select(sql, tuple(params))
-        sorted_result = set(tuple(sorted(t)) for t in result)
-        result_list = list(sorted_result)
-        return result_list if len(result_list) == 1 else -1
+        if not result:
+            return -1
+        normalized = [
+            tuple(DB_battle._normalize_mega_form(p) for p in t)
+            for t in result
+        ]
+        keys = {tuple(sorted(t)) for t in normalized}
+        if len(keys) != 1:
+            return -1
+        return [normalized[0]]
 
     @staticmethod
     def get_win_rate(
@@ -504,6 +564,15 @@ class DB_battle:
         return winRateList
 
     @staticmethod
+    def _build_player_choice_any(pokeName: str) -> tuple[str, list]:
+        expanded = DB_battle._expand_mega_forms(pokeName)
+        ph = ",".join("?" * len(expanded))
+        clause = " OR ".join(
+            f"player_choice{i} IN ({ph})" for i in range(1, 5)
+        )
+        return f"({clause})", expanded * 4
+
+    @staticmethod
     def get_win_rate_per_pokemon(
         party_list,
         from_date,
@@ -517,20 +586,17 @@ class DB_battle:
         base_where, base_params = DB_battle._build_base_where(
             from_date, to_date, rule, partyNum, partySubnum, regend_num
         )
-        _PLAYER_CHOICE_ANY = (
-            "(player_choice1 = ? OR player_choice2 = ? OR "
-            "player_choice3 = ? OR player_choice4 = ?)"
-        )
         winRateList = []
         for pokeName in party_list:
+            choice_clause, choice_params = DB_battle._build_player_choice_any(pokeName)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {_PLAYER_CHOICE_ANY}",
-                tuple(base_params + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {choice_clause}",
+                tuple(base_params + choice_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {_PLAYER_CHOICE_ANY}",
-                tuple(base_params + [1] + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {choice_clause}",
+                tuple(base_params + [1] + choice_params),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
@@ -550,10 +616,6 @@ class DB_battle:
         base_where, base_params = DB_battle._build_base_where(
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
-        _PLAYER_CHOICE_ANY = (
-            "(player_choice1 = ? OR player_choice2 = ? OR "
-            "player_choice3 = ? OR player_choice4 = ?)"
-        )
         cur.execute(
             f"SELECT count(*) FROM battle WHERE {base_where}", tuple(base_params)
         )
@@ -563,9 +625,10 @@ class DB_battle:
 
         sensyutuRateList = []
         for pokeName in party_list:
+            choice_clause, choice_params = DB_battle._build_player_choice_any(pokeName)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {_PLAYER_CHOICE_ANY}",
-                tuple(base_params + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {choice_clause}",
+                tuple(base_params + choice_params),
             )
             sensyutuCount = cur.fetchone()
             sensyutuRateList.append(sensyutuCount[0] / battleCount[0])
@@ -585,20 +648,17 @@ class DB_battle:
         base_where, base_params = DB_battle._build_base_where(
             from_date, to_date, rule, partyNum, partySubNum, regend_num
         )
-        _PLAYER_CHOICE_ANY = (
-            "(player_choice1 = ? OR player_choice2 = ? OR "
-            "player_choice3 = ? OR player_choice4 = ?)"
-        )
         winRateList = []
         for pokeName in party_list:
+            choice_clause, choice_params = DB_battle._build_player_choice_any(pokeName)
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND {_PLAYER_CHOICE_ANY}",
-                tuple(base_params + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND {choice_clause}",
+                tuple(base_params + choice_params),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {_PLAYER_CHOICE_ANY}",
-                tuple(base_params + [1] + [pokeName] * 4),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND {choice_clause}",
+                tuple(base_params + [1] + choice_params),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
@@ -627,9 +687,11 @@ class DB_battle:
 
         sensyutuRateList = []
         for pokeName in party_list:
+            expanded = DB_battle._expand_mega_forms(pokeName)
+            ph = ",".join("?" * len(expanded))
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND player_choice1 = ?",
-                tuple(base_params + [pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND player_choice1 IN ({ph})",
+                tuple(base_params + expanded),
             )
             sensyutuCount = cur.fetchone()
             sensyutuRateList.append(sensyutuCount[0] / battleCount[0])
@@ -651,14 +713,16 @@ class DB_battle:
         )
         winRateList = []
         for pokeName in party_list:
+            expanded = DB_battle._expand_mega_forms(pokeName)
+            ph = ",".join("?" * len(expanded))
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND player_choice1 = ?",
-                tuple(base_params + [pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND player_choice1 IN ({ph})",
+                tuple(base_params + expanded),
             )
             matchNum = cur.fetchone()
             cur.execute(
-                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND player_choice1 = ?",
-                tuple(base_params + [1, pokeName]),
+                f"SELECT count(*) FROM battle WHERE {base_where} AND result = ? AND player_choice1 IN ({ph})",
+                tuple(base_params + [1] + expanded),
             )
             winNum = cur.fetchone()
             winRateList.append(0 if matchNum[0] == 0 else winNum[0] / matchNum[0])
@@ -694,14 +758,25 @@ class DB_battle:
         return from_date, to_date
 
     @staticmethod
+    def _record_search_full_sql(pokelist: list[str]) -> tuple[str, list]:
+        expanded = [DB_battle._expand_mega_forms(p) for p in pokelist]
+        where = " AND ".join(
+            f"opponent_pokemon{i+1} IN ({','.join('?' * len(expanded[i]))})"
+            for i in range(6)
+        )
+        params: list = []
+        for e in expanded:
+            params.extend(e)
+        return f"SELECT * FROM battle WHERE {where};", params
+
+    @staticmethod
     def record_search_full(pokelist: list[str]):
-        paramList = tuple(pokelist)
-        sql = "SELECT * FROM battle WHERE opponent_pokemon1=? AND opponent_pokemon2=? AND opponent_pokemon3=? AND opponent_pokemon4=? AND opponent_pokemon5=? AND opponent_pokemon6 =?;"
-        result1 = DB_battle.__select(sql, paramList)
+        sql, params = DB_battle._record_search_full_sql(pokelist)
+        result1 = DB_battle.__select(sql, tuple(params))
 
         for no in unrecognizable_pokemon_no:
             if str(no) + "-0" in pokelist or str(no) + "-1" in pokelist:
-                paramList = (
+                alt_pokelist = (
                     [
                         str(no) + "-1" if item == str(no) + "-0" else item
                         for item in pokelist
@@ -712,22 +787,48 @@ class DB_battle:
                         for item in pokelist
                     ]
                 )
-                result2 = DB_battle.__select(sql, paramList)
+                alt_sql, alt_params = DB_battle._record_search_full_sql(alt_pokelist)
+                result2 = DB_battle.__select(alt_sql, tuple(alt_params))
                 result1.extend(result2)
 
         return list(set(result1))
 
     @staticmethod
+    def _record_search_partial_sql(pokelist: list[str]) -> tuple[str, list]:
+        union_set: set = set()
+        for p in pokelist:
+            union_set.update(DB_battle._expand_mega_forms(p))
+        union_list = sorted(union_set)
+        in_ph = ",".join("?" * len(union_list))
+        slot_where = " AND ".join(
+            f"opponent_pokemon{i+1} IN ({in_ph})" for i in range(1, 7)
+        )
+        distinct_sub = (
+            "SELECT COUNT(DISTINCT col) FROM ("
+            "SELECT opponent_pokemon1 AS col FROM battle "
+            "UNION ALL SELECT opponent_pokemon2 AS col FROM battle "
+            "UNION ALL SELECT opponent_pokemon3 AS col FROM battle "
+            "UNION ALL SELECT opponent_pokemon4 AS col FROM battle "
+            "UNION ALL SELECT opponent_pokemon5 AS col FROM battle "
+            "UNION ALL SELECT opponent_pokemon6 AS col FROM battle"
+            f") AS subquery WHERE col IN ({in_ph})"
+        )
+        sql = (
+            f"SELECT * FROM battle WHERE {slot_where} AND ({distinct_sub}) = 6;"
+        )
+        params = list(union_list) * 7
+        return sql, params
+
+    @staticmethod
     def record_search(pokelist: list[str]):
-        paramList = tuple(pokelist)
         result_full = DB_battle.record_search_full(pokelist)
 
-        sql = "SELECT * FROM battle WHERE (opponent_pokemon1 IN (?, ?, ?, ?, ?, ?)) AND (opponent_pokemon2 IN (?, ?, ?, ?, ?, ?)) AND (opponent_pokemon3 IN (?, ?, ?, ?, ?, ?)) AND (opponent_pokemon4 IN (?, ?, ?, ?, ?, ?)) AND (opponent_pokemon5 IN (?, ?, ?, ?, ?, ?)) AND (opponent_pokemon6 IN (?, ?, ?, ?, ?, ?)) AND (SELECT COUNT(DISTINCT col) FROM (SELECT opponent_pokemon1 AS col FROM battle UNION ALL SELECT opponent_pokemon2 AS col FROM battle UNION ALL SELECT opponent_pokemon3 AS col FROM battle UNION ALL SELECT opponent_pokemon4 AS col FROM battle UNION ALL SELECT opponent_pokemon5 AS col FROM battle UNION ALL SELECT opponent_pokemon6 AS col FROM battle) AS subquery WHERE col IN (?, ?, ?, ?, ?, ?)) = 6;"
-        result_all_1 = DB_battle.__select(sql, paramList * 7)
+        sql, params = DB_battle._record_search_partial_sql(pokelist)
+        result_all_1 = DB_battle.__select(sql, tuple(params))
 
         for no in unrecognizable_pokemon_no:
             if str(no) + "-0" in pokelist or str(no) + "-1" in pokelist:
-                paramList = (
+                alt_pokelist = (
                     [
                         str(no) + "-1" if item == str(no) + "-0" else item
                         for item in pokelist
@@ -738,7 +839,8 @@ class DB_battle:
                         for item in pokelist
                     ]
                 )
-                result_all_2 = DB_battle.__select(sql, paramList * 7)
+                alt_sql, alt_params = DB_battle._record_search_partial_sql(alt_pokelist)
+                result_all_2 = DB_battle.__select(alt_sql, tuple(alt_params))
                 result_all_1.extend(result_all_2)
 
         result_all = list(set(result_all_1))
