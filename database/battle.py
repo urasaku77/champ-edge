@@ -303,6 +303,11 @@ class DB_battle:
         return result[0]
 
     @staticmethod
+    def get_recent_n_battles(n: int = 20):
+        sql = "SELECT * FROM battle ORDER BY date DESC LIMIT ?"
+        return DB_battle.__select(sql, (n,))
+
+    @staticmethod
     def get_my_recent_party():
         sql = (
             "select player_pokemon1, player_pokemon2, player_pokemon3, "

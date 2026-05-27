@@ -198,8 +198,8 @@ class MainApp(ThemedTk):
             self.geometry(f"{_sx(950)}x{_sy(915)}")
 
         def _handle_exc(exc, val, tb):
-            import traceback as _tb
             import os as _os
+            import traceback as _tb
             log_dir = _os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else "."
             try:
                 with open(_os.path.join(log_dir, "error.log"), "a", encoding="utf-8") as f:

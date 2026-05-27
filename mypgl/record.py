@@ -174,6 +174,12 @@ class Record(tkinter.Toplevel):
         self.focus_set()
         self.geometry("1800x950")
 
+    def _open_feedback(self):
+        from mypgl.feedback import Feedback
+        raw = self._feedback_note.get("1.0", "end-1c")
+        note = "" if raw == self._feedback_note_ph else raw.strip()
+        Feedback(self, battles=list(self.battle_data_list), note=note).open()
+
     def _load_seasons(self) -> list:
         try:
             with open("recog/season.json", "r", encoding="utf-8") as f:
@@ -347,8 +353,24 @@ class Record(tkinter.Toplevel):
 
         keyword_label = tkinter.Label(self, text="キーワード")
         keyword_label.place(x=Const.searchX + 530, y=Const.searchY)
-        self.keyword_txt = tkinter.Entry(self, width=20)
+        _KW_PH = "相手TN・バトルメモで絞り込み"
+        self.keyword_txt = tkinter.Entry(self, width=36, fg="gray")
+        self.keyword_txt.insert(0, _KW_PH)
         self.keyword_txt.place(x=Const.searchX + 600, y=Const.searchY)
+
+        def _kw_focus_in(e):
+            if self.keyword_txt.get() == _KW_PH:
+                self.keyword_txt.delete(0, "end")
+                self.keyword_txt.config(fg="black")
+
+        def _kw_focus_out(e):
+            if not self.keyword_txt.get().strip():
+                self.keyword_txt.insert(0, _KW_PH)
+                self.keyword_txt.config(fg="gray")
+
+        self.keyword_txt.bind("<FocusIn>", _kw_focus_in)
+        self.keyword_txt.bind("<FocusOut>", _kw_focus_out)
+        self._keyword_ph = _KW_PH
 
         search_button = tkinter.Button(
             self,
@@ -375,6 +397,31 @@ class Record(tkinter.Toplevel):
         export_button.place(
             x=Const.searchX + 760, y=Const.searchY + Const.searchDY * 2.7
         )
+        feedback_button = tkinter.Button(
+            self,
+            text="AIフィードバック",
+            command=self._open_feedback,
+        )
+        feedback_button.place(x=Const.searchX + 880, y=Const.searchY - Const.searchDY)
+        self._feedback_note = tkinter.Text(self, width=30, height=4, fg="gray")
+        self._feedback_note.place(x=Const.searchX + 880, y=Const.searchY + Const.searchDY)
+        _NOTE_PH = "AIフィードバック補足メモ（例: スカーフ軸・受けループ対策が課題）"
+        self._feedback_note.insert("1.0", _NOTE_PH)
+        self._feedback_note.config(fg="gray")
+
+        def _note_focus_in(e):
+            if self._feedback_note.get("1.0", "end-1c") == _NOTE_PH:
+                self._feedback_note.delete("1.0", "end")
+                self._feedback_note.config(fg="black")
+
+        def _note_focus_out(e):
+            if not self._feedback_note.get("1.0", "end-1c").strip():
+                self._feedback_note.insert("1.0", _NOTE_PH)
+                self._feedback_note.config(fg="gray")
+
+        self._feedback_note.bind("<FocusIn>", _note_focus_in)
+        self._feedback_note.bind("<FocusOut>", _note_focus_out)
+        self._feedback_note_ph = _NOTE_PH
         self.favorite_var = tkinter.BooleanVar()
         self.favorite_var.set(False)
         favorite_check = tkinter.Checkbutton(
@@ -463,7 +510,7 @@ class Record(tkinter.Toplevel):
             self.regends_dict[self.regend_num.get()]
             if self.regend_num.get() != "0"
             else "0",
-            self.keyword_txt.get().strip(),
+            "" if self.keyword_txt.get().strip() == self._keyword_ph else self.keyword_txt.get().strip(),
         )
 
         self.page_num_var.set(1)

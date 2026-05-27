@@ -272,12 +272,46 @@ class ModeSetting(tkinter.Toplevel):
         )
         self.battle_record_auto_checkbox.grid(row=15, column=0, columnspan=2, pady=2, sticky="w", padx=20)
 
+        # 水平線（区切り）
+        ttk.Separator(self, orient="horizontal").grid(row=16, column=0, columnspan=2, sticky="ew", pady=5)
+
+        # ── AI フィードバック セクション ──
+        tkinter.Label(self, text="AI フィードバック", font=("", 10, "bold")).grid(
+            row=17, column=0, columnspan=2, pady=(2, 5)
+        )
+
+        import os as _os
+        env_key = _os.environ.get("ANTHROPIC_API_KEY", "")
+        if not env_key and _os.name == "nt":
+            try:
+                import winreg as _wr
+                with _wr.OpenKey(_wr.HKEY_CURRENT_USER, "Environment") as _reg:
+                    env_key, _ = _wr.QueryValueEx(_reg, "ANTHROPIC_API_KEY")
+            except Exception:
+                env_key = ""
+        if env_key:
+            tkinter.Label(
+                self, text="APIキー: 設定済み（環境変数）", foreground="green"
+            ).grid(row=18, column=0, columnspan=2, pady=2, sticky="w", padx=20)
+            self._api_key_entry = None
+        else:
+            tkinter.Label(self, text="APIキー:").grid(row=18, column=0, sticky="e", padx=5, pady=2)
+            self._api_key_var = tkinter.StringVar()
+            try:
+                import json as _json
+                with open(self.path, "r") as _f:
+                    self._api_key_var.set(_json.load(_f).get("anthropic_api_key", ""))
+            except Exception:
+                pass
+            self._api_key_entry = tkinter.Entry(self, textvariable=self._api_key_var, show="*", width=30)
+            self._api_key_entry.grid(row=18, column=1, sticky="w", padx=5, pady=2)
+
         self.submit_button = MyButton(self, text="保存", command=self.submit_form)
-        self.submit_button.grid(row=16, column=0, pady=10)
+        self.submit_button.grid(row=19, column=0, pady=10)
         self.cancel_button = MyButton(
             self, text="キャンセル", command=self.on_push_button
         )
-        self.cancel_button.grid(row=16, column=1, pady=10)
+        self.cancel_button.grid(row=19, column=1, pady=10)
 
     def open(self, location=tuple[int, int]):
         self.grab_set()
@@ -302,6 +336,7 @@ class ModeSetting(tkinter.Toplevel):
             "tn_ocr_enabled": self.tn_ocr_enabled_var.get(),
             "battle_record_auto": self.battle_record_auto_var.get(),
             "field_name_ocr_enabled": self.field_name_ocr_enabled_var.get(),
+            "anthropic_api_key": self._api_key_var.get() if self._api_key_entry is not None else "",
         }
 
         # tesseract_path は TesseractSetupDialog が直接保存するため、
