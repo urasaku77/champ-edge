@@ -58,25 +58,6 @@ class Analytics(tkinter.Toplevel):
         self.focus_set()
         self.geometry("1280x720")
 
-    def _open_feedback(self):
-        from database.battle import DB_battle
-        from mypgl.feedback import Feedback
-        if not hasattr(self, "from_date"):
-            from tkinter import messagebox
-            messagebox.showinfo("情報", "先に検索してください。", parent=self)
-            return
-        battles = DB_battle.get_battle_data_by_date(
-            self.from_date,
-            self.to_date,
-            self.rule.get(),
-            self.party_num,
-            self.party_subnum,
-            self.regends_dict[self.regend_num.get()] if self.regend_num.get() != "0" else "0",
-        )
-        raw = self._feedback_note.get("1.0", "end-1c")
-        note = "" if raw == self._feedback_note_ph else raw.strip()
-        Feedback(self, battles=battles, note=note).open()
-
     def _load_seasons(self) -> list:
         try:
             with open("recog/season.json", "r", encoding="utf-8") as f:
@@ -256,34 +237,6 @@ class Analytics(tkinter.Toplevel):
             x=Const.searchX + 450, y=Const.searchY + Const.searchDY * 2.7
         )
 
-        # ── AI フィードバック（上段ボタン・中段以下メモ、独立エリア） ──
-        feedback_button = tkinter.Button(
-            self,
-            text="AIフィードバック",
-            command=self._open_feedback,
-        )
-        feedback_button.place(x=Const.searchX + 560, y=Const.searchY - Const.searchDY)
-
-        _NOTE_PH = "AIフィードバック補足メモ（例: スカーフ軸・受けループ対策が課題）"
-        self._feedback_note = tkinter.Text(self, width=32, height=4, fg="gray")
-        self._feedback_note.insert("1.0", _NOTE_PH)
-        self._feedback_note.place(
-            x=Const.searchX + 560, y=Const.searchY + Const.searchDY
-        )
-
-        def _note_focus_in(e):
-            if self._feedback_note.get("1.0", "end-1c") == _NOTE_PH:
-                self._feedback_note.delete("1.0", "end")
-                self._feedback_note.config(fg="black")
-
-        def _note_focus_out(e):
-            if not self._feedback_note.get("1.0", "end-1c").strip():
-                self._feedback_note.insert("1.0", _NOTE_PH)
-                self._feedback_note.config(fg="gray")
-
-        self._feedback_note.bind("<FocusIn>", _note_focus_in)
-        self._feedback_note.bind("<FocusOut>", _note_focus_out)
-        self._feedback_note_ph = _NOTE_PH
         self.title_var = tkinter.StringVar()
         self.title_var.set("ＫＰと勝率")
         self.main_title_label = tkinter.Button(

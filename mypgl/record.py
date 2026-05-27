@@ -33,33 +33,45 @@ class EditBattleDialog(tkinter.Toplevel):
         row = 0
 
         if self.is_new:
-            now = datetime.datetime.now()
-            tkinter.Label(self, text="日時:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
-            dt_frame = tkinter.Frame(self)
-            dt_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
-            self.date_var = tkinter.StringVar(value=now.strftime("%Y/%m/%d"))
-            tkinter.Entry(dt_frame, textvariable=self.date_var, width=12).pack(side=tkinter.LEFT)
-            self.time_var = tkinter.StringVar(value=now.strftime("%H:%M"))
-            tkinter.Entry(dt_frame, textvariable=self.time_var, width=8).pack(side=tkinter.LEFT, padx=(4, 0))
-            row += 1
+            init_date_str = datetime.datetime.now().strftime("%Y/%m/%d")
+            init_time_str = datetime.datetime.now().strftime("%H:%M")
+            init_rule = default_rule if default_rule in (1, 2) else 1
+            init_party_num = str(default_party_num or "")
+            init_party_subnum = str(default_party_subnum or "")
+        else:
+            dt = datetime.datetime.fromtimestamp(battle_data[1])
+            init_date_str = dt.strftime("%Y/%m/%d")
+            init_time_str = dt.strftime("%H:%M")
+            init_rule = battle_data[2] if battle_data[2] in (1, 2) else 1
+            init_party_num = str(battle_data[8] or "")
+            init_party_subnum = str(battle_data[9] or "")
 
-            tkinter.Label(self, text="ルール:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
-            rule_frame = tkinter.Frame(self)
-            rule_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
-            self.rule_var = tkinter.IntVar(value=default_rule if default_rule in (1, 2) else 1)
-            tkinter.Radiobutton(rule_frame, text="シングル", variable=self.rule_var, value=1).pack(side=tkinter.LEFT)
-            tkinter.Radiobutton(rule_frame, text="ダブル", variable=self.rule_var, value=2).pack(side=tkinter.LEFT)
-            row += 1
+        tkinter.Label(self, text="日時:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        dt_frame = tkinter.Frame(self)
+        dt_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        self.date_var = tkinter.StringVar(value=init_date_str)
+        tkinter.Entry(dt_frame, textvariable=self.date_var, width=12).pack(side=tkinter.LEFT)
+        self.time_var = tkinter.StringVar(value=init_time_str)
+        tkinter.Entry(dt_frame, textvariable=self.time_var, width=8).pack(side=tkinter.LEFT, padx=(4, 0))
+        row += 1
 
-            tkinter.Label(self, text="P番号:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
-            pn_frame = tkinter.Frame(self)
-            pn_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
-            self.party_num_var = tkinter.StringVar(value=str(default_party_num or ""))
-            tkinter.Entry(pn_frame, textvariable=self.party_num_var, width=6).pack(side=tkinter.LEFT)
-            tkinter.Label(pn_frame, text="連番:").pack(side=tkinter.LEFT, padx=(10, 2))
-            self.party_subnum_var = tkinter.StringVar(value=str(default_party_subnum or ""))
-            tkinter.Entry(pn_frame, textvariable=self.party_subnum_var, width=6).pack(side=tkinter.LEFT)
-            row += 1
+        tkinter.Label(self, text="ルール:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        rule_frame = tkinter.Frame(self)
+        rule_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        self.rule_var = tkinter.IntVar(value=init_rule)
+        tkinter.Radiobutton(rule_frame, text="シングル", variable=self.rule_var, value=1).pack(side=tkinter.LEFT)
+        tkinter.Radiobutton(rule_frame, text="ダブル", variable=self.rule_var, value=2).pack(side=tkinter.LEFT)
+        row += 1
+
+        tkinter.Label(self, text="P番号:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        pn_frame = tkinter.Frame(self)
+        pn_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
+        self.party_num_var = tkinter.StringVar(value=init_party_num)
+        tkinter.Entry(pn_frame, textvariable=self.party_num_var, width=6).pack(side=tkinter.LEFT)
+        tkinter.Label(pn_frame, text="連番:").pack(side=tkinter.LEFT, padx=(10, 2))
+        self.party_subnum_var = tkinter.StringVar(value=init_party_subnum)
+        tkinter.Entry(pn_frame, textvariable=self.party_subnum_var, width=6).pack(side=tkinter.LEFT)
+        row += 1
 
         tkinter.Label(self, text="TN:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
         self.tn_var = tkinter.StringVar(value="" if self.is_new else (battle_data[5] or ""))
@@ -117,13 +129,28 @@ class EditBattleDialog(tkinter.Toplevel):
         pc_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.player_choice_vars = []
         self.player_choice_cbs = []
-        for col in range(22, 26):
-            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
-            var = tkinter.StringVar(value=initial)
+        self.player_choice_mega_vars = []
+        self.player_choice_mega_cbs = []
+        for slot, col in enumerate(range(22, 26)):
+            if self.is_new:
+                name, mega_label = "", ""
+            else:
+                name, mega_label = self._pid_to_choice_pair(battle_data[col])
+            var = tkinter.StringVar(value=name)
             cb = tkinter.ttk.Combobox(pc_frame, textvariable=var, values=[""], width=10, state="readonly")
-            cb.pack(side=tkinter.LEFT, padx=2)
+            cb.pack(side=tkinter.LEFT, padx=(2, 0))
             self.player_choice_vars.append(var)
             self.player_choice_cbs.append(cb)
+            mega_var = tkinter.StringVar(value=mega_label)
+            mega_cb = tkinter.ttk.Combobox(pc_frame, textvariable=mega_var, values=[""], width=4, state="readonly")
+            mega_cb.pack(side=tkinter.LEFT, padx=(0, 4))
+            self.player_choice_mega_vars.append(mega_var)
+            self.player_choice_mega_cbs.append(mega_cb)
+            cb.bind(
+                "<<ComboboxSelected>>",
+                lambda e, i=slot: self._refresh_player_mega(i),
+                add="+",
+            )
         row += 1
 
         tkinter.Label(self, text="相手選:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
@@ -131,17 +158,36 @@ class EditBattleDialog(tkinter.Toplevel):
         oc_frame.grid(row=row, column=1, columnspan=3, sticky="w", padx=5)
         self.opponent_choice_vars = []
         self.opponent_choice_cbs = []
-        for col in range(26, 30):
-            initial = "" if self.is_new else self._pid_to_name(battle_data[col])
-            var = tkinter.StringVar(value=initial)
+        self.opponent_choice_mega_vars = []
+        self.opponent_choice_mega_cbs = []
+        for slot, col in enumerate(range(26, 30)):
+            if self.is_new:
+                name, mega_label = "", ""
+            else:
+                name, mega_label = self._pid_to_choice_pair(battle_data[col])
+            var = tkinter.StringVar(value=name)
             cb = tkinter.ttk.Combobox(oc_frame, textvariable=var, values=[""], width=10, state="readonly")
-            cb.pack(side=tkinter.LEFT, padx=2)
+            cb.pack(side=tkinter.LEFT, padx=(2, 0))
             self.opponent_choice_vars.append(var)
             self.opponent_choice_cbs.append(cb)
+            mega_var = tkinter.StringVar(value=mega_label)
+            mega_cb = tkinter.ttk.Combobox(oc_frame, textvariable=mega_var, values=[""], width=4, state="readonly")
+            mega_cb.pack(side=tkinter.LEFT, padx=(0, 4))
+            self.opponent_choice_mega_vars.append(mega_var)
+            self.opponent_choice_mega_cbs.append(mega_cb)
+            cb.bind(
+                "<<ComboboxSelected>>",
+                lambda e, i=slot: self._refresh_opponent_mega(i),
+                add="+",
+            )
         row += 1
 
         self._refresh_player_choices()
         self._refresh_opponent_choices()
+        for i in range(len(self.player_choice_cbs)):
+            self._refresh_player_mega(i)
+        for i in range(len(self.opponent_choice_cbs)):
+            self._refresh_opponent_mega(i)
 
         tkinter.Button(self, text="保存", command=self._save).grid(row=row, column=1, pady=10)
         tkinter.Button(self, text="キャンセル", command=self.destroy).grid(row=row, column=2, pady=10)
@@ -160,6 +206,20 @@ class EditBattleDialog(tkinter.Toplevel):
         names = [""] + [v.get() for v in self.opponent_pokemon_vars if v.get().strip()]
         for cb in self.opponent_choice_cbs:
             cb["values"] = names
+
+    def _refresh_player_mega(self, slot: int):
+        name = self.player_choice_vars[slot].get()
+        options = self._get_mega_options_for_name(name)
+        self.player_choice_mega_cbs[slot]["values"] = options
+        if self.player_choice_mega_vars[slot].get() not in options:
+            self.player_choice_mega_vars[slot].set("")
+
+    def _refresh_opponent_mega(self, slot: int):
+        name = self.opponent_choice_vars[slot].get()
+        options = self._get_mega_options_for_name(name)
+        self.opponent_choice_mega_cbs[slot]["values"] = options
+        if self.opponent_choice_mega_vars[slot].get() not in options:
+            self.opponent_choice_mega_vars[slot].set("")
 
     @staticmethod
     def _pid_to_name(pid: str) -> str:
@@ -180,25 +240,119 @@ class EditBattleDialog(tkinter.Toplevel):
         except Exception:
             return "-1"
 
+    @staticmethod
+    def _pid_to_choice_pair(pid: str) -> tuple[str, str]:
+        """選出枠の保存pidを (表示名, メガラベル) に分解する。"""
+        if not pid or pid == "-1":
+            return ("", "")
+        try:
+            no_str, form_str = pid.split("-")
+            form_int = int(form_str)
+        except Exception:
+            return (EditBattleDialog._pid_to_name(pid), "")
+        if 10 <= form_int <= 19:
+            try:
+                base_name = DB_pokemon.get_pokemon_name_by_pid(f"{no_str}-0") or ""
+            except Exception:
+                base_name = ""
+            try:
+                mega_forms = DB_pokemon.get_mega_forms_by_no(int(no_str))
+            except Exception:
+                mega_forms = []
+            if len(mega_forms) >= 2:
+                label = "Y" if form_int == 12 else "X"
+            else:
+                label = "メガ"
+            return (base_name, label)
+        return (EditBattleDialog._pid_to_name(pid), "")
+
+    @staticmethod
+    def _get_mega_options_for_name(name: str) -> list[str]:
+        """選択中ポケモン名に応じたメガ選択肢を返す。"""
+        if not name or not name.strip():
+            return [""]
+        try:
+            pid = DB_pokemon.get_pokemon_pid_by_name(name)
+        except Exception:
+            return [""]
+        if not pid:
+            return [""]
+        try:
+            no = int(pid.split("-")[0])
+            mega_forms = DB_pokemon.get_mega_forms_by_no(no)
+        except Exception:
+            return [""]
+        if not mega_forms:
+            return [""]
+        if len(mega_forms) >= 2:
+            options = [""]
+            if any(f != 12 for f in mega_forms):
+                options.append("X")
+            if 12 in mega_forms:
+                options.append("Y")
+            return options
+        return ["", "メガ"]
+
+    @staticmethod
+    def _choice_to_pid(name: str, mega_label: str) -> str:
+        """選出枠の (表示名, メガラベル) から保存pidを組み立てる。"""
+        name = (name or "").strip()
+        if not name:
+            return "-1"
+        try:
+            pid = DB_pokemon.get_pokemon_pid_by_name(name) or "-1"
+        except Exception:
+            return "-1"
+        if not mega_label or pid == "-1":
+            return pid
+        no_str = pid.split("-")[0]
+        try:
+            mega_forms = DB_pokemon.get_mega_forms_by_no(int(no_str))
+        except Exception:
+            mega_forms = []
+        if not mega_forms:
+            return pid
+        if mega_label == "Y":
+            target = 12 if 12 in mega_forms else mega_forms[0]
+        elif mega_label == "X":
+            non_y = [f for f in mega_forms if f != 12]
+            target = non_y[0] if non_y else mega_forms[0]
+        else:
+            target = mega_forms[0]
+        return f"{no_str}-{target}"
+
     def _save(self):
         player_pokemons = [self._name_to_pid(v.get()) for v in self.player_pokemon_vars]
         opponent_pokemons = [self._name_to_pid(v.get()) for v in self.opponent_pokemon_vars]
-        player_choices = [self._name_to_pid(v.get()) for v in self.player_choice_vars]
-        opponent_choices = [self._name_to_pid(v.get()) for v in self.opponent_choice_vars]
+        player_choices = [
+            self._choice_to_pid(
+                self.player_choice_vars[i].get(),
+                self.player_choice_mega_vars[i].get(),
+            )
+            for i in range(len(self.player_choice_vars))
+        ]
+        opponent_choices = [
+            self._choice_to_pid(
+                self.opponent_choice_vars[i].get(),
+                self.opponent_choice_mega_vars[i].get(),
+            )
+            for i in range(len(self.opponent_choice_vars))
+        ]
+
+        try:
+            dt = datetime.datetime.strptime(
+                f"{self.date_var.get().strip()} {self.time_var.get().strip()}",
+                "%Y/%m/%d %H:%M",
+            )
+        except ValueError:
+            messagebox.showerror(
+                "入力エラー",
+                "日時は YYYY/MM/DD HH:MM 形式で入力してください。",
+                parent=self,
+            )
+            return
 
         if self.is_new:
-            try:
-                dt = datetime.datetime.strptime(
-                    f"{self.date_var.get().strip()} {self.time_var.get().strip()}",
-                    "%Y/%m/%d %H:%M",
-                )
-            except ValueError:
-                messagebox.showerror(
-                    "入力エラー",
-                    "日時は YYYY/MM/DD HH:MM 形式で入力してください。",
-                    parent=self,
-                )
-                return
             battle = Battle(
                 None,
                 int(dt.timestamp()),
@@ -219,10 +373,14 @@ class EditBattleDialog(tkinter.Toplevel):
         else:
             DB_battle.update_battle_full(
                 self.battle_id,
+                int(dt.timestamp()),
+                self.rule_var.get(),
                 self.result_var.get(),
                 self.tn_var.get(),
                 self.rate_var.get(),
                 self.memo_text.get("1.0", "end-1c"),
+                self.party_num_var.get().strip(),
+                self.party_subnum_var.get().strip(),
                 player_pokemons,
                 opponent_pokemons,
                 player_choices,
@@ -275,12 +433,6 @@ class Record(tkinter.Toplevel):
         self.focus_set()
         self.geometry("1800x950")
 
-    def _open_feedback(self):
-        from mypgl.feedback import Feedback
-        raw = self._feedback_note.get("1.0", "end-1c")
-        note = "" if raw == self._feedback_note_ph else raw.strip()
-        Feedback(self, battles=list(self.battle_data_list), note=note).open()
-
     def _load_seasons(self) -> list:
         try:
             with open("recog/season.json", "r", encoding="utf-8") as f:
@@ -308,37 +460,42 @@ class Record(tkinter.Toplevel):
             self.to_date_var.set(season["to_date"])
 
     def display_gui(self):
+        # 上部メニューの左端を「対戦時間」列の左端 (summaryX + 60 = 70) に合わせる
+        search_x = Const.summaryX + 60
+        search_y = Const.searchY
+        search_dy = Const.searchDY
+
         self._seasons = self._load_seasons()
         season_names = ["カスタム"] + [s["name"] for s in self._seasons]
         season_label = tkinter.Label(self, text="シーズン")
-        season_label.place(x=Const.searchX, y=Const.searchY - Const.searchDY)
+        season_label.place(x=search_x, y=search_y - search_dy)
         self.season_var = tkinter.StringVar(self, value="カスタム")
         season_menu = tkinter.OptionMenu(
             self, self.season_var, *season_names, command=self._on_season_select
         )
-        season_menu.place(x=Const.searchX, y=Const.searchY)
+        season_menu.place(x=search_x, y=search_y)
 
         self.time9_bln = tkinter.BooleanVar()
         self.time9_bln.set(True)
         time9_check = tkinter.Checkbutton(
             self, variable=self.time9_bln, text="開始日を11時以降にする"
         )
-        time9_check.place(x=Const.searchX + 120, y=Const.searchY - Const.searchDY)
+        time9_check.place(x=search_x + 120, y=search_y - search_dy)
 
         self.time23_bln = tkinter.BooleanVar()
         self.time23_bln.set(True)
         time23_check = tkinter.Checkbutton(
             self, variable=self.time23_bln, text="終了日を11時までにする"
         )
-        time23_check.place(x=Const.searchX + 320, y=Const.searchY - Const.searchDY)
+        time23_check.place(x=search_x + 320, y=search_y - search_dy)
 
         rank_label = tkinter.Label(self, text="パーティ絞り込み")
-        rank_label.place(x=Const.searchX, y=Const.searchY + Const.searchDY * 2)
+        rank_label.place(x=search_x, y=search_y + search_dy * 2)
 
         self.from_year_var = tkinter.IntVar(self)
         self.from_year_var.set(int(self.recent_date.year))
         self.from_year_menu = tkinter.OptionMenu(self, self.from_year_var, *Const.yearList)
-        self.from_year_menu.place(x=Const.searchX + 120, y=Const.searchY)
+        self.from_year_menu.place(x=search_x + 120, y=search_y)
         self.from_month_var = tkinter.IntVar(self)
         self.from_month_var.set(int(self.recent_date.month))
         self.from_date_var = tkinter.IntVar(self)
@@ -346,46 +503,65 @@ class Record(tkinter.Toplevel):
         self.from_month_menu = tkinter.OptionMenu(
             self, self.from_month_var, *Const.monthList
         )
-        self.from_month_menu.place(x=Const.searchX + 190, y=Const.searchY)
+        self.from_month_menu.place(x=search_x + 190, y=search_y)
         self.from_date_menu = tkinter.OptionMenu(self, self.from_date_var, *Const.dateList)
-        self.from_date_menu.place(x=Const.searchX + 240, y=Const.searchY)
+        self.from_date_menu.place(x=search_x + 240, y=search_y)
 
         mack_label = tkinter.Label(self, text=" ~ ", font=Const.titleFont)
-        mack_label.place(x=Const.searchX + 290, y=Const.searchY)
+        mack_label.place(x=search_x + 290, y=search_y)
 
         self.to_year_var = tkinter.IntVar(self)
         self.to_year_var.set(int(self.recent_date.year))
         self.to_year_menu = tkinter.OptionMenu(self, self.to_year_var, *Const.yearList)
-        self.to_year_menu.place(x=Const.searchX + 320, y=Const.searchY)
+        self.to_year_menu.place(x=search_x + 320, y=search_y)
         self.to_month_var = tkinter.IntVar(self)
         self.to_month_var.set(int(self.recent_date.month))
         self.to_date_var = tkinter.IntVar(self)
         self.to_date_var.set(int(self.recent_date.day))
         self.to_month_menu = tkinter.OptionMenu(self, self.to_month_var, *Const.monthList)
-        self.to_month_menu.place(x=Const.searchX + 390, y=Const.searchY)
+        self.to_month_menu.place(x=search_x + 390, y=search_y)
         self.to_date_menu = tkinter.OptionMenu(self, self.to_date_var, *Const.dateList)
-        self.to_date_menu.place(x=Const.searchX + 450, y=Const.searchY)
+        self.to_date_menu.place(x=search_x + 450, y=search_y)
+
+        sort_field_label = tkinter.Label(self, text="並び替え")
+        sort_field_label.place(x=search_x + 550, y=search_y)
+        self.sort_field_var = tkinter.StringVar(self, value="対戦時間")
+        sort_field_menu = tkinter.OptionMenu(
+            self, self.sort_field_var, "対戦時間", "登録順"
+        )
+        sort_field_menu.place(x=search_x + 610, y=search_y)
+
+        self.sort_asc_var = tkinter.BooleanVar(value=True)
+
+        def _toggle_sort_order():
+            self.sort_asc_var.set(not self.sort_asc_var.get())
+            self.sort_order_btn.config(text="昇順" if self.sort_asc_var.get() else "降順")
+
+        self.sort_order_btn = tkinter.Button(
+            self, text="昇順", width=4, command=_toggle_sort_order
+        )
+        self.sort_order_btn.place(x=search_x + 710, y=search_y)
 
         self.rule = tkinter.IntVar()
         self.rule.set(get_recog_value("rule"))
         rb_single = tkinter.Radiobutton(
             self, text="シングル", variable=self.rule, value=1
         )
-        rb_single.place(x=Const.searchX + 200, y=Const.searchY + Const.searchDY * 2.7)
+        rb_single.place(x=search_x + 200, y=search_y + search_dy * 2.7)
         rb_double = tkinter.Radiobutton(
             self, text="ダブル", variable=self.rule, value=2
         )
-        rb_double.place(x=Const.searchX + 270, y=Const.searchY + Const.searchDY * 2.7)
+        rb_double.place(x=search_x + 270, y=search_y + search_dy * 2.7)
 
         num_label = tkinter.Label(self, text="番号")
-        num_label.place(x=Const.searchX, y=Const.searchY + Const.searchDY * 3)
+        num_label.place(x=search_x, y=search_y + search_dy * 3)
         self.num_txt = tkinter.Entry(self, width=Const.txtboxWidth)
-        self.num_txt.place(x=Const.searchX + 40, y=Const.searchY + Const.searchDY * 3)
+        self.num_txt.place(x=search_x + 40, y=search_y + search_dy * 3)
         sub_num_label = tkinter.Label(self, text="連番")
-        sub_num_label.place(x=Const.searchX + 90, y=Const.searchY + Const.searchDY * 3)
+        sub_num_label.place(x=search_x + 90, y=search_y + search_dy * 3)
         self.sub_num_txt = tkinter.Entry(self, width=Const.txtboxWidth)
         self.sub_num_txt.place(
-            x=Const.searchX + 130, y=Const.searchY + Const.searchDY * 3
+            x=search_x + 130, y=search_y + search_dy * 3
         )
 
         # --- 伝説絞り込み機能（未使用） ---
@@ -453,20 +629,20 @@ class Record(tkinter.Toplevel):
         # --- ここまで ---
 
         keyword_label = tkinter.Label(self, text="キーワード")
-        keyword_label.place(x=Const.searchX + 530, y=Const.searchY)
+        keyword_label.place(x=search_x + 850, y=search_y - search_dy)
         _KW_PH = "相手TN・バトルメモで絞り込み"
-        self.keyword_txt = tkinter.Entry(self, width=36, fg="gray")
-        self.keyword_txt.insert(0, _KW_PH)
-        self.keyword_txt.place(x=Const.searchX + 600, y=Const.searchY)
+        self.keyword_txt = tkinter.Text(self, width=24, height=2, fg="gray")
+        self.keyword_txt.insert("1.0", _KW_PH)
+        self.keyword_txt.place(x=search_x + 850, y=search_y)
 
         def _kw_focus_in(e):
-            if self.keyword_txt.get() == _KW_PH:
-                self.keyword_txt.delete(0, "end")
+            if self.keyword_txt.get("1.0", "end-1c") == _KW_PH:
+                self.keyword_txt.delete("1.0", "end")
                 self.keyword_txt.config(fg="black")
 
         def _kw_focus_out(e):
-            if not self.keyword_txt.get().strip():
-                self.keyword_txt.insert(0, _KW_PH)
+            if not self.keyword_txt.get("1.0", "end-1c").strip():
+                self.keyword_txt.insert("1.0", _KW_PH)
                 self.keyword_txt.config(fg="gray")
 
         self.keyword_txt.bind("<FocusIn>", _kw_focus_in)
@@ -479,7 +655,7 @@ class Record(tkinter.Toplevel):
             command=self.get_battle_data,
         )
         search_button.place(
-            x=Const.searchX + 550, y=Const.searchY + Const.searchDY * 2.7
+            x=search_x + 550, y=search_y + search_dy * 2.7
         )
         delete_range_button = tkinter.Button(
             self,
@@ -488,7 +664,7 @@ class Record(tkinter.Toplevel):
             fg="red",
         )
         delete_range_button.place(
-            x=Const.searchX + 620, y=Const.searchY + Const.searchDY * 2.7
+            x=search_x + 620, y=search_y + search_dy * 2.7
         )
         export_button = tkinter.Button(
             self,
@@ -496,33 +672,8 @@ class Record(tkinter.Toplevel):
             command=self.export_csv,
         )
         export_button.place(
-            x=Const.searchX + 760, y=Const.searchY + Const.searchDY * 2.7
+            x=search_x + 760, y=search_y + search_dy * 2.7
         )
-        feedback_button = tkinter.Button(
-            self,
-            text="AIフィードバック",
-            command=self._open_feedback,
-        )
-        feedback_button.place(x=Const.searchX + 880, y=Const.searchY - Const.searchDY)
-        self._feedback_note = tkinter.Text(self, width=30, height=4, fg="gray")
-        self._feedback_note.place(x=Const.searchX + 880, y=Const.searchY + Const.searchDY)
-        _NOTE_PH = "AIフィードバック補足メモ（例: スカーフ軸・受けループ対策が課題）"
-        self._feedback_note.insert("1.0", _NOTE_PH)
-        self._feedback_note.config(fg="gray")
-
-        def _note_focus_in(e):
-            if self._feedback_note.get("1.0", "end-1c") == _NOTE_PH:
-                self._feedback_note.delete("1.0", "end")
-                self._feedback_note.config(fg="black")
-
-        def _note_focus_out(e):
-            if not self._feedback_note.get("1.0", "end-1c").strip():
-                self._feedback_note.insert("1.0", _NOTE_PH)
-                self._feedback_note.config(fg="gray")
-
-        self._feedback_note.bind("<FocusIn>", _note_focus_in)
-        self._feedback_note.bind("<FocusOut>", _note_focus_out)
-        self._feedback_note_ph = _NOTE_PH
         self.favorite_var = tkinter.BooleanVar()
         self.favorite_var.set(False)
         favorite_check = tkinter.Checkbutton(
@@ -532,7 +683,7 @@ class Record(tkinter.Toplevel):
             command=self.filter_favorites,
         )
         favorite_check.place(
-            x=Const.searchX + 450, y=Const.searchY + Const.searchDY * 2.7
+            x=search_x + 450, y=search_y + search_dy * 2.7
         )
         add_button = tkinter.Button(
             self,
@@ -540,19 +691,19 @@ class Record(tkinter.Toplevel):
             command=self._open_add_dialog,
         )
         add_button.place(
-            x=Const.searchX + 340, y=Const.searchY + Const.searchDY * 2.7
+            x=search_x + 340, y=search_y + search_dy * 2.7
         )
 
         koumoku_label0 = tkinter.Label(
             self,
             text="対戦時間",
         )
-        koumoku_label0.place(x=Const.summaryX + 60, y=Const.koumokuY)
+        koumoku_label0.place(x=Const.summaryX + 30, y=Const.koumokuY)
         koumoku_label1 = tkinter.Label(
             self,
             text="自分のパーティ",
         )
-        koumoku_label1.place(x=Const.myPokemonX, y=Const.koumokuY)
+        koumoku_label1.place(x=Const.myPokemonX + 50, y=Const.koumokuY)
         koumoku_label2 = tkinter.Label(self, text="選出")
         koumoku_label2.place(x=Const.mysensyutuX, y=Const.koumokuY)
         koumoku_label3 = tkinter.Label(self, text="勝敗")
@@ -610,6 +761,10 @@ class Record(tkinter.Toplevel):
             if self.sub_num_txt.get() is not None and self.sub_num_txt.get() != ""
             else 0
         )
+        kw_raw = self.keyword_txt.get("1.0", "end-1c").strip()
+        keyword = "" if kw_raw == self._keyword_ph else kw_raw
+        sort_field = "date" if self.sort_field_var.get() == "対戦時間" else "id"
+        sort_asc = self.sort_asc_var.get()
         self.battle_data_list = DB_battle.get_battle_data_by_date(
             self.from_date,
             self.to_date,
@@ -619,7 +774,9 @@ class Record(tkinter.Toplevel):
             self.regends_dict[self.regend_num.get()]
             if self.regend_num.get() != "0"
             else "0",
-            "" if self.keyword_txt.get().strip() == self._keyword_ph else self.keyword_txt.get().strip(),
+            keyword,
+            sort_field,
+            sort_asc,
         )
 
         self.page_num_var.set(1)

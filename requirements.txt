@@ -10,4 +10,3 @@ selenium
 simpleobsws
 pygame
 manga-ocr
-anthropic
