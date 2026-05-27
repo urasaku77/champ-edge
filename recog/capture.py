@@ -20,6 +20,7 @@ import pyocr
 import pyocr.builders
 from PIL import Image
 
+from database.pokemon import DB_pokemon
 from pokedata.exception import unrecognizable_pokemon
 from pokedata.pokemon import Pokemon
 from recog.coordinate import ConfCoordinate
@@ -59,6 +60,9 @@ class Capture:
         self.my_party_pids: list[str] = []
         self._last_field_pid: str = ""
         self._last_my_field_pid: str = ""
+        self._mega_triggered: dict[str, bool] = {"my": False, "oppo": False}
+        self._mega_stone_names: dict[str, list[str]] | None = None
+        self._mega_form_names: dict[str, list[str]] | None = None
         self._load_bgm_config()
         try:
             pygame.mixer.init()
@@ -300,6 +304,7 @@ class Capture:
             self.party_recognized = False
             self._last_field_pid = ""
             self._last_my_field_pid = ""
+            self._mega_triggered = {"my": False, "oppo": False}
             if self._bgm_playing != "bgm2":
                 self._switch_bgm(2)
             return True
@@ -316,10 +321,16 @@ class Capture:
             self.phase = "wait"
             self._switch_bgm(1)
             return "winright"
-        # コマンド選択画面かつOCR有効時のみフィールドポケモン認識を実行
+        # コマンド選択画面かつOCR有効時のみフィールドポケモン・メガシンカ認識を実行
         ocr_enabled = get_recog_value("field_name_ocr_enabled")
         battle_detected = self.is_exist_image("image/recogImg/situation/recogBattle.jpg", 0.8, "battle")
         print(f"[FIELD] ocr_enabled={ocr_enabled} battle={battle_detected} oppo_pids={self.oppo_party_pids} my_pids={self.my_party_pids}")
+        if ocr_enabled:
+            mega = self._detect_mega_narration()
+            if mega is not None:
+                side, x_or_y = mega
+                self._mega_triggered[side] = True
+                return ("mega_evolved", side, x_or_y)
         if ocr_enabled and battle_detected:
             if self.oppo_party_pids:
                 field_pid = self._recognize_field_by_name("opoFieldName", self.oppo_party_pids)
@@ -541,6 +552,73 @@ class Capture:
         inverted = cv2.bitwise_not(large)
         padded = cv2.copyMakeBorder(inverted, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
         return Image.fromarray(padded)
+
+    # メガシンカナレーション検知
+    # 発動時: "{ポケモン名}の{メガストーン名}と{トレーナー名}のゼンブイリングが反応した！"
+    # 完了時: "{メガ前ポケモン名}は{メガ後ポケモン名}にメガシンカした！"
+    # 相手側はいずれも先頭が "相手の" になる
+    def _detect_mega_narration(self) -> tuple[str, str] | None:
+        coord = self.coords.dicCoord.get("mega_narration")
+        if coord is None:
+            return None
+        img = self.img[coord.top : coord.bottom, coord.left : coord.right]
+        try:
+            pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            text = self._manga_ocr(pil).strip()
+        except Exception:
+            return None
+        if not text:
+            return None
+
+        # トリガー文言: ナレーションでなければ即抜ける（毎ループOCRを通すので過剰判定を避ける）
+        is_completion = "メガシンカ" in text
+        is_activation = "反応" in text
+        if not (is_completion or is_activation):
+            return None
+
+        print(f"[MEGA OCR] text={text!r}")
+
+        side = "oppo" if text.startswith("相手") else "my"
+        if self._mega_triggered.get(side):
+            return None
+
+        # ホワイトリストの遅延ロード
+        if self._mega_stone_names is None:
+            self._mega_stone_names = DB_pokemon.get_mega_stone_names()
+        if self._mega_form_names is None:
+            self._mega_form_names = DB_pokemon.get_mega_form_names()
+
+        if is_completion:
+            cand_y = self._mega_form_names["Y"]
+            cand_x = self._mega_form_names["X"]
+        else:
+            cand_y = self._mega_stone_names["Y"]
+            cand_x = self._mega_stone_names["X"] + self._mega_stone_names["single"]
+
+        x_or_y = self._classify_mega_xy(text, cand_y, cand_x)
+        print(f"[MEGA] side={side} kind={'完了' if is_completion else '発動'} x_or_y={x_or_y}")
+        return (side, x_or_y)
+
+    @staticmethod
+    def _classify_mega_xy(text: str, candidates_y: list[str], candidates_x: list[str]) -> str:
+        """OCR文字列がY系/X系どちらに近いか判定する。
+        OCRが 'Y' を1文字でも拾えていれば Y、そうでなければ X 系候補との曖昧マッチで決める。"""
+        import difflib
+
+        normalized = text.replace("Ｙ", "Y").replace("Ｘ", "X")
+        if "Y" in normalized or "y" in normalized:
+            return "Y"
+        if not candidates_y or not candidates_x:
+            return "X"
+        best_y = max(
+            (difflib.SequenceMatcher(None, c, normalized).ratio() for c in candidates_y),
+            default=0.0,
+        )
+        best_x = max(
+            (difflib.SequenceMatcher(None, c, normalized).ratio() for c in candidates_x),
+            default=0.0,
+        )
+        return "Y" if best_y > best_x else "X"
 
     def _recognize_field_by_name(self, coord_name: str, party_pids: list[str]) -> str:
         """HPバーのポケモン名テキストをOCRで読み取りパーティ候補と照合する。

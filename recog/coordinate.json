@@ -31,5 +31,6 @@
   "opoFieldIcon": { "top":  20, "bottom": 110, "left": 1380, "right": 1495 },
   "myFieldIcon":  { "top": 925, "bottom":1045, "left":   5, "right":  100 },
   "opoFieldName": { "top":  33, "bottom":  78, "left": 1580, "right": 1875 },
-  "myFieldName":  { "top": 928, "bottom": 988, "left": 155, "right":  365 }
+  "myFieldName":  { "top": 928, "bottom": 988, "left": 155, "right":  365 },
+  "mega_narration": { "top": 780, "bottom": 950, "left": 180, "right": 1230 }
 }

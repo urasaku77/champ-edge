@@ -881,6 +881,9 @@ class MainApp(ThemedTk):
                         if p.pid == pid or p.pid.split("-")[0] == base_no:
                             self._stage.set_active_pokemon_from_index(0, i)
                             break
+            case ("mega_evolved", str() as side, str() as x_or_y):
+                if self._stage is not None:
+                    self._auto_mega_evolve(side, x_or_y)
             case tuple():
                 self.party_frames[1].set_party_from_capture(result[0])
                 self.record_frame.tn.delete(0, tkinter.END)
@@ -910,6 +913,30 @@ class MainApp(ThemedTk):
             case _:
                 pass
         self._after_id = self.after(1000, self.loop_image_recognize)
+
+    # メガシンカ自動検知時にアクティブポケモンをメガフォームへ切り替える
+    def _auto_mega_evolve(self, side: str, x_or_y: str):
+        from database.pokemon import DB_pokemon
+
+        player = 0 if side == "my" else 1
+        pokemon = self.active_poke_frames[player]._pokemon
+        if pokemon is None or pokemon.is_empty:
+            print(f"[MEGA] skip: active pokemon empty (side={side})")
+            return
+        mega_forms = DB_pokemon.get_mega_forms_by_no(pokemon.no)
+        if not mega_forms:
+            print(f"[MEGA] skip: no={pokemon.no} has no mega forms in DB")
+            return
+        if pokemon.form in mega_forms:
+            print(f"[MEGA] skip: already mega (form={pokemon.form})")
+            return
+        press_count = 2 if (x_or_y == "Y" and len(mega_forms) >= 2) else 1
+        print(f"[MEGA] evolve side={side} no={pokemon.no} press={press_count}")
+        for _ in range(press_count):
+            pokemon.form_change()
+        self.set_active_pokemon(player, pokemon)
+        self.after_appear(pokemon, player)
+        self._stage.calc_damage()
 
     def _show_party_progress(self, total: int):
         if self._party_progress_win is not None:

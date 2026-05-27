@@ -143,6 +143,38 @@ class DB_pokemon:
         ]
 
     @staticmethod
+    def get_mega_stone_names() -> dict[str, list[str]]:
+        """メガストーン名を末尾X/Yで分類して返す。末尾以外は'single'。"""
+        rows = DB_pokemon.__select(
+            "SELECT item_name FROM item_data "
+            "WHERE item_name LIKE '%ナイト' OR item_name LIKE '%ナイトX' OR item_name LIKE '%ナイトY'"
+        )
+        names = [row["item_name"] for row in rows]
+        result: dict[str, list[str]] = {"X": [], "Y": [], "single": []}
+        for name in names:
+            if name.endswith("ナイトX"):
+                result["X"].append(name)
+            elif name.endswith("ナイトY"):
+                result["Y"].append(name)
+            else:
+                result["single"].append(name)
+        return result
+
+    @staticmethod
+    def get_mega_form_names() -> dict[str, list[str]]:
+        """メガシンカ後ポケモン名 (form 10-19 かつ 'メガ' で始まる名前) を form==12 のものを Y、それ以外を X に分類して返す。"""
+        rows = DB_pokemon.__select(
+            "SELECT name, form FROM pokemon_data WHERE form >= 10 AND form <= 19 AND name LIKE 'メガ%'"
+        )
+        result: dict[str, list[str]] = {"X": [], "Y": []}
+        for row in rows:
+            if row["form"] == 12:
+                result["Y"].append(row["name"])
+            else:
+                result["X"].append(row["name"])
+        return result
+
+    @staticmethod
     def __select(sql: str, params: tuple = ()) -> list:
         result = []
         cur = DB_pokemon.__db.cursor()
