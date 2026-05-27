@@ -311,11 +311,7 @@ def main(progress_callback=None):
     print("ランキングリストを取得中...")
     pids, season = _fetch_ranking()
 
-    seasons = [season]
-    if int(season) > 1:
-        seasons.append(str(int(season) - 1))
-
-    print(f"シーズン {', '.join(seasons)}、{len(pids)} 体分のデータを取得します")
+    print(f"シーズン {season}、{len(pids)} 体分のデータを取得します")
 
     # ranking.txt を最新のランキング順で上書き
     with open("stats/ranking.txt", "w", encoding="utf-8") as f:
@@ -329,8 +325,7 @@ def main(progress_callback=None):
             os.remove(path)
 
     for i, pid in enumerate(pids, 1):
-        for s in seasons:
-            name = scrape_one(pid, s)
+        name = scrape_one(pid, season)
         label = f"{name} ({pid})" if name else pid
         print(f"  [{i}/{len(pids)}] {label}")
         if progress_callback:
