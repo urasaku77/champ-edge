@@ -41,6 +41,7 @@ jobs:
             Where-Object { $_ -notmatch "^-e\s" -and $_ -notmatch "^#" -and $_.Trim() -ne "" }
           $deps | Out-File -FilePath requirements_ci.txt -Encoding utf8
           pip install -r requirements_ci.txt
+          pip install pyinstaller==6.7.0
 
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
@@ -118,6 +119,7 @@ jobs:
         run: |
           grep -v "^-e\|^#\|^$" requirements.lock > requirements_ci.txt
           pip install -r requirements_ci.txt
+          pip install pyinstaller==6.7.0
 
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
