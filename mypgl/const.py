@@ -17,7 +17,8 @@ class Const(object):
     dbName = "database/battle.db"
     list2 = []
     kpStartX = 400
-    kpStartY = 210
+    kpStartY = 240
+    controlRowY = 150
     kpMargin = 10
     kpMojiDX = 25
     kpPictureDX = 55
@@ -37,7 +38,7 @@ class Const(object):
             myPartyPointList.append(
                 (myPartyStartX + j * myPartyDX, myPartyStartY + i * myPartyDY)
             )
-    for i in range(5):
+    for i in range(10):
         for j in range(10):
             list2.append(
                 (

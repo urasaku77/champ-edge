@@ -36,28 +36,127 @@ class Analytics(tkinter.Toplevel):
         self.result_2_label_list = []
 
         self.img_list = []
+        self.kp_img_list = []
         self.canvas_list = []
 
         self.record_count_label = None
         self.whole_win_rate_label = None
 
-        self.sort_condition_options = [("KP（選出/初手）", 0), ("勝率", 1)]
+        self.sort_condition_options = [("KP", 0), ("勝率", 1), ("使用率順", 2)]
         self.sort_line_options = [("降順", 0), ("昇順", 1)]
+        self.mode_options = [
+            ("ＫＰと勝率", "ＫＰと勝率"),
+            ("選出と勝率", "選出と勝率"),
+            ("初手と勝率", "初手と勝率"),
+        ]
+        self.display_mode_options = [("％表示", 0), ("分数表示", 1), ("両方表示", 2)]
+        self.scroll_mode_options = [("スクロール表示", 0), ("全面表示", 1)]
+        self.ranking_count_options = [("50位まで", 50), ("100位まで", 100)]
         self.merge_mega_var = tkinter.BooleanVar()
-        self.merge_mega_var.set(False)
+        self.merge_mega_var.set(True)
         self._mega_groups: dict = {}
         self._ranking_index = self._load_ranking_index()
+        self.result_1_counts: list[tuple[int, int]] = []
+        self.result_2_counts: list[tuple[int, int]] = []
+        self._prev_sort_condition = 0
+        self.rank_labels: list = []
+        self._cell_positions: list[tuple[int, int, int]] = list(Const.list2)
 
         self.display_gui(self.recent_date)
+        self._apply_cell_layout()
         self.update_result()
 
-        for i in range(50):
-            rank_label = tkinter.Label(self, text=str(i + 1) + "位")
-            rank_label.place(x=Const.list2[i][1] - 40, y=Const.list2[i][2])
+        for i in range(100):
+            rank_label = tkinter.Label(self.kp_inner_frame, text=str(i + 1) + "位")
+            self.rank_labels.append(rank_label)
+        self._apply_rank_label_visibility()
 
     def open(self):
         self.focus_set()
         self.geometry("1280x720")
+
+    def _apply_rank_label_visibility(self):
+        count = self.ranking_count_var.get()
+        for i, lbl in enumerate(self.rank_labels):
+            if i < count:
+                lbl.place(x=self._cell_positions[i][1] - 40, y=self._cell_positions[i][2])
+            else:
+                lbl.place_forget()
+
+    def _apply_cell_layout(self):
+        show_both = self.display_mode_var.get() == 2
+        scroll_mode = self.scroll_mode_var.get() == 0
+        if show_both:
+            dx = 165
+            full_window_width = 2080
+        else:
+            dx = Const.kpPictureDX + Const.kpMargin + Const.kpMojiDX
+            full_window_width = 1280
+        dy = Const.kpPictureDY + Const.kpMargin
+        rows = 10
+        cols = 10
+        inner_width = 40 + cols * dx + 20
+
+        self._cell_positions = []
+        for i in range(rows):
+            for j in range(cols):
+                self._cell_positions.append(
+                    (
+                        j,
+                        40 + j * dx,
+                        i * dy,
+                    )
+                )
+
+        ranking_count = self.ranking_count_var.get()
+        shown_rows = 5 if ranking_count == 50 else 10
+
+        if scroll_mode:
+            window_width = 1280
+            window_height = 720
+        else:
+            window_width = full_window_width
+            window_height = Const.kpStartY + shown_rows * dy + 40
+
+        self.geometry(f"{window_width}x{window_height}")
+
+        canvas_w = window_width - (Const.kpStartX - 40) - 30
+        canvas_h = window_height - Const.kpStartY - 30
+        scroll_h = shown_rows * dy + 20
+        full_visible_w = min(inner_width, canvas_w) if scroll_mode else inner_width
+        full_visible_h = min(scroll_h, canvas_h) if scroll_mode else scroll_h
+        self.kp_canvas_outer.configure(
+            width=full_visible_w, height=full_visible_h
+        )
+        self.kp_canvas_outer.configure(scrollregion=(0, 0, inner_width, scroll_h))
+        self.kp_inner_frame.configure(width=inner_width, height=scroll_h)
+
+        if scroll_mode and inner_width > full_visible_w:
+            self.kp_xscroll.place(
+                x=Const.kpStartX - 40,
+                y=Const.kpStartY + full_visible_h,
+                width=full_visible_w,
+            )
+        else:
+            self.kp_xscroll.place_forget()
+        if scroll_mode and scroll_h > full_visible_h:
+            self.kp_yscroll.place(
+                x=Const.kpStartX - 40 + full_visible_w,
+                y=Const.kpStartY,
+                height=full_visible_h,
+            )
+        else:
+            self.kp_yscroll.place_forget()
+
+    def _on_ranking_count_change(self):
+        self._apply_cell_layout()
+        self._apply_rank_label_visibility()
+        self.change_sort_condition()
+
+    def _on_display_mode_change(self):
+        self._apply_cell_layout()
+        self._apply_rank_label_visibility()
+        self._refresh_display()
 
     def _load_seasons(self) -> list:
         try:
@@ -266,18 +365,22 @@ class Analytics(tkinter.Toplevel):
             command=self.update_result,
         )
         search_button.place(
-            x=Const.searchX + 450, y=Const.searchY + Const.searchDY * 2.7
+            x=Const.searchX + 510, y=Const.searchY + Const.searchDY * 2.7
         )
 
         self.title_var = tkinter.StringVar()
         self.title_var.set("ＫＰと勝率")
-        self.main_title_label = tkinter.Button(
-            self,
-            textvariable=self.title_var,
-            font=Const.titleFont,
-            state="disable",
-            command=self.change_mode,
-        )
+        mode_frame = tkinter.Frame(self)
+        for text, value in self.mode_options:
+            rb = tkinter.Radiobutton(
+                mode_frame,
+                text=text,
+                variable=self.title_var,
+                value=value,
+                command=self.apply_mode,
+            )
+            rb.grid(sticky="w")
+        mode_frame.place(x=Const.kpStartX, y=Const.controlRowY)
         sort_condition_frame = tkinter.Frame(self)
         self.sort_condition_var = tkinter.IntVar()
         self.sort_condition_var.set(0)
@@ -287,10 +390,10 @@ class Analytics(tkinter.Toplevel):
                 text=text,
                 variable=self.sort_condition_var,
                 value=value,
-                command=self.change_sort_condition,
+                command=self._on_sort_condition_change,
             )
             rb.grid(sticky="w")
-        sort_condition_frame.place(x=Const.searchX + 130, y=Const.kpStartY - 60)
+        sort_condition_frame.place(x=Const.searchX + 130, y=Const.controlRowY)
         sort_line_frame = tkinter.Frame(self)
         self.sort_line_var = tkinter.IntVar()
         self.sort_line_var.set(1)
@@ -303,23 +406,71 @@ class Analytics(tkinter.Toplevel):
                 command=self.change_sort_condition,
             )
             rb.grid(sticky="w")
-        sort_line_frame.place(x=Const.searchX + 270, y=Const.kpStartY - 60)
-        ranking_sort_rb = tkinter.Radiobutton(
-            self,
-            text="使用率順",
-            variable=self.sort_line_var,
-            value=2,
-            command=self.change_sort_condition,
-        )
-        ranking_sort_rb.place(x=Const.searchX + 390, y=Const.kpStartY - 60)
+        sort_line_frame.place(x=Const.searchX + 270, y=Const.controlRowY)
+        display_mode_frame = tkinter.Frame(self)
+        self.display_mode_var = tkinter.IntVar()
+        self.display_mode_var.set(0)
+        for text, value in self.display_mode_options:
+            rb = tkinter.Radiobutton(
+                display_mode_frame,
+                text=text,
+                variable=self.display_mode_var,
+                value=value,
+                command=self._on_display_mode_change,
+            )
+            rb.grid(sticky="w")
+        display_mode_frame.place(x=Const.searchX + 390, y=Const.controlRowY)
+        scroll_mode_frame = tkinter.Frame(self)
+        self.scroll_mode_var = tkinter.IntVar()
+        self.scroll_mode_var.set(1)
+        for text, value in self.scroll_mode_options:
+            rb = tkinter.Radiobutton(
+                scroll_mode_frame,
+                text=text,
+                variable=self.scroll_mode_var,
+                value=value,
+                command=self._on_display_mode_change,
+            )
+            rb.grid(sticky="w")
+        scroll_mode_frame.place(x=Const.searchX + 490, y=Const.controlRowY)
+        ranking_count_frame = tkinter.Frame(self)
+        self.ranking_count_var = tkinter.IntVar()
+        self.ranking_count_var.set(50)
+        for text, value in self.ranking_count_options:
+            rb = tkinter.Radiobutton(
+                ranking_count_frame,
+                text=text,
+                variable=self.ranking_count_var,
+                value=value,
+                command=self._on_ranking_count_change,
+            )
+            rb.grid(sticky="w")
+        ranking_count_frame.place(x=Const.searchX + 610, y=Const.controlRowY)
         self.merge_mega_check = tkinter.Checkbutton(
             self,
             text="メガ統合",
             variable=self.merge_mega_var,
-            command=self.update_result,
+            command=self.apply_mode,
         )
-        self.merge_mega_check.place(x=Const.searchX + 390, y=Const.kpStartY - 35)
-        self.main_title_label.place(x=Const.kpStartX, y=Const.kpStartY - 60)
+        self.merge_mega_check.place(x=Const.searchX + 720, y=Const.controlRowY)
+
+        self.kp_canvas_outer = tkinter.Canvas(self, highlightthickness=0)
+        self.kp_canvas_outer.place(x=Const.kpStartX - 40, y=Const.kpStartY)
+        self.kp_xscroll = tkinter.Scrollbar(
+            self, orient="horizontal", command=self.kp_canvas_outer.xview
+        )
+        self.kp_yscroll = tkinter.Scrollbar(
+            self, orient="vertical", command=self.kp_canvas_outer.yview
+        )
+        self.kp_canvas_outer.configure(
+            xscrollcommand=self.kp_xscroll.set,
+            yscrollcommand=self.kp_yscroll.set,
+        )
+        self.kp_inner_frame = tkinter.Frame(self.kp_canvas_outer)
+        self.kp_canvas_outer.create_window(
+            (0, 0), window=self.kp_inner_frame, anchor="nw"
+        )
+
         self.subtitle_var = tkinter.StringVar()
         self.subtitle_var.set("直近使用したパーティ")
         self.sub_title_label = tkinter.Label(
@@ -366,18 +517,22 @@ class Analytics(tkinter.Toplevel):
             else 0
         )
         self.title_var.set("ＫＰと勝率")
-        self.main_title_label["state"] = (
-            "disable" if self.party_num == 0 and self.party_subnum == 0 else "normal"
-        )
-        _kp_result = DB_battle.calc_kp(
-            self.from_date,
-            self.to_date,
-            self.rule.get(),
-            self.party_num,
-            self.party_subnum,
+        _regend = (
             self.regends_dict[self.regend_num.get()]
             if self.regend_num.get() != "0"
-            else "0",
+            else "0"
+        )
+        self.record_count = DB_battle.count_record(
+            self.from_date, self.to_date, self.rule.get(),
+            self.party_num, self.party_subnum, _regend,
+        )
+        self.win_count = DB_battle.count_win(
+            self.from_date, self.to_date, self.rule.get(),
+            self.party_num, self.party_subnum, _regend,
+        )
+        _kp_result = DB_battle.calc_kp(
+            self.from_date, self.to_date, self.rule.get(),
+            self.party_num, self.party_subnum, _regend,
         )
         if self.merge_mega_var.get():
             _kp_result = self._merge_kp_results(_kp_result)
@@ -385,38 +540,16 @@ class Analytics(tkinter.Toplevel):
             self._mega_groups = {}
         self.pokemon_list = [item[0] for item in _kp_result]
         self.result_1_list = [item[1] for item in _kp_result]
-        self.result_2_list = DB_battle.get_win_rate(
+        self.result_1_counts = [
+            (kp, self.record_count[0]) for kp in self.result_1_list
+        ]
+        win_counts = DB_battle.get_win_counts(
             self._get_query_groups(),
-            self.from_date,
-            self.to_date,
-            self.rule.get(),
-            self.party_num,
-            self.party_subnum,
-            self.regends_dict[self.regend_num.get()]
-            if self.regend_num.get() != "0"
-            else "0",
+            self.from_date, self.to_date, self.rule.get(),
+            self.party_num, self.party_subnum, _regend,
         )
-
-        self.record_count = DB_battle.count_record(
-            self.from_date,
-            self.to_date,
-            self.rule.get(),
-            self.party_num,
-            self.party_subnum,
-            self.regends_dict[self.regend_num.get()]
-            if self.regend_num.get() != "0"
-            else "0",
-        )
-        self.win_count = DB_battle.count_win(
-            self.from_date,
-            self.to_date,
-            self.rule.get(),
-            self.party_num,
-            self.party_subnum,
-            self.regends_dict[self.regend_num.get()]
-            if self.regend_num.get() != "0"
-            else "0",
-        )
+        self.result_2_counts = win_counts
+        self.result_2_list = [n / d if d else 0 for n, d in win_counts]
 
         self.kp_list = list(self.pokemon_list)
         self.change_sort_condition()
@@ -441,49 +574,59 @@ class Analytics(tkinter.Toplevel):
         )
         self.display_party_detail()
 
+    def _format_value(self, n: int, d: int) -> str:
+        mode = self.display_mode_var.get()
+        rate = (n * 100 / d) if d else 0
+        if mode == 1:
+            return f"{n}/{d}"
+        if mode == 2:
+            return f"{rate:.1f}% ({n}/{d})"
+        return f"{rate:.1f}%"
+
     def display_result_1(self):
-        if self.title_var.get() == "ＫＰと勝率":
-            for i in range(len(self.result_1_list)):
-                if i > 49:
-                    break
-                result_1_label = tkinter.Label(
-                    self,
-                    text=str(
-                        "{:.1f}".format(
-                            (
-                                int(self.result_1_list[i])
-                                * 100
-                                / int(self.record_count[0])
-                            )
-                        )
-                    )
-                    + "%",
-                )
-                result_1_label.place(x=Const.list2[i][1] - 40, y=Const.list2[i][2] + 20)
-                self.result_1_label_list.append(result_1_label)
-        else:
-            for i in range(len(self.result_1_list)):
-                if i > 49:
-                    break
-                result_1_label = tkinter.Label(
-                    self,
-                    text=str("{:.1f}".format(self.result_1_list[i] * 100)) + "%",
-                )
-                result_1_label.place(x=Const.list2[i][1] - 40, y=Const.list2[i][2] + 20)
-                self.result_1_label_list.append(result_1_label)
+        show_both = self.display_mode_var.get() == 2
+        x_off = 55 if show_both else -40
+        y_off = 8 if show_both else 20
+        limit = self.ranking_count_var.get()
+        for i in range(len(self.result_1_list)):
+            if i >= limit:
+                break
+            n, d = self.result_1_counts[i] if i < len(self.result_1_counts) else (0, 0)
+            result_1_label = tkinter.Label(
+                self.kp_inner_frame, text=self._format_value(n, d)
+            )
+            result_1_label.place(
+                x=self._cell_positions[i][1] + x_off,
+                y=self._cell_positions[i][2] + y_off,
+            )
+            self.result_1_label_list.append(result_1_label)
 
     def display_result_2(self):
+        show_both = self.display_mode_var.get() == 2
+        x_off = 55 if show_both else -40
+        y_off = 32 if show_both else 40
+        limit = self.ranking_count_var.get()
         for i in range(len(self.result_2_list)):
-            if i > 49:
+            if i >= limit:
                 break
+            n, d = self.result_2_counts[i] if i < len(self.result_2_counts) else (0, 0)
             result_2_label = tkinter.Label(
-                self, text=str("{:.1f}".format(self.result_2_list[i] * 100)) + "%"
+                self.kp_inner_frame, text=self._format_value(n, d)
             )
-            result_2_label.place(x=Const.list2[i][1] - 40, y=Const.list2[i][2] + 40)
+            result_2_label.place(
+                x=self._cell_positions[i][1] + x_off,
+                y=self._cell_positions[i][2] + y_off,
+            )
             self.result_2_label_list.append(result_2_label)
-            i = i + 1
+
+    def _refresh_display(self):
+        self.delete_result()
+        self.display_result_1()
+        self.display_result_2()
+        self.display_image()
 
     def display_image(self):
+        limit = self.ranking_count_var.get()
         i = 0
         for pokemon in self.pokemon_list:
             if len(pokemon[0]) < 1:
@@ -491,13 +634,13 @@ class Analytics(tkinter.Toplevel):
             img = Image.open(Const.createPass(pokemon))
             img = img.resize((40, 40))
             img = ImageTk.PhotoImage(img)
-            canvas = tkinter.Canvas(self, width=50, height=50)
-            canvas.place(x=Const.list2[i][1], y=Const.list2[i][2] + 10)
+            canvas = tkinter.Canvas(self.kp_inner_frame, width=50, height=50)
+            canvas.place(x=self._cell_positions[i][1], y=self._cell_positions[i][2] + 10)
             canvas.create_image(5, 5, image=img, anchor=tkinter.NW)
-            self.img_list.append(img)
+            self.kp_img_list.append(img)
             self.canvas_list.append(canvas)
             i = i + 1
-            if i > 49:
+            if i >= limit:
                 break
 
     def _merge_kp_results(self, kp_result):
@@ -525,13 +668,20 @@ class Analytics(tkinter.Toplevel):
             return [self._mega_groups.get(pid, [pid]) for pid in self.pokemon_list]
         return list(self.pokemon_list)
 
+    def _on_sort_condition_change(self):
+        new_sc = self.sort_condition_var.get()
+        if self._prev_sort_condition == 2 and new_sc != 2:
+            self._prev_sort_condition = new_sc
+            self.apply_mode()
+            return
+        self._prev_sort_condition = new_sc
+        self.change_sort_condition()
+
     def change_sort_condition(self):
         self.delete_result()
-        sort_line = self.sort_line_var.get()
-        self.merge_mega_check.config(
-            state="disabled" if sort_line == 2 else "normal"
-        )
-        if sort_line == 2:
+        sort_condition = self.sort_condition_var.get()
+        self._prev_sort_condition = sort_condition
+        if sort_condition == 2:
             self._apply_ranking_order()
             self.display_result_1()
             self.display_result_2()
@@ -543,34 +693,63 @@ class Analytics(tkinter.Toplevel):
                 self.pokemon_list,
                 self.result_1_list,
                 self.result_2_list,
+                self.result_1_counts,
+                self.result_2_counts,
                 strict=False,
             )
         )
 
         name_order_dict = {name: index for index, name in enumerate(self.kp_list)}
-        if self.sort_condition_var.get() == 0:
+        sort_line = self.sort_line_var.get()
+        if sort_condition == 0:
             new_result_list.sort(
-                key=lambda x: (x[1], x[2], name_order_dict[x[0]]),
+                key=lambda x: (x[1], x[2], name_order_dict.get(x[0], 0)),
                 reverse=bool(sort_line),
             )
-        elif self.sort_condition_var.get() == 1:
+        elif sort_condition == 1:
             new_result_list.sort(
-                key=lambda x: (x[2], x[1], name_order_dict[x[0]]),
+                key=lambda x: (x[2], x[1], name_order_dict.get(x[0], 0)),
                 reverse=bool(sort_line),
             )
 
         self.pokemon_list = [item[0] for item in new_result_list]
         self.result_1_list = [item[1] for item in new_result_list]
         self.result_2_list = [item[2] for item in new_result_list]
+        self.result_1_counts = [item[3] for item in new_result_list]
+        self.result_2_counts = [item[4] for item in new_result_list]
 
         self.display_result_1()
         self.display_result_2()
         self.display_image()
 
     def _apply_ranking_order(self):
-        ranked = sorted(self._ranking_index.items(), key=lambda x: x[1])[:50]
-        pokemon_list = [self._from_ranking_key(k) for k, _ in ranked]
-        query_groups = [DB_battle._expand_mega_forms(p) for p in pokemon_list]
+        from database.pokemon import DB_pokemon
+
+        limit = self.ranking_count_var.get()
+        ranked = sorted(self._ranking_index.items(), key=lambda x: x[1])[:limit]
+        base_pokemon_list = [self._from_ranking_key(k) for k, _ in ranked]
+        merge_mega = self.merge_mega_var.get()
+        if merge_mega:
+            pokemon_list = base_pokemon_list
+            query_groups: list = [
+                DB_battle._expand_mega_forms(p) for p in pokemon_list
+            ]
+        else:
+            pokemon_list = []
+            for p in base_pokemon_list:
+                pokemon_list.append(p)
+                parts = p.split("-")
+                if len(parts) >= 2:
+                    try:
+                        no = int(parts[0])
+                        for f in DB_pokemon.get_mega_forms_by_no(no):
+                            pokemon_list.append(f"{no}-{f}")
+                    except ValueError:
+                        pass
+                if len(pokemon_list) >= limit:
+                    break
+            pokemon_list = pokemon_list[:limit]
+            query_groups = pokemon_list
         _regend = (
             self.regends_dict[self.regend_num.get()]
             if self.regend_num.get() != "0"
@@ -578,20 +757,20 @@ class Analytics(tkinter.Toplevel):
         )
         title = self.title_var.get()
         if title == "選出と勝率":
-            result_1_list = DB_battle.get_oppo_chosen_rate(
+            c1 = DB_battle.get_oppo_chosen_counts(
                 query_groups, self.from_date, self.to_date, self.rule.get(),
                 self.party_num, self.party_subnum, _regend,
             )
-            result_2_list = DB_battle.get_oppo_chosen_and_win_rate(
+            c2 = DB_battle.get_oppo_chosen_and_win_counts(
                 query_groups, self.from_date, self.to_date, self.rule.get(),
                 self.party_num, self.party_subnum, _regend,
             )
         elif title == "初手と勝率":
-            result_1_list = DB_battle.get_oppo_first_chosen_rate(
+            c1 = DB_battle.get_oppo_first_chosen_counts(
                 query_groups, self.from_date, self.to_date, self.rule.get(),
                 self.party_num, self.party_subnum, _regend,
             )
-            result_2_list = DB_battle.get_oppo_first_chosen_and_win_rate(
+            c2 = DB_battle.get_oppo_first_chosen_and_win_counts(
                 query_groups, self.from_date, self.to_date, self.rule.get(),
                 self.party_num, self.party_subnum, _regend,
             )
@@ -602,86 +781,77 @@ class Analytics(tkinter.Toplevel):
             )
             kp_map: dict[str, int] = {}
             for pid, kp in kp_result:
-                base_id = DB_battle._normalize_mega_form(pid)
-                kp_map[base_id] = kp_map.get(base_id, 0) + kp
-            result_1_list = [kp_map.get(p, 0) for p in pokemon_list]
-            result_2_list = DB_battle.get_win_rate(
+                key = DB_battle._normalize_mega_form(pid) if merge_mega else pid
+                kp_map[key] = kp_map.get(key, 0) + kp
+            kp_list = [kp_map.get(p, 0) for p in pokemon_list]
+            c1 = [(kp, self.record_count[0]) for kp in kp_list]
+            c2 = DB_battle.get_win_counts(
                 query_groups, self.from_date, self.to_date, self.rule.get(),
                 self.party_num, self.party_subnum, _regend,
             )
         self.pokemon_list = pokemon_list
-        self.result_1_list = result_1_list
-        self.result_2_list = result_2_list
+        self.kp_list = list(pokemon_list)
+        self.result_1_counts = c1
+        self.result_2_counts = c2
+        if title == "ＫＰと勝率":
+            self.result_1_list = [n for n, _ in c1]
+        else:
+            self.result_1_list = [n / d if d else 0 for n, d in c1]
+        self.result_2_list = [n / d if d else 0 for n, d in c2]
 
-    def change_mode(self):
+    def apply_mode(self):
         _regend = self.regends_dict[self.regend_num.get()] if self.regend_num.get() != "0" else "0"
-        _qgroups = self._get_query_groups()
-        if self.title_var.get() == "ＫＰと勝率":
-            self.title_var.set("選出と勝率")
-            self.result_1_list = DB_battle.get_oppo_chosen_rate(
-                _qgroups,
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
-            )
-            self.result_2_list = DB_battle.get_oppo_chosen_and_win_rate(
-                _qgroups,
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
-            )
-
-        elif self.title_var.get() == "選出と勝率":
-            self.title_var.set("初手と勝率")
-            self.result_1_list = DB_battle.get_oppo_first_chosen_rate(
-                _qgroups,
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
-            )
-            self.result_2_list = DB_battle.get_oppo_first_chosen_and_win_rate(
-                _qgroups,
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
-            )
-
-        elif self.title_var.get() == "初手と勝率":
-            self.title_var.set("ＫＰと勝率")
+        title = self.title_var.get()
+        if title == "ＫＰと勝率":
             _kp_result = DB_battle.calc_kp(
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
+                self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
             )
             if self.merge_mega_var.get():
                 _kp_result = self._merge_kp_results(_kp_result)
+            else:
+                self._mega_groups = {}
             self.pokemon_list = [item[0] for item in _kp_result]
             self.result_1_list = [item[1] for item in _kp_result]
-
-            self.result_2_list = DB_battle.get_win_rate(
+            self.kp_list = list(self.pokemon_list)
+            self.result_1_counts = [
+                (kp, self.record_count[0]) for kp in self.result_1_list
+            ]
+            win_counts = DB_battle.get_win_counts(
                 self._get_query_groups(),
-                self.from_date,
-                self.to_date,
-                self.rule.get(),
-                self.party_num,
-                self.party_subnum,
-                _regend,
+                self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
             )
+            self.result_2_counts = win_counts
+            self.result_2_list = [n / d if d else 0 for n, d in win_counts]
+        elif title == "選出と勝率":
+            _qgroups = self._get_query_groups()
+            c1 = DB_battle.get_oppo_chosen_counts(
+                _qgroups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            c2 = DB_battle.get_oppo_chosen_and_win_counts(
+                _qgroups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            self.result_1_counts = c1
+            self.result_2_counts = c2
+            self.result_1_list = [n / d if d else 0 for n, d in c1]
+            self.result_2_list = [n / d if d else 0 for n, d in c2]
+        elif title == "初手と勝率":
+            _qgroups = self._get_query_groups()
+            c1 = DB_battle.get_oppo_first_chosen_counts(
+                _qgroups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            c2 = DB_battle.get_oppo_first_chosen_and_win_counts(
+                _qgroups, self.from_date, self.to_date, self.rule.get(),
+                self.party_num, self.party_subnum, _regend,
+            )
+            self.result_1_counts = c1
+            self.result_2_counts = c2
+            self.result_1_list = [n / d if d else 0 for n, d in c1]
+            self.result_2_list = [n / d if d else 0 for n, d in c2]
         self.change_sort_condition()
 
     def display_party_detail(self):
@@ -919,15 +1089,7 @@ class Analytics(tkinter.Toplevel):
             self.record_count_label.destroy()
         if self.whole_win_rate_label is not None:
             self.whole_win_rate_label.destroy()
-        for kpLabel in self.result_1_label_list:
-            kpLabel.destroy()
-        self.result_1_label_list = []
-        for win_rate_label in self.result_2_label_list:
-            win_rate_label.destroy()
-        self.result_2_label_list = []
-        for canvas in self.canvas_list:
-            canvas.delete("all")
-        self.canvas_list = []
+        self.delete_result()
 
     def delete_result(self):
         for kp_label in self.result_1_label_list:
@@ -936,6 +1098,10 @@ class Analytics(tkinter.Toplevel):
         for win_rate_label in self.result_2_label_list:
             win_rate_label.destroy()
         self.result_2_label_list = []
+        for canvas in self.canvas_list:
+            canvas.destroy()
+        self.canvas_list = []
+        self.kp_img_list = []
 
     def zero_pad_number(self, s):
         # 正規表現で最初の数字部分を抽出
