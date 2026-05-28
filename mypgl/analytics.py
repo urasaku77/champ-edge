@@ -52,6 +52,7 @@ class Analytics(tkinter.Toplevel):
         self.display_mode_options = [("％表示", 0), ("分数表示", 1), ("両方表示", 2)]
         self.scroll_mode_options = [("スクロール表示", 0), ("全面表示", 1)]
         self.ranking_count_options = [("50位まで", 50), ("100位まで", 100)]
+        self.top_n_options = [("10", 10), ("30", 30), ("50", 50)]
         self.merge_mega_var = tkinter.BooleanVar()
         self.merge_mega_var.set(True)
         self._mega_groups: dict = {}
@@ -64,6 +65,7 @@ class Analytics(tkinter.Toplevel):
 
         self.display_gui(self.recent_date)
         self._apply_cell_layout()
+        self._update_radio_states()
         self.update_result()
 
         for i in range(100):
@@ -157,6 +159,52 @@ class Analytics(tkinter.Toplevel):
         self._apply_cell_layout()
         self._apply_rank_label_visibility()
         self._refresh_display()
+
+    def _on_top_n_change(self):
+        if self.top_n_filter_var.get() and self.ranking_count_var.get() == 100:
+            self.ranking_count_var.set(50)
+            self._apply_cell_layout()
+            self._apply_rank_label_visibility()
+        self._update_radio_states()
+        self.apply_mode()
+
+    def _update_radio_states(self):
+        top_n_on = self.top_n_filter_var.get()
+        is_ranking_sort = self.sort_condition_var.get() == 2
+        self.sort_condition_radio_widgets[2].config(
+            state="disabled" if top_n_on else "normal"
+        )
+        self.ranking_count_radio_widgets[100].config(
+            state="disabled" if top_n_on else "normal"
+        )
+        self.top_n_check.config(
+            state="disabled" if is_ranking_sort else "normal"
+        )
+        radio_state = "normal" if (top_n_on and not is_ranking_sort) else "disabled"
+        for rb in self.top_n_radio_widgets.values():
+            rb.config(state=radio_state)
+
+    def _apply_top_n_filter(self):
+        if not self.top_n_filter_var.get():
+            return
+        threshold = self.top_n_value_var.get()
+        allowed = {
+            self._from_ranking_key(k)
+            for k, rank in self._ranking_index.items()
+            if rank <= threshold
+        }
+        keep = [
+            i
+            for i, pid in enumerate(self.pokemon_list)
+            if DB_battle._normalize_mega_form(pid) in allowed
+        ]
+        self.pokemon_list = [self.pokemon_list[i] for i in keep]
+        self.result_1_list = [self.result_1_list[i] for i in keep]
+        self.result_2_list = [self.result_2_list[i] for i in keep]
+        if self.result_1_counts:
+            self.result_1_counts = [self.result_1_counts[i] for i in keep]
+        if self.result_2_counts:
+            self.result_2_counts = [self.result_2_counts[i] for i in keep]
 
     def _load_seasons(self) -> list:
         try:
@@ -384,6 +432,7 @@ class Analytics(tkinter.Toplevel):
         sort_condition_frame = tkinter.Frame(self)
         self.sort_condition_var = tkinter.IntVar()
         self.sort_condition_var.set(0)
+        self.sort_condition_radio_widgets: dict = {}
         for text, value in self.sort_condition_options:
             rb = tkinter.Radiobutton(
                 sort_condition_frame,
@@ -393,6 +442,7 @@ class Analytics(tkinter.Toplevel):
                 command=self._on_sort_condition_change,
             )
             rb.grid(sticky="w")
+            self.sort_condition_radio_widgets[value] = rb
         sort_condition_frame.place(x=Const.searchX + 130, y=Const.controlRowY)
         sort_line_frame = tkinter.Frame(self)
         self.sort_line_var = tkinter.IntVar()
@@ -436,6 +486,7 @@ class Analytics(tkinter.Toplevel):
         ranking_count_frame = tkinter.Frame(self)
         self.ranking_count_var = tkinter.IntVar()
         self.ranking_count_var.set(50)
+        self.ranking_count_radio_widgets: dict = {}
         for text, value in self.ranking_count_options:
             rb = tkinter.Radiobutton(
                 ranking_count_frame,
@@ -445,6 +496,7 @@ class Analytics(tkinter.Toplevel):
                 command=self._on_ranking_count_change,
             )
             rb.grid(sticky="w")
+            self.ranking_count_radio_widgets[value] = rb
         ranking_count_frame.place(x=Const.searchX + 610, y=Const.controlRowY)
         self.merge_mega_check = tkinter.Checkbutton(
             self,
@@ -453,6 +505,31 @@ class Analytics(tkinter.Toplevel):
             command=self.apply_mode,
         )
         self.merge_mega_check.place(x=Const.searchX + 720, y=Const.controlRowY)
+
+        self.top_n_filter_var = tkinter.BooleanVar()
+        self.top_n_filter_var.set(False)
+        self.top_n_value_var = tkinter.IntVar()
+        self.top_n_value_var.set(30)
+        self.top_n_check = tkinter.Checkbutton(
+            self,
+            text="トップに絞る",
+            variable=self.top_n_filter_var,
+            command=self._on_top_n_change,
+        )
+        self.top_n_check.place(x=Const.searchX + 720, y=Const.controlRowY + 25)
+        top_n_radio_frame = tkinter.Frame(self)
+        self.top_n_radio_widgets: dict = {}
+        for col, (text, value) in enumerate(self.top_n_options):
+            rb = tkinter.Radiobutton(
+                top_n_radio_frame,
+                text=text,
+                variable=self.top_n_value_var,
+                value=value,
+                command=self._on_top_n_change,
+            )
+            rb.grid(row=0, column=col, sticky="w")
+            self.top_n_radio_widgets[value] = rb
+        top_n_radio_frame.place(x=Const.searchX + 720, y=Const.controlRowY + 50)
 
         self.kp_canvas_outer = tkinter.Canvas(self, highlightthickness=0)
         self.kp_canvas_outer.place(x=Const.kpStartX - 40, y=Const.kpStartY)
@@ -551,6 +628,7 @@ class Analytics(tkinter.Toplevel):
         self.result_2_counts = win_counts
         self.result_2_list = [n / d if d else 0 for n, d in win_counts]
 
+        self._apply_top_n_filter()
         self.kp_list = list(self.pokemon_list)
         self.change_sort_condition()
         self.record_count_label = tkinter.Label(
@@ -670,6 +748,7 @@ class Analytics(tkinter.Toplevel):
 
     def _on_sort_condition_change(self):
         new_sc = self.sort_condition_var.get()
+        self._update_radio_states()
         if self._prev_sort_condition == 2 and new_sc != 2:
             self._prev_sort_condition = new_sc
             self.apply_mode()
@@ -852,6 +931,8 @@ class Analytics(tkinter.Toplevel):
             self.result_2_counts = c2
             self.result_1_list = [n / d if d else 0 for n, d in c1]
             self.result_2_list = [n / d if d else 0 for n, d in c2]
+        self._apply_top_n_filter()
+        self.kp_list = list(self.pokemon_list)
         self.change_sort_condition()
 
     def display_party_detail(self):
