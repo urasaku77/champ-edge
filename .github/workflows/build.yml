@@ -43,6 +43,13 @@ jobs:
           pip install -r requirements_ci.txt
           pip install pyinstaller==6.7.0
 
+      - name: Inject update token
+        shell: bash
+        env:
+          CHAMPEDGE_GH_TOKEN: ${{ secrets.UPDATE_PAT }}
+        run: |
+          printf 'EMBEDDED_TOKEN = %s\n' "\"$CHAMPEDGE_GH_TOKEN\"" > component/_token.py
+
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm
 
@@ -120,6 +127,12 @@ jobs:
           grep -v "^-e\|^#\|^$" requirements.lock > requirements_ci.txt
           pip install -r requirements_ci.txt
           pip install pyinstaller==6.7.0
+
+      - name: Inject update token
+        env:
+          CHAMPEDGE_GH_TOKEN: ${{ secrets.UPDATE_PAT }}
+        run: |
+          printf 'EMBEDDED_TOKEN = %s\n' "\"$CHAMPEDGE_GH_TOKEN\"" > component/_token.py
 
       - name: Build with PyInstaller
         run: python -m PyInstaller champedge.spec --noconfirm

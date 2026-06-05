@@ -45,6 +45,11 @@ from recog.capture import Capture
 from recog.recog import BgmSetting, CaptureSetting, ModeSetting, get_recog_value
 from stats.search import get_similar_party
 
+try:
+    from component._token import EMBEDDED_TOKEN
+except ImportError:
+    EMBEDDED_TOKEN = ""
+
 _IS_MAC = sys.platform == "darwin"
 # Mac の ttk ウィジェットは Windows より幅広に描画されるため
 # 横方向だけスケールし、縦方向は Mac 画面の高さに収まるよう微圧縮
@@ -553,7 +558,7 @@ class MainApp(ThemedTk):
         current = self._get_current_version()
         api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
         try:
-            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
+            req = urllib.request.Request(api_url, headers=self._gh_headers())
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception:
@@ -1038,7 +1043,7 @@ class MainApp(ThemedTk):
     _LAST_UPDATE_FILE = "stats/last_update.txt"
     _LAST_BATTLE_UPDATE_FILE = "stats/last_update_battle.txt"
     _STATS_BASE_URL = (
-        "https://raw.githubusercontent.com/urasaku77/champ-edge/main/stats"
+        "https://api.github.com/repos/urasaku77/champ-edge/contents/stats"
     )
     _HOME_FILES = [
         "home_waza.csv",
@@ -1053,12 +1058,21 @@ class MainApp(ThemedTk):
     _RELEASES_REPO = "urasaku77/champ-edge"
     _VERSION_FILE = "version.txt"
 
+    def _gh_headers(self, extra: dict | None = None) -> dict:
+        headers = {"User-Agent": "champedge-updater/1.0"}
+        if EMBEDDED_TOKEN:
+            headers["Authorization"] = f"Bearer {EMBEDDED_TOKEN}"
+        if extra:
+            headers.update(extra)
+        return headers
+
     def _fetch_text(self, url: str) -> str:
         import ssl
         import urllib.request
 
         ctx = ssl._create_unverified_context()
-        req = urllib.request.Request(url, headers={"User-Agent": "champedge/1.0"})
+        extra = {"Accept": "application/vnd.github.raw"} if "api.github.com" in url else None
+        req = urllib.request.Request(url, headers=self._gh_headers(extra))
         with urllib.request.urlopen(req, context=ctx) as r:
             return r.read().decode("utf-8")
 
@@ -1245,7 +1259,7 @@ class MainApp(ThemedTk):
         api_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/latest"
 
         try:
-            req = urllib.request.Request(api_url, headers={"User-Agent": "champedge-updater/1.0"})
+            req = urllib.request.Request(api_url, headers=self._gh_headers())
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = _json.loads(resp.read().decode("utf-8"))
         except Exception as e:
@@ -1314,10 +1328,7 @@ class MainApp(ThemedTk):
                 asset_url = f"https://api.github.com/repos/{self._RELEASES_REPO}/releases/assets/{asset_id}"
                 req = urllib.request.Request(
                     asset_url,
-                    headers={
-                        "User-Agent": "champedge-updater/1.0",
-                        "Accept": "application/octet-stream",
-                    },
+                    headers=self._gh_headers({"Accept": "application/octet-stream"}),
                 )
                 downloaded = 0
                 with urllib.request.urlopen(req) as resp:

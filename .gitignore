@@ -15,3 +15,4 @@ logs/
 image/readme/desktop.ini
 tessdata/
 recog/bgm.json
+component/_token.py
