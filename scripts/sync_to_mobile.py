@@ -121,6 +121,48 @@ def sync_kousei(dry: bool) -> int:
     return int(_write_if_changed(f"{DST}/data/scrape/kousei.json", _json_bytes(dst), dry))
 
 
+def sync_sprite_templates(dry: bool) -> int:
+    """image/pokemon/*.png から OCR 照合テンプレ(sprite_templates.bin)を生成する。
+
+    元 champ-edge の recognize_oppo_party と同じ matchTemplate(グレー+CLAHE) 用に、
+    各画像を「αを黒に合成→グレースケール」した生バイトを 1 ファイルにパックする
+    (形式: 'SPT1', count, [pidLen,pid,h,w,gray...])。cv2/numpy が無い環境では
+    既存ファイルを保持してスキップ。"""
+    print("\n== image/pokemon/*.png -> assets/data/sprite_templates.bin ==")
+    try:
+        import struct
+        import cv2
+        import numpy as np
+    except ImportError:
+        print("  ! cv2/numpy 不在のためスキップ (既存 .bin を保持)")
+        return 0
+    src_dir = "image/pokemon"
+    if not os.path.isdir(src_dir):
+        print(f"  ! src なし、スキップ: {src_dir}")
+        return 0
+    buf = bytearray(b"SPT1")
+    entries = bytearray()
+    count = 0
+    for f in sorted(os.listdir(src_dir)):
+        if not f.endswith(".png"):
+            continue
+        im = cv2.imread(os.path.join(src_dir, f), cv2.IMREAD_UNCHANGED)
+        if im is None:
+            continue
+        if im.ndim == 3 and im.shape[2] == 4:
+            a = im[:, :, 3:4].astype(np.float32) / 255.0
+            gray = cv2.cvtColor((im[:, :, :3].astype(np.float32) * a).astype(np.uint8),
+                                cv2.COLOR_BGR2GRAY)
+        else:
+            gray = cv2.cvtColor(im[:, :, :3] if im.ndim == 3 else im, cv2.COLOR_BGR2GRAY)
+        pid = f[:-4].encode("ascii")
+        h, w = gray.shape
+        entries += struct.pack("<B", len(pid)) + pid + struct.pack("<HH", h, w) + gray.tobytes()
+        count += 1
+    buf += struct.pack("<I", count) + entries
+    return int(_write_if_changed(f"{DST}/data/sprite_templates.bin", bytes(buf), dry))
+
+
 def sync_images(dry: bool) -> int:
     """image/pokemon/*.png -> assets/pokemon/ (ミラー)。PC に無い余剰は削除。"""
     print("\n== image/pokemon/*.png -> assets/pokemon/ ==")
@@ -153,7 +195,8 @@ def main() -> int:
     args = parser.parse_args()
 
     total = 0
-    for task in (sync_db, sync_home, sync_ranking, sync_season, sync_kousei, sync_images):
+    for task in (sync_db, sync_home, sync_ranking, sync_season, sync_kousei,
+                 sync_images, sync_sprite_templates):
         total += task(args.dry)
 
     print(f"\n=== 完了: 変更 {total} 件{'  (dry-run)' if args.dry else ''} ===")

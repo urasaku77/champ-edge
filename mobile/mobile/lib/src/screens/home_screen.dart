@@ -21,6 +21,7 @@ import 'similar_party_dialog.dart';
 import 'battle_history_screen.dart';
 import 'battle_record_dialog.dart';
 import 'box_screen.dart';
+import 'ocr_import_screen.dart';
 import 'party_manager_screen.dart';
 import 'pokemon_picker.dart';
 import 'settings_screen.dart';
@@ -1297,6 +1298,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _openPartyManager();
       case 'ボックス編集':
         _openBox();
+      case 'スクショ取込':
+        _importOpponentFromScreenshot();
       case '設定':
         Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const SettingsScreen()));
@@ -1305,6 +1308,26 @@ class _HomeScreenState extends State<HomeScreen> {
           duration: const Duration(seconds: 1),
           content: Text('「$label」は今後実装予定です'),
         ));
+    }
+  }
+
+  /// スクショ取込画面で相手6体を認識→相手パーティへ反映（#3）。
+  Future<void> _importOpponentFromScreenshot() async {
+    final pids = await Navigator.of(context).push<List<String>>(
+        MaterialPageRoute(builder: (_) => const OcrImportScreen()));
+    if (pids == null || !mounted) return;
+    var changed = false;
+    for (var i = 0; i < pids.length && i < _oppParty.length; i++) {
+      if (pids[i].isEmpty) continue;
+      final p = await PokeDb.instance.buildPokemon(pids[i]);
+      if (p != null) {
+        _oppParty[i] = p;
+        changed = true;
+      }
+    }
+    if (changed && mounted) {
+      setState(() => _oppChosen.clear());
+      _autosaveLast();
     }
   }
 
@@ -1324,6 +1347,7 @@ class _HomeScreenState extends State<HomeScreen> {
               [
                 ['パーティ編集', Icons.edit],
                 ['ボックス編集', Icons.inventory_2],
+                ['スクショ取込', Icons.photo_library],
               ],
               [
                 ['対戦履歴', Icons.history],
