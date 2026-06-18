@@ -67,3 +67,12 @@ database/battle.db
 
 # Personal Claude Code overrides
 .claude/settings.local.json
+
+# Mobile アセットは PC マスターから scripts/sync_to_mobile.py で生成 (Issue #26)。
+# ビルド前に scripts/prebuild.sh が再生成するため git 管理しない。
+mobile/assets/data/pokemon.db
+mobile/assets/data/home/
+mobile/assets/data/scrape/ranking.json
+mobile/assets/data/scrape/season.json
+mobile/assets/data/scrape/kousei.json
+mobile/assets/pokemon/
