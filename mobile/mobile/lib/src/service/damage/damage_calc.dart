@@ -823,6 +823,7 @@ class DamageCalc {
         case 'いわはこび':
         case 'はがねつかい':
         case 'りゅうのあぎと':
+        case 'ほのおのたてがみ':
           if (waza.type == typeBuffAbilities[attacker.ability]) {
             hosei[key] = 6144;
           }

@@ -93,6 +93,7 @@ class CombatantState {
     if (smackdown) return false;
     return types.contains(PokeType.flying) ||
         ability == 'ふゆう' ||
+        ability == 'うなぎのぼり' ||
         item == 'ふうせん';
   }
 }

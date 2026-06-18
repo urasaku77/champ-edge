@@ -24,6 +24,7 @@ const Map<String, PokeType> typeBuffAbilities = {
   'はがねつかい': PokeType.steel,
   'トランジスタ': PokeType.electric,
   'りゅうのあぎと': PokeType.dragon,
+  'ほのおのたてがみ': PokeType.fire,
 };
 
 /// パンチ技（てつのこぶし等）。
