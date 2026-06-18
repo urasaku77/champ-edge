@@ -1,0 +1,77 @@
+rules_version = '2';
+
+// champ-edge mobile — Firestore セキュリティルール（管理者主導の招待制 allowlist）
+//
+// コレクション構成（admins は廃止し users.role に一本化）：
+//   users/{uid}    … 登録ユーザー一覧（＝ allowlist）。存在＝利用許可。
+//                     { name, email, createdAt, inviteCode?, role: 'admin' | 'user' }
+//                     role == 'admin' が管理者（基本は作成者本人のみ。Console で付与）。
+//   invites/{code} … 招待コード。{ email, createdBy, createdAt, used, usedBy, usedAt, expiresAt? }
+//                     管理者が「対象 Gmail 向け」に発行。利用者が初回に1回だけ消費。
+//
+// セキュリティ要点：
+//  - 利用者は自分の users ドキュメントを作成/更新できるが、**role は自分で変更できない**
+//    （新規作成は role='user' 固定、更新時も role を変えられない）。管理者昇格は Console のみ。
+//  - 招待消費はクライアントのトランザクション（invite を used に更新＋users/{uid} 作成）。
+//    Cloud Functions は使わない（Spark 無料枠維持）。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 招待コード（コード照合のみ。コード自体が秘密の一回限りトークン）
+    match /invites/{code} {
+      // サインイン済みなら、自分が持つコード（doc ID）を検証用に読める。管理者は全件。
+      allow read: if isAdmin() || isSignedIn();
+
+      // 発行・削除は管理者のみ。
+      allow create, delete: if isAdmin();
+
+      // 消費（利用者）：未使用コードを used/usedBy/usedAt のみ更新可。
+      // メール一致は不要（コードが認可。Apple のメール非公開でも動く）。
+      allow update: if isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.used == false
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['used', 'usedBy', 'usedAt'])
+          && request.resource.data.used == true
+          && request.resource.data.usedBy == request.auth.uid
+        );
+    }
+
+    // 登録ユーザー一覧（allowlist）
+    match /users/{uid} {
+      // 本人 or 管理者が読める（管理者は一覧取得）。
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+
+      // 自分の uid でのみ作成。role は 'user' 固定（自己昇格を防止）。
+      // メール一致は要求しない（Apple のメール非公開対応・認可はコード消費で担保）。
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'user';
+
+      // 本人更新は role を変更不可。管理者は任意更新可。無効化（削除）は管理者のみ。
+      allow update: if isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.role == resource.data.role
+        );
+      allow delete: if isAdmin();
+
+      // （P4）本人の同期データ：users/{uid}/data/** を本人のみ読み書き。
+      match /data/{doc=**} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+  }
+}

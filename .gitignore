@@ -1,0 +1,69 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node.js (OpenSpec / tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build artifacts
+build/
+dist/
+out/
+*.tsbuildinfo
+
+# --- Flutter (placeholder, in case selected) ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+pubspec.lock
+*.iml
+
+# --- React Native (placeholder, in case selected) ---
+ios/Pods/
+ios/build/
+android/.gradle/
+android/build/
+android/app/build/
+*.keystore
+!debug.keystore
+
+# --- KMP / Compose Multiplatform (placeholder) ---
+.gradle/
+gradle-app.setting
+local.properties
+
+# --- Python (for any auxiliary scripts) ---
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# User-specific data (never commit)
+database/battle.db
+
+# Local OpenSpec working files (uncomment if needed)
+# openspec/changes/draft-*/
+
+# Personal Claude Code overrides
+.claude/settings.local.json

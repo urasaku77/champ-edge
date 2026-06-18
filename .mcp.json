@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "pokemon-db": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "./assets/data/pokemon.db"
+      ],
+      "env": {}
+    }
+  }
+}

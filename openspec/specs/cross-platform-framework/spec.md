@@ -1,0 +1,40 @@
+# cross-platform-framework Specification
+
+## Purpose
+TBD - created by archiving change decide-cross-platform-framework. Update Purpose after archive.
+## Requirements
+### Requirement: iOS/Android で共通コードベースを使用する
+システムは iOS と Android の両方で、同一の Flutter コードベースを使用して主要機能を提供し**なければならない（MUST）**。
+
+#### Scenario: 共通コードで起動する
+- **WHEN** iOS 版または Android 版アプリを起動すると
+- **THEN** 同じ Flutter コードベースからビルドされたアプリが動作し、主要画面が表示される
+
+### Requirement: ランドスケープを主軸とした UI を提供する
+システムは主要画面を横画面（ランドスケープ）で表示し**なければならない（MUST）**。横持ちのスマートフォン操作に適した UI を提供する。
+
+#### Scenario: 横向きで起動する
+- **WHEN** アプリが起動すると
+- **THEN** アプリは横向き画面で表示され、主要 UI 要素は横画面レイアウトで整列する
+
+### Requirement: ローカル参照データをオフラインで利用できる
+システムは `pokemon.db` などの参照データを端末に保持し**なければならない（MUST）**。ネットワーク接続がなくても参照機能を提供する。
+
+#### Scenario: オフライン参照
+- **WHEN** ネットワークが切断された状態でアプリを操作すると
+- **THEN** ポケモンデータおよび技・特性の基本参照をローカルキャッシュから読み出せる
+
+### Requirement: ネイティブ機能連携を準備する
+システムはスクリーンショット自動取込や OCR 連携のため、iOS/Android のネイティブ機能を呼び出すためのプラットフォームチャネルを用意し**なければならない（MUST）**。
+
+#### Scenario: プラットフォームチャネルの呼び出し
+- **WHEN** Flutter 側からネイティブ機能を呼び出すためにチャネルメソッドを実行すると
+- **THEN** iOS/Android のプラットフォームチャネルが存在し、呼び出しを受け付ける
+
+### Requirement: ダメージ計算が高速に応答する
+システムはダメージ計算処理をユーザ操作後に高速で返し**なければならない（MUST）**。計算結果を短時間で画面に表示する。
+
+#### Scenario: ダメージ計算結果の表示
+- **WHEN** ユーザが初期の攻撃力・防御力・技威力を入力すると
+- **THEN** システムは短時間でダメージ推定値を計算し、結果を画面に表示する
+
