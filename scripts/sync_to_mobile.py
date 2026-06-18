@@ -1,90 +1,162 @@
 #!/usr/bin/env python3
-"""PC 側データを mobile/assets/ に同期する。
+"""PC マスターデータ (database/, image/, recog/, stats/) から、
+スマホ版 (Flutter) が参照する `mobile/mobile/assets/` を生成・同期する。
 
-ルール変更・シーズン更新・新ポケモン画像追加などの後に実行すると、
-スマホ版 (Flutter) が参照する assets/ を最新状態に揃える。
+PC 版を唯一のマスターとし、Mobile アセットはここから変換生成する
+(Issue #26)。ルール変更・シーズン更新・新ポケモン画像追加などの後、
+あるいは Flutter ビルド前 (scripts/prebuild.sh 経由) に実行する。
 
 使い方:
   python scripts/sync_to_mobile.py        # 同期実行
-  python scripts/sync_to_mobile.py --dry  # 差分確認のみ
+  python scripts/sync_to_mobile.py --dry  # 差分のみ表示 (書き換えなし)
 """
 import argparse
 import filecmp
+import json
 import os
 import shutil
 import sys
 
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
 
-# (PC 側パス, mobile 側パス, 種別 file/dir)
-MAPPINGS: list[tuple[str, str, str]] = [
-    ("database/pokemon.db",            "mobile/assets/data/pokemon.db",            "file"),
-    ("image/pokemon",                  "mobile/assets/image/pokemon",              "dir"),
-    ("image/typeicon",                 "mobile/assets/image/typeicon",             "dir"),
-    ("image/menu",                     "mobile/assets/image/menu",                 "dir"),
-    ("image/other",                    "mobile/assets/image/other",                "dir"),
-    ("image/favicon.ico",              "mobile/assets/image/favicon.ico",          "file"),
-    ("stats/home_doryoku.csv",         "mobile/assets/data/stats/home_doryoku.csv","file"),
-    ("stats/home_motimono.csv",        "mobile/assets/data/stats/home_motimono.csv","file"),
-    ("stats/home_seikaku.csv",         "mobile/assets/data/stats/home_seikaku.csv","file"),
-    ("stats/home_tokusei.csv",         "mobile/assets/data/stats/home_tokusei.csv","file"),
-    ("stats/home_waza.csv",            "mobile/assets/data/stats/home_waza.csv",   "file"),
-    ("stats/ranking.json",             "mobile/assets/data/stats/ranking.json",    "file"),
-    ("stats/ranking.txt",              "mobile/assets/data/stats/ranking.txt",     "file"),
-    ("stats/season.txt",               "mobile/assets/data/stats/season.txt",      "file"),
-    ("stats/last_update.txt",          "mobile/assets/data/stats/last_update.txt", "file"),
-    ("stats/last_update_battle.txt",   "mobile/assets/data/stats/last_update_battle.txt", "file"),
-]
+# Flutter が参照するアセットルート (pubspec.yaml は二重 mobile/ 配下)。
+DST = "mobile/mobile/assets"
 
 
-def _sync_file(src: str, dst: str, dry: bool) -> tuple[int, int]:
-    """ファイル1件を同期。戻り値: (更新件数, スキップ件数)"""
+# ---- 共通ヘルパ ----------------------------------------------------------
+
+def _write_if_changed(dst: str, data: bytes, dry: bool) -> bool:
+    """内容が変わるときだけ書き込む。戻り値: 更新したか。"""
+    if os.path.exists(dst) and open(dst, "rb").read() == data:
+        return False
+    print(f"  {'(dry) ' if dry else ''}更新: {dst}")
+    if not dry:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "wb") as f:
+            f.write(data)
+    return True
+
+
+def _copy_if_changed(src: str, dst: str, dry: bool) -> bool:
+    """ファイルをコピー (内容差分があるときだけ)。戻り値: 更新したか。"""
     if not os.path.exists(src):
         print(f"  ! src なし、スキップ: {src}")
-        return 0, 0
+        return False
     if os.path.exists(dst) and filecmp.cmp(src, dst, shallow=False):
-        return 0, 1
+        return False
     print(f"  {'(dry) ' if dry else ''}更新: {src} -> {dst}")
     if not dry:
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(src, dst)
-    return 1, 0
+    return True
 
 
-def _sync_dir(src: str, dst: str, dry: bool) -> tuple[int, int]:
-    """ディレクトリ配下を再帰同期。ファイル単位で差分判定。"""
-    if not os.path.isdir(src):
+def _json_bytes(obj) -> bytes:
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+# ---- 各同期タスク --------------------------------------------------------
+
+def sync_db(dry: bool) -> int:
+    print("\n== database/pokemon.db -> assets/data/pokemon.db ==")
+    return int(_copy_if_changed("database/pokemon.db",
+                                f"{DST}/data/pokemon.db", dry))
+
+
+def sync_home(dry: bool) -> int:
+    print("\n== stats/home_*.csv -> assets/data/home/ ==")
+    n = 0
+    for cat in ("doryoku", "motimono", "seikaku", "tokusei", "waza"):
+        n += int(_copy_if_changed(f"stats/home_{cat}.csv",
+                                  f"{DST}/data/home/home_{cat}.csv", dry))
+    return n
+
+
+def sync_ranking(dry: bool) -> int:
+    """stats/ranking.txt -> scrape/ranking.json。pid のゼロ埋め除去 (0445-00 -> 0445-0)。"""
+    print("\n== stats/ranking.txt -> assets/data/scrape/ranking.json ==")
+    src = "stats/ranking.txt"
+    if not os.path.exists(src):
         print(f"  ! src なし、スキップ: {src}")
-        return 0, 0
-    updated = skipped = 0
-    for root, _, files in os.walk(src):
-        rel_root = os.path.relpath(root, src)
-        dst_root = dst if rel_root == "." else os.path.join(dst, rel_root)
-        for name in files:
-            s = os.path.join(root, name)
-            d = os.path.join(dst_root, name)
-            u, sk = _sync_file(s, d, dry)
-            updated += u
-            skipped += sk
-    return updated, skipped
+        return 0
+    pids = [l.strip() for l in open(src, encoding="utf-8").read().splitlines() if l.strip()]
+    pids = [f"{p.split('-')[0]}-{int(p.split('-')[1])}" for p in pids]
+    return int(_write_if_changed(f"{DST}/data/scrape/ranking.json", _json_bytes(pids), dry))
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def sync_season(dry: bool) -> int:
+    """recog/season.json -> scrape/season.json。年月日フィールドを ISO 文字列へ。"""
+    print("\n== recog/season.json -> assets/data/scrape/season.json ==")
+    src = "recog/season.json"
+    if not os.path.exists(src):
+        print(f"  ! src なし、スキップ: {src}")
+        return 0
+    data = json.load(open(src, encoding="utf-8"))
+    dst = [{
+        "name": e["name"],
+        "from": f"{e['from_year']}-{e['from_month']:02d}-{e['from_date']:02d}",
+        "to": f"{e['to_year']}-{e['to_month']:02d}-{e['to_date']:02d}",
+    } for e in data]
+    return int(_write_if_changed(f"{DST}/data/scrape/season.json", _json_bytes(dst), dry))
+
+
+def sync_kousei(dry: bool) -> int:
+    """stats/ranking.json -> scrape/kousei.json。parties をフラット化・URL 重複排除・
+    icons->pokemons リネーム・title は空文字。"""
+    print("\n== stats/ranking.json -> assets/data/scrape/kousei.json ==")
+    src = "stats/ranking.json"
+    if not os.path.exists(src):
+        print(f"  ! src なし、スキップ: {src}")
+        return 0
+    data = json.load(open(src, encoding="utf-8"))
+    seen, dst = set(), []
+    for entry in data:
+        for party in entry.get("parties", []):
+            url = party.get("url", "")
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            dst.append({"title": "", "url": url, "pokemons": party.get("icons", [])})
+    return int(_write_if_changed(f"{DST}/data/scrape/kousei.json", _json_bytes(dst), dry))
+
+
+def sync_images(dry: bool) -> int:
+    """image/pokemon/*.png -> assets/pokemon/ (ミラー)。PC に無い余剰は削除。"""
+    print("\n== image/pokemon/*.png -> assets/pokemon/ ==")
+    src_dir, dst_dir = "image/pokemon", f"{DST}/pokemon"
+    if not os.path.isdir(src_dir):
+        print(f"  ! src なし、スキップ: {src_dir}")
+        return 0
+    if not dry:
+        os.makedirs(dst_dir, exist_ok=True)
+    src_files = {f for f in os.listdir(src_dir) if f.endswith(".png")}
+    dst_files = ({f for f in os.listdir(dst_dir) if f.endswith(".png")}
+                 if os.path.isdir(dst_dir) else set())
+    n = 0
+    for f in sorted(src_files):
+        n += int(_copy_if_changed(os.path.join(src_dir, f),
+                                  os.path.join(dst_dir, f), dry))
+    for f in sorted(dst_files - src_files):  # PC に無い余剰を削除 (ミラー)
+        print(f"  {'(dry) ' if dry else ''}削除(余剰): {dst_dir}/{f}")
+        if not dry:
+            os.remove(os.path.join(dst_dir, f))
+        n += 1
+    return n
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry", action="store_true", help="差分のみ表示、書き換えない")
     args = parser.parse_args()
 
-    total_updated = total_skipped = 0
-    for src, dst, kind in MAPPINGS:
-        print(f"\n== {src} -> {dst} ==")
-        if kind == "file":
-            u, sk = _sync_file(src, dst, args.dry)
-        else:
-            u, sk = _sync_dir(src, dst, args.dry)
-        total_updated += u
-        total_skipped += sk
+    total = 0
+    for task in (sync_db, sync_home, sync_ranking, sync_season, sync_kousei, sync_images):
+        total += task(args.dry)
 
-    print(f"\n=== 完了: 更新 {total_updated} 件 / 同一 {total_skipped} 件{'  (dry-run)' if args.dry else ''} ===")
+    print(f"\n=== 完了: 変更 {total} 件{'  (dry-run)' if args.dry else ''} ===")
     return 0
 
 
