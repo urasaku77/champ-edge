@@ -1,0 +1,34 @@
+name: champ_edge_mobile
+description: "champ-edge-mobile Phase 1 MVP Flutter skeleton"
+publish_to: none
+version: 0.1.0+8
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  sqflite: ^2.0.0+4
+  path_provider: ^2.0.15
+  path: ^1.8.3
+  url_launcher: ^6.2.0
+  firebase_core: ^4.10.0
+  firebase_auth: ^6.5.2
+  cloud_firestore: ^6.5.0
+  google_sign_in: ^7.2.0
+  http: ^1.6.0
+  package_info_plus: ^8.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/pokemon.db
+    - assets/data/home/
+    - assets/data/scrape/
+    - assets/pokemon/

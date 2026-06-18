@@ -1,0 +1,4 @@
+name: decide-damage-engine-language
+schema: spec-driven
+description: "Choose the implementation language and sharing strategy for the Phase 1 damage calculation engine."
+status: proposed

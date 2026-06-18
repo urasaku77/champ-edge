@@ -1,0 +1,4 @@
+name: decide-cross-platform-framework
+schema: spec-driven
+description: "Choose the cross-platform mobile framework for the champ-edge-mobile Phase 1 MVP."
+status: proposed

@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "994765802690",
+    "project_id": "champedge",
+    "storage_bucket": "champedge.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:994765802690:android:b1c075882a3ebded8fbf5b",
+        "android_client_info": {
+          "package_name": "io.github.urasaku77.champedge"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "994765802690-1rbds6af6de10c3lffb46cffpm84j1hh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.github.urasaku77.champedge",
+            "certificate_hash": "5ccdd0305185e1372d64ec6e6ecd94d06bbd6647"
+          }
+        },
+        {
+          "client_id": "994765802690-q1qlmh726h4e1o8kjh53g1i8018vh9th.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.github.urasaku77.champedge",
+            "certificate_hash": "b085b0fc36ac6758e753f85d0afc4fd5b4c0d22d"
+          }
+        },
+        {
+          "client_id": "994765802690-gq1fv7u8uoou4egk89ch6iin8l5amru5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyzvdvjyFa_c3CMkdvxQHy-7BsavPAL8Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "994765802690-gq1fv7u8uoou4egk89ch6iin8l5amru5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "994765802690-0ftq4l4db02ot0s6hf2k9b5erluvh4mq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "io.github.urasaku77.champedge"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
