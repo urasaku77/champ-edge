@@ -24,6 +24,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.pokemon import DB_pokemon
 
 _SSL_CTX = ssl._create_unverified_context()
+
+# 全角数字 → 半角数字（DB の技名は半角のため、ページ上の "１０まんボルト" 等を正規化する）
+_FW_DIGIT_TRANS = str.maketrans("０１２３４５６７８９", "0123456789")
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -74,7 +77,7 @@ class _TextExtractor(HTMLParser):
 
     def handle_data(self, data):
         if self._depth == 0:
-            text = data.strip()
+            text = data.strip().translate(_FW_DIGIT_TRANS)
             if text:
                 self.tokens.append(text)
 
