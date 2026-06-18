@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Edit(*)",
+      "Write(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "WebSearch",
+      "Agent(*)",
+      "Read(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "TodoWrite(*)",
+      "ToolSearch(*)",
+      "PowerShell(*)",
+      "WebFetch(domain:bulbapedia.bulbagarden.net)",
+      "WebFetch(domain:wiki.pokemonwiki.com)",
+      "WebFetch(domain:yakkun.com)",
+      "WebFetch(domain:game8.jp)",
+      "WebFetch(domain:gamewith.jp)",
+      "WebFetch(domain:appmedia.jp)",
+      "WebFetch(domain:pente.koro-pokemon.com)",
+      "WebFetch(domain:www.yukiruri.com)",
+      "WebFetch(domain:altema.jp)",
+      "WebFetch(domain:www.serebii.net)",
+      "WebFetch(domain:www.nintendolife.com)",
+      "WebFetch(domain:note.com)",
+      "WebFetch(domain:gamepedia.jp)",
+      "WebFetch(domain:lifematome.blog)",
+      "WebFetch(domain:www.famitsu.com)",
+      "WebFetch(domain:gamerch.com)",
+      "WebFetch(domain:lushgreengame.com)"
+    ]
+  }
+}
