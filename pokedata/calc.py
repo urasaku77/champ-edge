@@ -762,7 +762,7 @@ class DamageCalc:
                 case "プラス" | "マイナス":
                     if attacker.ability_enable and waza.category == 特殊:
                         hosei[key] = 6144
-                case "いわはこび" | "はがねつかい" | "りゅうのあぎと":
+                case "いわはこび" | "はがねつかい" | "りゅうのあぎと" | "ほのおのたてがみ":
                     if waza.type == DamageCalc.__type_buff_abilities[attacker.ability]:
                         hosei[key] = 6144
                 case "ごりむちゅう":
@@ -1285,6 +1285,7 @@ class DamageCalc:
         "はがねつかい": Types.はがね,
         "トランジスタ": Types.でんき,
         "りゅうのあぎと": Types.ドラゴン,
+        "ほのおのたてがみ": Types.ほのお,
     }
     # パンチ技(てつのこぶし)
     __punch_moves = [

@@ -572,7 +572,7 @@ class Pokemon:
             return False
         return (
             (Types.ひこう in self.__type)
-            or self.__ability == "ふゆう"
+            or self.__ability in ("ふゆう", "うなぎのぼり")
             or self.__item == "ふうせん"
         )
 
