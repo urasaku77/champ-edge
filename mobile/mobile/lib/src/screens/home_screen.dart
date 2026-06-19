@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../data/ability_values.dart';
 import '../data/home_stats.dart';
@@ -15,6 +17,8 @@ import '../service/appear_ability.dart';
 import '../service/damage_engine.dart';
 import '../data/battle_db.dart';
 import '../data/app_settings.dart';
+import '../data/my_party_ocr.dart';
+import 'my_party_import_screen.dart';
 import 'adder_dialog.dart';
 import 'battle_analysis_screen.dart';
 import 'similar_party_dialog.dart';
@@ -355,6 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _myChosen.remove(i);
                 }),
                 onEdit: () => _editParty(_myParty, '自分'),
+                onEditDoubleTap: _importMyPartyFromScreenshots,
                 footer: _isTablet ? _bottomControls() : null,
               ),
             ),
@@ -378,6 +383,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _oppChosen.remove(i);
                 }),
                 onEdit: () => _editParty(_oppParty, '相手'),
+                onEditLongPress: _importOpponentFromLatestScreenshot,
+                onEditDoubleTap: _importOpponentFromScreenshot,
               ),
             ),
           ],
@@ -1312,9 +1319,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// スクショ取込画面で相手6体を認識→相手パーティへ反映（#3）。
-  Future<void> _importOpponentFromScreenshot() async {
+  /// [initialImage] を渡すとピッカーを開かずその画像を即解析する（長押し経由）。
+  Future<void> _importOpponentFromScreenshot({Uint8List? initialImage}) async {
     final pids = await Navigator.of(context).push<List<String>>(
-        MaterialPageRoute(builder: (_) => const OcrImportScreen()));
+        MaterialPageRoute(
+            builder: (_) => OcrImportScreen(initialImage: initialImage)));
     if (pids == null || !mounted) return;
     var changed = false;
     for (var i = 0; i < pids.length && i < _oppParty.length; i++) {
@@ -1329,6 +1338,66 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _oppChosen.clear());
       _autosaveLast();
     }
+  }
+
+  /// 自分パーティ取込（HOME/SVスクショ2枚→種族/特性/持ち物/技/努力値/性格）。
+  /// 自分パネルの編集ボタンをダブルタップで起動。結果を自分パーティへ反映。
+  Future<void> _importMyPartyFromScreenshots() async {
+    final slots = await Navigator.of(context).push<List<MyPartySlot>>(
+        MaterialPageRoute(builder: (_) => const MyPartyImportScreen()));
+    if (slots == null || !mounted) return;
+    var changed = false;
+    for (var i = 0; i < slots.length && i < _myParty.length; i++) {
+      final s = slots[i];
+      if (s.pid.isEmpty) continue;
+      final p = await PokeDb.instance.buildPokemon(s.pid);
+      if (p == null) continue;
+      if (s.ability.isNotEmpty && p.abilityOptions.contains(s.ability)) {
+        p.ability = s.ability;
+      }
+      if (s.item.isNotEmpty) p.item = s.item;
+      if (s.nature.isNotEmpty) p.nature = s.nature;
+      p.ev = List<int>.from(s.evs);
+      final moves = <BattleMove>[];
+      for (final mn in s.moves) {
+        if (mn.isEmpty) continue;
+        final bm = await PokeDb.instance.moveByName(mn);
+        if (bm != null) moves.add(bm);
+      }
+      while (moves.length < 4) {
+        moves.add(emptyMove());
+      }
+      p.moves = moves.take(4).toList();
+      _myParty[i] = p;
+      changed = true;
+    }
+    if (changed && mounted) {
+      setState(() => _myChosen.clear());
+      _autosaveLast();
+    }
+  }
+
+  /// 写真ライブラリの最新画像（＝直前に撮った選出スクショの想定）を取得して
+  /// そのまま OCR 取込へ流す。相手編集ボタンの長押しから呼ばれる。
+  Future<void> _importOpponentFromLatestScreenshot() async {
+    final ps = await PhotoManager.requestPermissionExtend();
+    if (!ps.hasAccess) {
+      if (mounted) _snack('写真へのアクセスが許可されていません');
+      return;
+    }
+    final albums = await PhotoManager.getAssetPathList(
+        type: RequestType.image, onlyAll: true);
+    if (albums.isEmpty) {
+      if (mounted) _snack('写真が見つかりませんでした');
+      return;
+    }
+    final assets = await albums.first.getAssetListPaged(page: 0, size: 1);
+    final bytes = assets.isEmpty ? null : await assets.first.originBytes;
+    if (bytes == null) {
+      if (mounted) _snack('最新のスクショを取得できませんでした');
+      return;
+    }
+    if (mounted) await _importOpponentFromScreenshot(initialImage: bytes);
   }
 
   Widget _buildMenuDrawer() {
@@ -1393,6 +1462,8 @@ class _SidePanel extends StatelessWidget {
     required this.onTapPoke,
     required this.onLongPoke,
     required this.onEdit,
+    this.onEditLongPress,
+    this.onEditDoubleTap,
     this.footer,
   });
 
@@ -1411,6 +1482,9 @@ class _SidePanel extends StatelessWidget {
   final ValueChanged<int> onTapPoke;
   final ValueChanged<int> onLongPoke;
   final VoidCallback onEdit;
+  // 相手パネルのみ設定：編集ボタン長押し＝最新スクショ取込／ダブルタップ＝ピッカー取込。
+  final VoidCallback? onEditLongPress;
+  final VoidCallback? onEditDoubleTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1446,8 +1520,12 @@ class _SidePanel extends StatelessWidget {
                 ),
               _MiniBtn(
                 icon: Icons.edit,
-                tooltip: 'パーティ編集',
+                tooltip: onEditLongPress != null
+                    ? 'パーティ編集（長押し:最新スクショ／ダブルタップ:スクショ選択）'
+                    : 'パーティ編集',
                 onTap: onEdit,
+                onLongPress: onEditLongPress,
+                onDoubleTap: onEditDoubleTap,
               ),
             ],
           ),
@@ -1564,10 +1642,16 @@ class _PokeIcon extends StatelessWidget {
 /// パーティ横の小さい操作ボタン。
 class _MiniBtn extends StatelessWidget {
   const _MiniBtn(
-      {required this.icon, required this.tooltip, required this.onTap});
+      {required this.icon,
+      required this.tooltip,
+      required this.onTap,
+      this.onLongPress,
+      this.onDoubleTap});
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onDoubleTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1575,6 +1659,8 @@ class _MiniBtn extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
+        onDoubleTap: onDoubleTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           width: 40,

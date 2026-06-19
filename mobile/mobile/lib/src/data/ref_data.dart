@@ -51,11 +51,30 @@ class RefData {
   File _cacheFileSync(Directory dir, String assetPath) =>
       File(p.join(dir.path, assetPath.replaceAll('/', '_')));
 
-  /// 参照ファイルを読む。キャッシュ（取得済み）があればそれ、無ければ同梱アセット。
+  /// 取得/キャッシュした内容が「中身として妥当」か検証する。
+  /// Cloudflare Pages はパス不一致時に 200 で index.html を返すことがあり、それを
+  /// CSV/JSON として誤キャッシュすると HOME 情報等が壊れる。HTML や空を弾いて、
+  /// 汚染キャッシュは同梱アセットへフォールバック＝自己修復させる。
+  static bool _looksValid(String s, String assetPath) {
+    final t = s.trimLeft();
+    if (t.isEmpty) return false;
+    final low = t.toLowerCase();
+    if (low.startsWith('<!doctype') || low.startsWith('<html')) return false;
+    if (assetPath.endsWith('.json')) return t.startsWith('[') || t.startsWith('{');
+    return true; // csv 等
+  }
+
+  /// 参照ファイルを読む。キャッシュ（取得済み・妥当なもの）があればそれ、無ければ同梱アセット。
   Future<String> loadString(String assetPath) async {
     try {
       final f = _cacheFileSync(await _dir(), assetPath);
-      if (await f.exists()) return await f.readAsString();
+      if (await f.exists()) {
+        final cached = await f.readAsString();
+        if (_looksValid(cached, assetPath)) return cached;
+        // 汚染キャッシュは削除して同梱アセットへ。
+        await f.delete().catchError((_) => f);
+        debugPrint('[RefData] discarded invalid cache: $assetPath');
+      }
     } catch (e) {
       debugPrint('[RefData] cache read failed ($assetPath): $e');
     }
@@ -103,7 +122,7 @@ class RefData {
             final res = await req.close().timeout(const Duration(seconds: 10));
             if (res.statusCode != 200) continue;
             final body = await res.transform(utf8.decoder).join();
-            if (body.trim().isEmpty) continue;
+            if (!_looksValid(body, path)) continue; // HTML/空は誤って取得＝キャッシュしない
             await _cacheFileSync(dir, path).writeAsString(body);
             any = true;
           } catch (e) {

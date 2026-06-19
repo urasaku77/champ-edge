@@ -187,6 +187,35 @@ def sync_images(dry: bool) -> int:
     return n
 
 
+def sync_available_pokemon(dry: bool) -> int:
+    """assets/pokemon/*.png から availablePokemonPids (Dart) を再生成する。
+
+    パーティ編集の検索候補はこの集合に限定されるため、画像追加後にこれを
+    更新しないと新ポケモン・新メガが検索に出ない（Issue: メガメタグロス等が
+    画像はあるのに検索不可だった原因）。画像ミラー(sync_images)の後に実行する。
+    """
+    print("\n== assets/pokemon/*.png -> lib/src/data/available_pokemon.dart ==")
+    img_dir = f"{DST}/pokemon"
+    dst = "mobile/mobile/lib/src/data/available_pokemon.dart"
+    if not os.path.isdir(img_dir):
+        print(f"  ! 画像ディレクトリ なし、スキップ: {img_dir}")
+        return 0
+    pids = sorted(
+        (f[:-4] for f in os.listdir(img_dir) if f.endswith(".png")),
+        key=lambda p: (int(p.split("-")[0]), int(p.split("-")[1])),
+    )
+    lines = ["// 自動生成: assets/pokemon/ に画像があるポケモンの pid 集合。",
+             "// scripts/sync_to_mobile.py が画像から再生成する（手で編集しない）。",
+             "// パーティ編集のポケモン候補をこれに限定する。",
+             "const Set<String> availablePokemonPids = {"]
+    for i in range(0, len(pids), 8):
+        chunk = ", ".join(f"'{p}'" for p in pids[i:i + 8])
+        lines.append(f"  {chunk},")
+    lines.append("};")
+    data = ("\n".join(lines) + "\n").encode("utf-8")
+    return int(_write_if_changed(dst, data, dry))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -196,7 +225,7 @@ def main() -> int:
 
     total = 0
     for task in (sync_db, sync_home, sync_ranking, sync_season, sync_kousei,
-                 sync_images, sync_sprite_templates):
+                 sync_images, sync_sprite_templates, sync_available_pokemon):
         total += task(args.dry)
 
     print(f"\n=== 完了: 変更 {total} 件{'  (dry-run)' if args.dry else ''} ===")

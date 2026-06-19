@@ -1,7 +1,7 @@
 name: champ_edge_mobile
 description: "champ-edge-mobile Phase 1 MVP Flutter skeleton"
 publish_to: none
-version: 0.1.0+12
+version: 0.1.0+17
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
@@ -22,7 +22,8 @@ dependencies:
   image_picker: ^1.1.2
   image: ^4.2.0
   opencv_dart: ^2.2.1
-
+  photo_manager: ^3.9.0
+  google_mlkit_text_recognition: ^0.15.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -34,5 +35,6 @@ flutter:
     - assets/data/pokemon.db
     - assets/data/sprite_templates.bin
     - assets/data/home/
+    - assets/data/typeicon/
     - assets/data/scrape/
     - assets/pokemon/

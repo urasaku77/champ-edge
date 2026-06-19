@@ -64,9 +64,35 @@ class PokeDb {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final dbFile = File(join(dir.path, _dbFileName));
-      if (!await dbFile.exists()) {
-        final data = await rootBundle.load(_assetPath);
-        await dbFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
+      // バンドル(アセット)の DB を端末へコピーする。pokemon.db は参照専用データ
+      // （ポケモン/技/特性/道具）でユーザーデータを含まないため、アプリ更新で
+      // 同梱 DB が変わったら端末側を上書き更新する。旧実装は「ファイルが無い時
+      // だけコピー」で、初回起動時の DB が更新されず新ポケモン・新メガ（例:
+      // メガメタグロス 0376-11）が反映されなかった。
+      //
+      // 更新判定は「アセットの実バイト長」を別マーカーファイル(.len)へ記録して比較する。
+      // コピー済み DB ファイルのサイズではなく **アセット側の実長(data.lengthInBytes)** を
+      // 基準にするのが要点。`data.buffer.asUint8List()` の長さは基盤バッファ長で実アセット
+      // 長と一致しないことがあり、それで比較すると更新を取りこぼす（build15 で再コピーが
+      // 走らなかった原因）。マーカーが無い既存ユーザーは必ず再コピーされる。
+      final data = await rootBundle.load(_assetPath);
+      final assetLen = data.lengthInBytes;
+      final lenFile = File('${dbFile.path}.len');
+      int? installedLen;
+      if (await lenFile.exists()) {
+        installedLen = int.tryParse((await lenFile.readAsString()).trim());
+      }
+      final needsCopy = !await dbFile.exists() || installedLen != assetLen;
+      if (needsCopy) {
+        // 旧 DB を開いたままにしないよう、コピー前に念のため閉じておく。
+        await _db?.close();
+        _db = null;
+        // バッファ全体ではなくアセットの実バイト範囲だけを書き出す。
+        final bytes =
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        await dbFile.writeAsBytes(bytes, flush: true);
+        await lenFile.writeAsString('$assetLen');
+        debugPrint('[PokeDb] bundled DB copied ($assetLen bytes)');
       }
       _db = await openDatabase(dbFile.path, readOnly: true);
       debugPrint('[PokeDb] opened: ${dbFile.path}');
@@ -130,6 +156,40 @@ class PokeDb {
     final rows =
         await _db!.rawQuery('SELECT item_name FROM item_data ORDER BY item_id');
     return ['なし', ...rows.map((r) => r['item_name'] as String)];
+  }
+
+  /// 自パーティOCRの照合辞書用。画像のある通常フォーム（メガ除く）の (name, pid)。
+  /// 能力タブ写真から読んだ名前をこの一覧へ曖昧一致させて pid を確定する。
+  Future<List<({String name, String pid})>> allPokemonNamesWithPid() async {
+    if (_db == null) return const [];
+    final rows = await _db!.rawQuery(
+      "SELECT no, form, name FROM pokemon_data "
+      "WHERE (name NOT LIKE 'メガ%' OR name = 'メガニウム') ORDER BY no, form",
+    );
+    final out = <({String name, String pid})>[];
+    for (final r in rows) {
+      final pid = '${(r['no'] as int).toString().padLeft(4, '0')}-${r['form']}';
+      if (!availablePokemonPids.contains(pid)) continue;
+      out.add((name: r['name'] as String, pid: pid));
+    }
+    return out;
+  }
+
+  /// 全特性名（重複排除）。OCRの特性曖昧一致用。
+  Future<List<String>> allAbilityNames() async {
+    if (_db == null) return const [];
+    final rows = await _db!
+        .rawQuery('SELECT ability_name FROM ability_data ORDER BY ability_id');
+    return [for (final r in rows) (r['ability_name'] as String).trim()]
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// 全技名。OCRの技曖昧一致用。
+  Future<List<String>> allWazaNames() async {
+    if (_db == null) return const [];
+    final rows = await _db!.rawQuery('SELECT name FROM waza_data');
+    return [for (final r in rows) r['name'] as String];
   }
 
   /// ポケモンを名前の部分一致で検索（pokemon_data）。(name, pid) を返す。

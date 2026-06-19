@@ -2,6 +2,10 @@
 
     <!-- 参照データのクラウド取得（HOME使用率・構築記事等）に必要。 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 相手選出スクショの取込（photo_manager で写真ライブラリ読取）。 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
 
     <application
         android:label="ChampEdge"
