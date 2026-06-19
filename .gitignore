@@ -17,3 +17,6 @@ image/readme/desktop.ini
 tessdata/
 recog/bgm.json
 component/_token.py
+
+# Cloudflare Pages 配信物 (scripts/build_pages.py が生成。デプロイ時にビルド)
+/public/
