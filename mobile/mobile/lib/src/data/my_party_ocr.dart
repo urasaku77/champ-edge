@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' show Rect;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 
@@ -38,7 +39,12 @@ class MyPartyOcr {
   List<String> _abilities = const [];
   List<String> _waza = const [];
   List<String> _items = const [];
+  Map<String, List<int>> _baseStats = const {};
   bool _loaded = false;
+
+  /// 直近の解析の診断情報（検出カード数・OCR生テキスト等）。実機デバッグ用に
+  /// 取込画面で表示する。
+  String debugInfo = '';
 
   Future<void> _load() async {
     if (_loaded) return;
@@ -47,6 +53,7 @@ class MyPartyOcr {
     _abilities = await PokeDb.instance.allAbilityNames();
     _waza = await PokeDb.instance.allWazaNames();
     _items = (await PokeDb.instance.itemNames())..removeWhere((s) => s == 'なし');
+    _baseStats = await PokeDb.instance.allBaseStats();
     _loaded = true;
   }
 
@@ -61,6 +68,7 @@ class MyPartyOcr {
   }) async {
     await _load();
     final slots = List.generate(6, (_) => MyPartySlot());
+    final dbg = StringBuffer();
 
     // --- 能力タブ: 名前/特性/持ち物/技 ---
     if (abilityPath != null && abilityBytes != null) {
@@ -68,6 +76,10 @@ class MyPartyOcr {
       try {
         final cards = _detectCards(img);
         final lines = await _ocrLines(abilityPath);
+        dbg.writeln('[能力] 画像 ${img.cols}x${img.rows} / カード ${cards.length} / OCR行 ${lines.length}');
+        for (final l in lines.take(40)) {
+          dbg.writeln('  "${l.text}" @(${l.box.left.round()},${l.box.top.round()})');
+        }
         for (var i = 0; i < cards.length && i < 6; i++) {
           _parseAbilityCard(cards[i], lines, slots[i]);
         }
@@ -82,6 +94,10 @@ class MyPartyOcr {
       try {
         final cards = _detectCards(img);
         final lines = await _ocrLines(statusPath);
+        dbg.writeln('[ステータス] 画像 ${img.cols}x${img.rows} / カード ${cards.length} / OCR行 ${lines.length}');
+        for (final l in lines.take(40)) {
+          dbg.writeln('  "${l.text}" @(${l.box.left.round()},${l.box.top.round()})');
+        }
         for (var i = 0; i < cards.length && i < 6; i++) {
           _parseStatusCard(img, cards[i], lines, slots[i]);
         }
@@ -89,12 +105,13 @@ class MyPartyOcr {
         img.dispose();
       }
     }
+    debugInfo = dbg.toString();
+    debugPrint('[MyPartyOcr]\n$debugInfo');
 
-    // --- 名前確定（OCR名→DB曖昧一致）---
+    // --- 名前確定（ステータスタブのみで pid 未確定の保険）---
     for (final s in slots) {
-      if (s.name.isEmpty) continue;
-      // メガストーン所持なら基本形名はそのままでよい（フォーム切替で対応）。
-      final hit = _closestPokemon(s.name);
+      if (s.pid.isNotEmpty || s.name.isEmpty) continue;
+      final hit = _bestPokemon(s.name);
       if (hit != null) {
         s.name = hit.name;
         s.pid = hit.pid;
@@ -103,11 +120,22 @@ class MyPartyOcr {
     return slots;
   }
 
-  ({String name, String pid})? _closestPokemon(String raw) {
-    final names = [for (final p in _pokemon) p.name];
-    final best = closestMatch(raw, names, cutoff: 0.6);
-    if (best.isEmpty) return null;
-    return _pokemon.firstWhere((p) => p.name == best);
+  // 種族名へ最も近いものを score 付きで返す（cutoff 未満は null）。
+  ({String name, String pid, double score})? _bestPokemon(String raw,
+      {double cutoff = 0.6}) {
+    final t = normalizeText(raw);
+    if (t.isEmpty) return null;
+    ({String name, String pid})? best;
+    var bestScore = -1.0;
+    for (final p in _pokemon) {
+      final s = sequenceRatio(t, p.name);
+      if (s > bestScore) {
+        bestScore = s;
+        best = p;
+      }
+    }
+    if (best == null || bestScore < cutoff) return null;
+    return (name: best.name, pid: best.pid, score: bestScore);
   }
 
   // ML Kit で画像全体をOCRし、行（テキスト＋矩形）を返す。
@@ -150,12 +178,26 @@ class MyPartyOcr {
     final right = inCard.where((l) => l.box.center.dx >= midX).toList()
       ..sort((a, b) => a.box.top.compareTo(b.box.top));
 
-    // 名前は左列の最上行（ニックネームでなく種族名表示なので最上）。
-    if (left.isNotEmpty) s.name = left.first.text;
-    // 特性・持ち物は名前以降の行を辞書照合（最初に当たったものを採用）。
-    for (final l in left.skip(1)) {
+    // 名前: 左列の各行を種族名へ照合し、最もスコアの高い行を名前とする
+    // （最上行決め打ちだと、OCRが名前行を崩した/別行を拾った時に誤判定する。
+    //  例: ガブリアス→アリアドス。全行を種族辞書で評価して最良を選ぶ方が堅牢）。
+    var nameIdx = -1;
+    var nameScore = 0.0;
+    for (var k = 0; k < left.length; k++) {
+      final hit = _bestPokemon(left[k].text, cutoff: 0.5);
+      if (hit != null && hit.score > nameScore) {
+        nameScore = hit.score;
+        nameIdx = k;
+        s.name = hit.name;
+        s.pid = hit.pid;
+      }
+    }
+    // 特性・持ち物は名前行を除く左列から辞書照合（最初に当たったものを採用）。
+    for (var k = 0; k < left.length; k++) {
+      if (k == nameIdx) continue;
+      final l = left[k];
       if (s.ability.isEmpty) {
-        final a = closestMatch(l.text, _abilities, cutoff: 0.55);
+        final a = closestMatch(l.text, _abilities, cutoff: 0.5);
         if (a.isNotEmpty) {
           s.ability = a;
           continue;
@@ -181,16 +223,18 @@ class MyPartyOcr {
   }
 
   // ステータスカード: 上27%スキップ→左右半分×3行で H/A/B・C/D/S。
-  // 各行で努力値数字（OCR）と性格矢印（色）を取得。
+  // 各行で「実数値（行内の最大の妥当数値）」と性格矢印（色）を取得し、
+  // 実数値から努力値(0-32)を逆算する。小さいEV(1,2)はOCRが棒の後の小数字を
+  // 読み落とすため、確実に読める実数値から逆算する方が堅牢。
   void _parseStatusCard(
       cv.Mat img, cv.Rect c, List<_OcrLine> lines, MyPartySlot s) {
     final statTop = c.y + (c.height * 0.27).round();
     final bodyH = c.y + c.height - statTop;
     final rowH = bodyH ~/ 3;
     final midX = c.x + c.width / 2;
-    // 左右×3行のステータスキー割当。
     const leftKeys = [0, 1, 2]; // H,A,B
     const rightKeys = [3, 4, 5]; // C,D,S
+    final actual = List<int>.filled(6, 0); // 実数値
     final upPx = <int, int>{};
     final downPx = <int, int>{};
     for (final half in [false, true]) {
@@ -201,19 +245,21 @@ class MyPartyOcr {
         final y0 = statTop + r * rowH;
         final y1 = y0 + rowH;
         final key = keys[r];
-        // 努力値: 行内(右60%は実数値/EVバー)の数字トークンから EV を抽出。
-        final nums = <String>[];
+        // 実数値 = 行内の最大の妥当数値(20-999)。EVの小数字より必ず大きい。
+        var mx = 0;
         for (final l in lines) {
           final cx = l.box.center.dx, cy = l.box.center.dy;
           if (cx >= x0 && cx < x1 && cy >= y0 && cy < y1) {
-            nums.add(l.text);
+            for (final m in RegExp(r'\d+').allMatches(l.text)) {
+              final n = int.parse(m.group(0)!);
+              if (n >= 20 && n <= 999 && n > mx) mx = n;
+            }
           }
         }
-        s.evs[key] = parseEv(nums.join(' '));
+        actual[key] = mx;
         // 性格矢印: 行の左60%領域で 桃(↑)/水(↓) 画素数を数える。
-        final rx0 = x0.round();
-        final rw = ((x1 - x0) * 0.6).round();
-        final rr = _safeRect(img, rx0, y0, rw, rowH);
+        final rr = _safeRect(
+            img, x0.round(), y0, ((x1 - x0) * 0.6).round(), rowH);
         if (rr != null) {
           final (u, d) = _arrowPixels(img, rr);
           if (u > 5) upPx[key] = u;
@@ -226,12 +272,52 @@ class MyPartyOcr {
     final down = _maxKey(downPx);
     final nat = natureFromArrows(_statLetter(up), _statLetter(down));
     if (nat != 'まじめ') s.nature = nat;
+    // 努力値逆算（実数値→EV）。種族値は能力タブで確定した pid から、IV31/L50固定。
+    final base = _baseStats[s.pid];
+    if (base != null) {
+      for (var i = 0; i < 6; i++) {
+        if (actual[i] <= 0) {
+          s.evs[i] = 0;
+          continue;
+        }
+        final mul = up == i ? 1.1 : (down == i ? 0.9 : 1.0);
+        s.evs[i] = _solveEv(actual[i], base[i], mul, i == 0);
+      }
+    }
     // 名前が能力タブで取れていなければステータスタブの最上行で補完。
     if (s.name.isEmpty) {
       final inCard = _linesIn(c, lines)
         ..sort((a, b) => a.box.top.compareTo(b.box.top));
       if (inCard.isNotEmpty) s.name = inCard.first.text;
     }
+  }
+
+  // アプリの実数値計算（damage_calc と同式）。L50/IV31 固定で ev 0..32 を総当たり。
+  static int _calcStat(int base, int iv, int ev, int level, double mul, bool isHp) {
+    final common = 2 * base + iv + 2 * ev;
+    if (isHp) return (common * level) ~/ 100 + 10 + level;
+    var v = (common * level) ~/ 100 + 5;
+    if (mul == 1.1) {
+      v = (v * 11) ~/ 10;
+    } else if (mul == 0.9) {
+      v = (v * 9) ~/ 10;
+    }
+    return v;
+  }
+
+  static int _solveEv(int actual, int base, double mul, bool isHp) {
+    for (var ev = 0; ev <= 32; ev++) {
+      if (_calcStat(base, 31, ev, 50, mul, isHp) == actual) return ev;
+    }
+    var best = 0, bd = 1 << 30; // 一致なしは最近傍
+    for (var ev = 0; ev <= 32; ev++) {
+      final d = (_calcStat(base, 31, ev, 50, mul, isHp) - actual).abs();
+      if (d < bd) {
+        bd = d;
+        best = ev;
+      }
+    }
+    return best;
   }
 
   static String? _statLetter(int? k) =>

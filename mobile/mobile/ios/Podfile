@@ -31,6 +31,12 @@ target 'Runner' do
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # 自分パーティOCRの日本語認識に必須。google_mlkit_text_recognition の iOS は
+  # 既定でラテン文字モデルしか入らないため、日本語モデルを明示追加する。
+  # （未追加だと TextRecognitionScript.japanese が機能せず1文字も読めない）
+  pod 'GoogleMLKit/TextRecognitionJapanese', '~> 9.0.0'
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

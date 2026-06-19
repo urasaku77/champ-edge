@@ -192,6 +192,22 @@ class PokeDb {
     return [for (final r in rows) r['name'] as String];
   }
 
+  /// pid → 種族値 [H,A,B,C,D,S]。自パOCRの努力値逆算（実数値→EV）に使う。
+  Future<Map<String, List<int>>> allBaseStats() async {
+    if (_db == null) return const {};
+    final rows =
+        await _db!.rawQuery('SELECT no, form, H, A, B, C, D, S FROM pokemon_data');
+    final m = <String, List<int>>{};
+    for (final r in rows) {
+      final pid = '${(r['no'] as int).toString().padLeft(4, '0')}-${r['form']}';
+      m[pid] = [
+        r['H'] as int, r['A'] as int, r['B'] as int,
+        r['C'] as int, r['D'] as int, r['S'] as int,
+      ];
+    }
+    return m;
+  }
+
   /// ポケモンを名前の部分一致で検索（pokemon_data）。(name, pid) を返す。
   ///
   /// 旧アプリと同様にメガシンカ（name LIKE 'メガ%'、メガニウム除く）と除外リストを外し、
