@@ -17,8 +17,6 @@ import '../service/appear_ability.dart';
 import '../service/damage_engine.dart';
 import '../data/battle_db.dart';
 import '../data/app_settings.dart';
-import '../data/my_party_ocr.dart';
-import 'my_party_import_screen.dart';
 import 'adder_dialog.dart';
 import 'battle_analysis_screen.dart';
 import 'similar_party_dialog.dart';
@@ -46,12 +44,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  int _myActive = 0;
-  int _oppActive = 0;
+  // アクティブ（詳細カード・ダメージ計算の対象）。-1 = 未選択。パーティ読込/起動時は
+  // -1 にして、ユーザーが明示タップするまでどのポケモンも「選択中」表示にしない。
+  int _myActive = -1;
+  int _oppActive = -1;
   // 選出（選んだ順のスロット番号。番号バッジとして表示）。原典同様、初期は空で
   // タップにより明示的に登録する（登録/クリアでは勝手に選出しない）。
   final List<int> _myChosen = [];
   final List<int> _oppChosen = [];
+
+  /// 未選択時に使う空ポケモン（詳細カードを空表示にする）。
+  final BattlePokemon _blankActive = BattlePokemon(
+    name: '',
+    pid: '0000-0',
+    baseStats: const [0, 0, 0, 0, 0, 0],
+    type1: PokeType.none,
+    abilityOptions: const ['—'],
+    moves: List.generate(4, (_) => emptyMove()),
+  );
+  BattlePokemon get _myActiveP => (_myActive >= 0 && _myActive < _myParty.length)
+      ? _myParty[_myActive]
+      : _blankActive;
+  BattlePokemon get _oppActiveP =>
+      (_oppActive >= 0 && _oppActive < _oppParty.length)
+          ? _oppParty[_oppActive]
+          : _blankActive;
 
   // パーティ（編集可能）。自分は前回状態を復元（無ければ空）、相手は毎回スカウトし直す
   // 想定なので起動時は常に空（前回の相手は復元しない）。
@@ -153,11 +170,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 前回セッションの自分パーティのみ復元（相手は毎回スカウトし直すため復元しない）。
   Future<void> _restoreLast() async {
+    // 起動時は「使用中」に設定したパーティを最新の保存内容で割り当てる。
+    // 使用中が未設定なら前回セッションの自動保存を復元（それも無ければ空のまま）。
+    final usingId = await PartyStore.instance.loadUsingPartyId();
+    if (usingId != null && usingId.isNotEmpty) {
+      final list = await PartyStore.instance.listSavedParties();
+      SavedParty? s;
+      for (final p in list) {
+        if (p.id == usingId) {
+          s = p;
+          break;
+        }
+      }
+      if (s != null && mounted) {
+        setState(() {
+          _myParty = _ensure6(
+              [for (final p in s!.party) BattlePokemon.fromJson(p.toJson())]);
+          _myActive = -1;
+          _myPartyNum = s.num;
+          _myPartySubnum = s.subnum;
+          _myPartyTitle = s.title;
+        });
+        _backfillWeights();
+        return;
+      }
+    }
     final my = await PartyStore.instance.loadLast('my');
     if (!mounted || my == null) return;
     setState(() {
       _myParty = _ensure6(my);
-      _myActive = _myActive.clamp(0, _myParty.length - 1);
+      _myActive = -1; // 起動・読込直後は未選択（明示タップまで選択中表示しない）
     });
     _backfillWeights();
   }
@@ -213,8 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// ポケモンを選択（選出/切替）する共通処理。切替時はランク・一過性効果をクリアし、
   /// 未補完の実ポケモンは HOME 使用率から自動補完する。
   Future<void> _selectActive(int i, bool isMy) async {
-    final myOld = _myParty[_myActive];
-    final oppOld = _oppParty[_oppActive];
+    final myOld = _myActiveP;
+    final oppOld = _oppActiveP;
     final curActive = isMy ? _myActive : _oppActive;
     final switching = i != curActive;
     setState(() {
@@ -250,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _applyAbilityWeatherField(p);
-      applyAppearAbility(p, isMy ? _oppParty[_oppActive] : _myParty[_myActive]);
+      applyAppearAbility(p, isMy ? _oppActiveP : _myActiveP);
     });
   }
 
@@ -314,17 +356,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _myActive = _myActive.clamp(0, _myParty.length - 1);
-    _oppActive = _oppActive.clamp(0, _oppParty.length - 1);
-    final my = _myParty[_myActive];
-    final opp = _oppParty[_oppActive];
+    _myActive = _myActive < 0 ? -1 : _myActive.clamp(0, _myParty.length - 1);
+    _oppActive = _oppActive < 0 ? -1 : _oppActive.clamp(0, _oppParty.length - 1);
+    final my = _myActiveP;
+    final opp = _oppActiveP;
     final fieldState = FieldState(weather: _weather, field: _field);
     // iPad など大画面では余白を活かして間隔を広げ、相手技は10枠表示する。
     _isTablet = MediaQuery.of(context).size.shortestSide >= 600;
     if (_isTablet && !_tabletOppNormalized) {
       _tabletOppNormalized = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await _normalizeOpponentMoves(_oppParty[_oppActive]);
+        if (_oppActive >= 0) await _normalizeOpponentMoves(_oppParty[_oppActive]);
         if (mounted) setState(() {});
       });
     }
@@ -359,7 +401,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   _myChosen.remove(i);
                 }),
                 onEdit: () => _editParty(_myParty, '自分'),
-                onEditDoubleTap: _importMyPartyFromScreenshots,
                 footer: _isTablet ? _bottomControls() : null,
               ),
             ),
@@ -715,7 +756,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ..clear()
         ..addAll(_ensure6(const []));
       _oppChosen.clear();
-      _oppActive = 0;
+      _oppActive = -1;
       // ドラフトをクリア（登録したのでリセット。番号/連番は識別なので保持）。
       _recTn.clear();
       _recRate.clear();
@@ -1260,7 +1301,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _myParty = _ensure6(
           [for (final p in used.party) BattlePokemon.fromJson(p.toJson())]);
-      _myActive = 0;
+      _myActive = -1;
       _myChosen.clear();
       _myPartyNum = used.num;
       _myPartySubnum = used.subnum;
@@ -1280,16 +1321,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onMenuTap(String label) {
     switch (label) {
       case '素早さ比較':
-        final mine = _myParty[_myActive];
-        final opp = _oppParty[_oppActive];
+        final mine = _myActiveP;
+        final opp = _oppActiveP;
         if (mine.name.isEmpty || opp.name.isEmpty) {
           _snack('素早さ比較は両者のポケモンを選択してから開いてください');
           return;
         }
         showSpeedCompareDialog(context, mine, opp);
       case '重さ比較':
-        final mine = _myParty[_myActive];
-        final opp = _oppParty[_oppActive];
+        final mine = _myActiveP;
+        final opp = _oppActiveP;
         if (mine.name.isEmpty || opp.name.isEmpty) {
           _snack('重さ比較は両者のポケモンを選択してから開いてください');
           return;
@@ -1305,8 +1346,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _openPartyManager();
       case 'ボックス編集':
         _openBox();
-      case 'スクショ取込':
-        _importOpponentFromScreenshot();
       case '設定':
         Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const SettingsScreen()));
@@ -1336,43 +1375,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (changed && mounted) {
       setState(() => _oppChosen.clear());
-      _autosaveLast();
-    }
-  }
-
-  /// 自分パーティ取込（HOME/SVスクショ2枚→種族/特性/持ち物/技/努力値/性格）。
-  /// 自分パネルの編集ボタンをダブルタップで起動。結果を自分パーティへ反映。
-  Future<void> _importMyPartyFromScreenshots() async {
-    final slots = await Navigator.of(context).push<List<MyPartySlot>>(
-        MaterialPageRoute(builder: (_) => const MyPartyImportScreen()));
-    if (slots == null || !mounted) return;
-    var changed = false;
-    for (var i = 0; i < slots.length && i < _myParty.length; i++) {
-      final s = slots[i];
-      if (s.pid.isEmpty) continue;
-      final p = await PokeDb.instance.buildPokemon(s.pid);
-      if (p == null) continue;
-      if (s.ability.isNotEmpty && p.abilityOptions.contains(s.ability)) {
-        p.ability = s.ability;
-      }
-      if (s.item.isNotEmpty) p.item = s.item;
-      if (s.nature.isNotEmpty) p.nature = s.nature;
-      p.ev = List<int>.from(s.evs);
-      final moves = <BattleMove>[];
-      for (final mn in s.moves) {
-        if (mn.isEmpty) continue;
-        final bm = await PokeDb.instance.moveByName(mn);
-        if (bm != null) moves.add(bm);
-      }
-      while (moves.length < 4) {
-        moves.add(emptyMove());
-      }
-      p.moves = moves.take(4).toList();
-      _myParty[i] = p;
-      changed = true;
-    }
-    if (changed && mounted) {
-      setState(() => _myChosen.clear());
       _autosaveLast();
     }
   }
@@ -1416,7 +1418,6 @@ class _HomeScreenState extends State<HomeScreen> {
               [
                 ['パーティ編集', Icons.edit],
                 ['ボックス編集', Icons.inventory_2],
-                ['スクショ取込', Icons.photo_library],
               ],
               [
                 ['対戦履歴', Icons.history],
@@ -3517,6 +3518,34 @@ class _StatEditorDialogState extends State<_StatEditorDialog> {
                             fontSize: 11,
                             color: Colors.black54,
                             fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 96),
+              ],
+            ),
+            // 合計の下に努力値の一括クリア（ランククリアと対）。
+            Row(
+              children: [
+                const SizedBox(width: 64),
+                const SizedBox(width: 36),
+                const SizedBox(width: 40),
+                Expanded(
+                  child: Center(
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.delete_sweep, size: 14),
+                      label: const Text('努力値クリア',
+                          style: TextStyle(fontSize: 9)),
+                      onPressed: () => setState(() {
+                        for (var k = 0; k < 6; k++) {
+                          p.ev[k] = 0;
+                        }
+                      }),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 96),

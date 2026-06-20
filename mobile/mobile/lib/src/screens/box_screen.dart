@@ -38,8 +38,39 @@ class _BoxScreenState extends State<BoxScreen> {
     });
   }
 
-  /// 追加：種族を検索窓で選び、そのまま個別編集（技・努力値まで）して保存。
+  /// 追加：「パーティから選択（複数）」か「一から作成」を選ぶ。
   Future<void> _add() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('ポケモンを追加'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'party'),
+            child: const ListTile(
+                leading: Icon(Icons.groups),
+                title: Text('パーティから選択'),
+                subtitle: Text('保存パーティから複数選んで追加')),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'new'),
+            child: const ListTile(
+                leading: Icon(Icons.add),
+                title: Text('一から作成'),
+                subtitle: Text('種族を検索して個別に作成')),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'new') {
+      await _addNew();
+    } else if (choice == 'party') {
+      await _addFromParty();
+    }
+  }
+
+  /// 一から作成：種族を検索窓で選び、そのまま個別編集（技・努力値まで）して保存。
+  Future<void> _addNew() async {
     final pid = await pickPokemon(context);
     if (pid == null) return;
     final p = await PokeDb.instance.buildPokemon(pid);
@@ -49,6 +80,19 @@ class _BoxScreenState extends State<BoxScreen> {
     );
     if (edited == null) return;
     await PartyStore.instance.saveBoxPokemon(edited);
+    _reload();
+  }
+
+  /// 保存パーティから複数選択してボックスへ追加。
+  Future<void> _addFromParty() async {
+    final picked = await Navigator.of(context).push<List<BattlePokemon>>(
+      MaterialPageRoute(builder: (_) => const _PartyPokemonMultiPicker()),
+    );
+    if (picked == null || picked.isEmpty) return;
+    for (final p in picked) {
+      await PartyStore.instance
+          .saveBoxPokemon(BattlePokemon.fromJson(p.toJson()));
+    }
     _reload();
   }
 
@@ -240,5 +284,114 @@ class _BoxScreenState extends State<BoxScreen> {
     if (ok != true) return;
     await PartyStore.instance.deleteBoxPokemon(id);
     _reload();
+  }
+}
+
+/// 保存パーティのポケモンを複数選択してボックスへ追加するピッカー。
+class _PartyPokemonMultiPicker extends StatefulWidget {
+  const _PartyPokemonMultiPicker();
+
+  @override
+  State<_PartyPokemonMultiPicker> createState() =>
+      _PartyPokemonMultiPickerState();
+}
+
+class _PartyPokemonMultiPickerState extends State<_PartyPokemonMultiPicker> {
+  List<SavedParty> _parties = const [];
+  final Set<String> _sel = {}; // key: "partyIndex:slotIndex"
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final list = await PartyStore.instance.listSavedParties();
+    if (!mounted) return;
+    setState(() {
+      _parties = list;
+      _loading = false;
+    });
+  }
+
+  List<BattlePokemon> _selectedPokemon() {
+    final out = <BattlePokemon>[];
+    for (var pi = 0; pi < _parties.length; pi++) {
+      final party = _parties[pi].party;
+      for (var si = 0; si < party.length; si++) {
+        if (_sel.contains('$pi:$si')) out.add(party[si]);
+      }
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('パーティから選択', style: TextStyle(fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: _sel.isEmpty
+                ? null
+                : () => Navigator.pop(context, _selectedPokemon()),
+            child: Text('追加 (${_sel.length})',
+                style: TextStyle(
+                    color: _sel.isEmpty ? Colors.white38 : Colors.white)),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _parties.isEmpty
+              ? const Center(child: Text('保存パーティがありません'))
+              : ListView.builder(
+                  itemCount: _parties.length,
+                  itemBuilder: (_, pi) {
+                    final sp = _parties[pi];
+                    final mons = [
+                      for (var si = 0; si < sp.party.length; si++)
+                        if (sp.party[si].name.isNotEmpty) (si, sp.party[si])
+                    ];
+                    if (mons.isEmpty) return const SizedBox.shrink();
+                    return Card(
+                      margin:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                            child: Text(sp.label.isEmpty ? '(無題)' : sp.label,
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          for (final (si, mon) in mons)
+                            CheckboxListTile(
+                              dense: true,
+                              value: _sel.contains('$pi:$si'),
+                              onChanged: (v) => setState(() {
+                                final k = '$pi:$si';
+                                if (v == true) {
+                                  _sel.add(k);
+                                } else {
+                                  _sel.remove(k);
+                                }
+                              }),
+                              secondary: Image.asset(mon.imageAsset,
+                                  width: 32,
+                                  height: 32,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox(width: 32)),
+                              title: Text(mon.name),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+    );
   }
 }

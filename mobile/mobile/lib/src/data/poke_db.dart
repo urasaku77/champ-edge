@@ -9,6 +9,7 @@ import 'package:sqflite/sqflite.dart';
 import '../model/battle_pokemon.dart';
 import '../service/damage_engine.dart';
 import 'available_pokemon.dart';
+import 'form_data.dart';
 
 /// パーティ選択から除外するポケモン（旧 exception.remove_pokemon_name_from_party）。
 const Set<String> _excludedFromParty = {
@@ -308,20 +309,27 @@ class PokeDb {
     ];
   }
 
-  /// フォルム切替。そのポケモンの全フォルム（通常 1-9・メガ 10-19 を含む）を昇順に
-  /// 循環し（最後の次は先頭）、種族値・タイプ・特性・名前・画像を更新する
-  /// （技・努力値・性格・持ち物・ランク等は維持）。フォルムが1つなら false。
+  /// フォルム切替（メガシンカ含む）。**PC版 changeble_form_in_battle に定義された
+  /// ポケモンのみ**変化する（地方フォルム＝ガラル/ヒスイ等やアルセウスのタイプ違いは
+  /// バトル中に変わらないので対象外＝タップしても何も起きない）。種族値・タイプ・特性・
+  /// 名前・画像を更新する（技・努力値・性格・持ち物・ランク等は維持）。
   Future<bool> formChange(BattlePokemon p) async {
     if (_db == null) return false;
-    final formRows = await _db!.rawQuery(
-      'SELECT form FROM pokemon_data WHERE no = ? ORDER BY form',
-      [p.dexNo],
-    );
-    final forms = [for (final r in formRows) r['form'] as int];
-    if (forms.length <= 1) return false;
-    final idx = forms.indexOf(p.formNo);
-    // 現フォルムが一覧に無ければ先頭、あれば次（最後の次は先頭へ循環）。
-    final next = idx < 0 ? forms.first : forms[(idx + 1) % forms.length];
+    final no = p.dexNo;
+    if (!kChangeableFormNos.contains(no)) return false;
+    // バトル中フォルムチェンジ（ヒヒダルマ等の専用遷移）を優先、無ければメガ循環。
+    int? next = nextBattleForm(no, p.formNo);
+    if (next == null) {
+      // メガ循環: 基本 → 11 → 12 → 基本。
+      final megaForms = await megaFormsOf(no);
+      if (megaForms.isEmpty) return false;
+      if (!megaForms.contains(p.formNo)) {
+        next = megaForms.first;
+      } else {
+        final idx = megaForms.indexOf(p.formNo);
+        next = (idx + 1 < megaForms.length) ? megaForms[idx + 1] : p.baseForm;
+      }
+    }
     final rows = await _db!.rawQuery(
       'SELECT name, H, A, B, C, D, S, type1, type2, ability1, ability2, '
       'ability3, weight FROM pokemon_data WHERE no = ? AND form = ? LIMIT 1',

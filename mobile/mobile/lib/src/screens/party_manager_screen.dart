@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/home_stats.dart';
+import '../data/my_party_ocr.dart';
 import '../data/party_store.dart';
 import '../data/poke_db.dart';
 import '../model/battle_pokemon.dart';
 import '../service/damage/poke_types.dart';
+import 'my_party_import_screen.dart';
 import 'pokemon_picker.dart';
 
 /// 一覧の並び替え基準（登録日／番号）。
@@ -365,6 +367,32 @@ class _PartyDetailEditorState extends State<_PartyDetailEditor> {
     if (edited != null) setState(() => _party[i] = edited);
   }
 
+  /// ポケモンをダブルタップでボックスへ追加（個体をそのまま保存）。
+  Future<void> _addToBox(int i) async {
+    final p = _party[i];
+    if (p.name.isEmpty) return;
+    await PartyStore.instance
+        .saveBoxPokemon(BattlePokemon.fromJson(p.toJson()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 1000),
+        content: Text('${p.name} をボックスに追加しました')));
+  }
+
+  /// HOME/SVのパーティ画面スクショ2枚からこのパーティ6体を取り込む（自パOCR）。
+  Future<void> _importFromScreenshots() async {
+    final slots = await Navigator.of(context).push<List<MyPartySlot>>(
+        MaterialPageRoute(builder: (_) => const MyPartyImportScreen()));
+    if (slots == null || !mounted) return;
+    final built = await buildPartyFromSlots(slots);
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < built.length && i < _party.length; i++) {
+        if (built[i].name.isNotEmpty) _party[i] = built[i];
+      }
+    });
+  }
+
   Future<void> _persist() async {
     await PartyStore.instance.savePartyEntry(
       id: widget.saved.id,
@@ -493,6 +521,12 @@ class _PartyDetailEditorState extends State<_PartyDetailEditor> {
       appBar: AppBar(
         title: const Text('パーティ詳細'),
         actions: [
+          // 自パOCR取込（HOME/SVスクショ2枚→6体）。
+          IconButton(
+            icon: const Icon(Icons.photo_library),
+            tooltip: 'スクショから取込',
+            onPressed: _importFromScreenshots,
+          ),
           // 使用中かどうかをチェックボックスで明示・切替（背景に埋もれないチップ表示）。
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -611,6 +645,7 @@ class _PartyDetailEditorState extends State<_PartyDetailEditor> {
           childWhenDragging: Opacity(opacity: 0.3, child: card),
           child: InkWell(
             onTap: () => _editPokemon(i),
+            onDoubleTap: () => _addToBox(i),
             borderRadius: BorderRadius.circular(8),
             child: DecoratedBox(
               decoration: BoxDecoration(

@@ -5,9 +5,52 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 
+import '../model/battle_pokemon.dart';
+import '../service/damage/poke_types.dart';
 import 'fuzzy_match.dart';
 import 'party_ocr_logic.dart';
 import 'poke_db.dart';
+
+/// 取込結果(スロット)から6体の [BattlePokemon] を構築する。未認識スロットは空ポケモン。
+/// 自パOCRの結果をパーティへ反映する共通処理（パーティ詳細編集・Top 双方で使う）。
+Future<List<BattlePokemon>> buildPartyFromSlots(List<MyPartySlot> slots) async {
+  final out = <BattlePokemon>[];
+  for (final s in slots) {
+    BattlePokemon? p;
+    if (s.pid.isNotEmpty) {
+      p = await PokeDb.instance.buildPokemon(s.pid);
+      if (p != null) {
+        if (s.ability.isNotEmpty && p.abilityOptions.contains(s.ability)) {
+          p.ability = s.ability;
+        }
+        if (s.item.isNotEmpty) p.item = s.item;
+        if (s.nature.isNotEmpty) p.nature = s.nature;
+        p.ev = List<int>.from(s.evs);
+        final moves = <BattleMove>[];
+        for (final mn in s.moves) {
+          if (mn.isEmpty) continue;
+          final bm = await PokeDb.instance.moveByName(mn);
+          if (bm != null) moves.add(bm);
+        }
+        while (moves.length < 4) {
+          moves.add(emptyMove());
+        }
+        p.moves = moves.take(4).toList();
+      }
+    }
+    out.add(p ?? _emptyBattlePokemon());
+  }
+  return out;
+}
+
+BattlePokemon _emptyBattlePokemon() => BattlePokemon(
+      name: '',
+      pid: '0000-0',
+      baseStats: const [0, 0, 0, 0, 0, 0],
+      type1: PokeType.none,
+      abilityOptions: const ['—'],
+      moves: List.generate(4, (_) => emptyMove()),
+    );
 
 /// 自分パーティ取込（#自パーティOCR）。
 ///
