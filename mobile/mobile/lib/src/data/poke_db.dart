@@ -213,6 +213,11 @@ class PokeDb {
   ///
   /// 旧アプリと同様にメガシンカ（name LIKE 'メガ%'、メガニウム除く）と除外リストを外し、
   /// さらに**画像があるポケモンのみ**に限定する。
+  ///
+  /// 同名で複数フォルムが画像つきで存在する場合（例: ガラルヤドラン 80-1/80-2、
+  /// ビビヨン 666-0/666-18）は**1件に集約**する。残すのは「フォーム番号が大きい方」＝
+  /// バトルDB(ランキング/構築記事)が使うフォルム。類似パーティ照合は pid 直接比較なので、
+  /// バトルDB側に揃えておくと一致が保たれる。
   Future<List<({String name, String pid})>> searchPokemon(String query,
       {int limit = 400, bool includeMega = false}) async {
     if (_db == null) return const [];
@@ -225,16 +230,25 @@ class PokeDb {
       "ORDER BY no, form",
       ['%${_toKatakana(query)}%'],
     );
-    final result = <({String name, String pid})>[];
+    // name → 採用エントリ（同名はフォーム番号が大きい方を残す）。
+    final byName = <String, ({String name, String pid, int no, int form})>{};
     for (final r in rows) {
       final name = r['name'] as String;
-      final pid = '${(r['no'] as int).toString().padLeft(4, '0')}-${r['form']}';
+      final no = r['no'] as int;
+      final form = r['form'] as int;
+      final pid = '${no.toString().padLeft(4, '0')}-$form';
       if (_excludedFromParty.contains(name)) continue;
       if (!availablePokemonPids.contains(pid)) continue; // 画像があるもののみ
-      result.add((name: name, pid: pid));
-      if (result.length >= limit) break;
+      final prev = byName[name];
+      if (prev == null || form > prev.form) {
+        byName[name] = (name: name, pid: pid, no: no, form: form);
+      }
     }
-    return result;
+    final entries = byName.values.toList()
+      ..sort((a, b) => a.no != b.no ? a.no.compareTo(b.no) : a.form.compareTo(b.form));
+    return [
+      for (final e in entries.take(limit)) (name: e.name, pid: e.pid)
+    ];
   }
 
   /// pid から BattlePokemon を構築（種族値・タイプ・特性・体重を DB から）。
