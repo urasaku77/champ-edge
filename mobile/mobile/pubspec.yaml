@@ -1,7 +1,7 @@
 name: champ_edge_mobile
 description: "champ-edge-mobile Phase 1 MVP Flutter skeleton"
 publish_to: none
-version: 0.1.0+20
+version: 0.1.0+21
 environment:
   sdk: ">=3.0.0 <4.0.0"
 

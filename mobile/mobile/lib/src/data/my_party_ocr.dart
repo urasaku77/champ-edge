@@ -208,6 +208,21 @@ class MyPartyOcr {
         if (it.isNotEmpty) s.item = _fixItem(it);
       }
     }
+    // メガストーン → 種族名 即確定（PC版 _identify_pokemon 由来の安全な保険）。
+    // 持ち物が「○○ナイト(X/Y)」なら末尾を除いた語から種族を確定し、名前OCRが
+    // 崩れていても正す。10組検証で無回帰を確認済み。なお PC版の多段識別の
+    // 画像フォールバック（スプライト/タイプアイコン照合）は ML Kit の高精度OCR
+    // と相性が悪く誤爆して逆に精度が落ちたため移植しない。
+    if (s.item.contains('ナイト')) {
+      final stem = s.item.replaceAll(RegExp(r'ナイト[XYＸＹxy]?$'), '').trim();
+      if (stem.isNotEmpty) {
+        final hit = _bestPokemon(stem, cutoff: 0.45);
+        if (hit != null) {
+          s.name = hit.name;
+          s.pid = hit.pid;
+        }
+      }
+    }
     // 技：右列の各行を技辞書へ。
     var mi = 0;
     for (final l in right) {
