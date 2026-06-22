@@ -49,16 +49,6 @@ class PokeDb {
     return buf.toString();
   }
 
-  /// カタカナ→ひらがな（DB の技名はひらがなのため、検索入力を変換する）。
-  static String _toHiragana(String s) {
-    final buf = StringBuffer();
-    for (final r in s.runes) {
-      // カタカナ U+30A1–U+30F6 → ひらがな (-0x60)
-      buf.writeCharCode((r >= 0x30A1 && r <= 0x30F6) ? r - 0x60 : r);
-    }
-    return buf.toString();
-  }
-
   /// DB を開く。成功可否を返す（プラグイン未統合などで失敗したら false）。
   Future<bool> open() async {
     if (_db != null) return true;
@@ -110,16 +100,53 @@ class PokeDb {
     return (r.first['c'] as int?) ?? 0;
   }
 
-  /// 技を名前の部分一致で検索（waza_data）。技名はひらがな格納のため、
-  /// 生入力とカタカナ→ひらがな変換の両方でマッチさせる（例: みずびたし／ミズビタシ）。
+  /// 技検索インデックス（全技を一度だけ読み、正規化キーを添えてキャッシュ）。
+  List<({BattleMove move, String key})>? _moveIndex;
+
+  /// 数字・英字を含む技の「読み」エイリアス。読みでも検索できるようにする
+  /// （例「じゅうまんボルト」「ディーディーラリアット」）。カナ正規化されるので
+  /// ひらがな/カタカナは区別しない。
+  static const Map<String, String> _moveReadingAlias = {
+    '10まんボルト': 'じゅうまんボルト',
+    '10まんばりき': 'じゅうまんばりき',
+    '3ぼんのや': 'さんぼんのや',
+    'テクスチャー2': 'テクスチャーツー',
+    'DDラリアット': 'ディーディーラリアット',
+    'Gのちから': 'ジーのちから',
+    'Vジェネレート': 'ブイジェネレート',
+  };
+
+  /// 技を名前の部分一致で検索（waza_data）。技名はひらがな・カタカナ混在のため
+  /// （例「10まんボルト」）、ポケモン検索と同様に**両辺をカタカナへ正規化**して
+  /// 部分一致させ、ひらがな/カタカナを区別しない。数字・英字を含む技は読み
+  /// （[_moveReadingAlias]）もキーに含め、読みでも検索できる。
   Future<List<BattleMove>> searchMoves(String query, {int limit = 60}) async {
     if (_db == null) return const [];
-    final rows = await _db!.rawQuery(
-      'SELECT name, type, category, power FROM waza_data '
-      'WHERE name LIKE ? OR name LIKE ? ORDER BY power DESC, name LIMIT ?',
-      ['%$query%', '%${_toHiragana(query)}%', limit],
-    );
-    return rows.map(_rowToMove).toList();
+    if (_moveIndex == null) {
+      final rows = await _db!
+          .rawQuery('SELECT name, type, category, power FROM waza_data');
+      _moveIndex = [
+        for (final r in rows)
+          (
+            move: _rowToMove(r),
+            // 名前＋（あれば）読みエイリアスを区切り文字付きで結合してキーに。
+            key: _toKatakana(r['name'] as String) +
+                (_moveReadingAlias.containsKey(r['name'])
+                    ? '${_toKatakana(_moveReadingAlias[r['name']]!)}'
+                    : '')
+          )
+      ];
+    }
+    final q = _toKatakana(query.trim());
+    final out = <BattleMove>[];
+    for (final e in _moveIndex!) {
+      if (q.isEmpty || e.key.contains(q)) out.add(e.move);
+    }
+    out.sort((a, b) {
+      final c = b.power.compareTo(a.power);
+      return c != 0 ? c : a.name.compareTo(b.name);
+    });
+    return out.length > limit ? out.sublist(0, limit) : out;
   }
 
   /// 技を完全名で取得。
