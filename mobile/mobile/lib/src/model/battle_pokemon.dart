@@ -437,6 +437,95 @@ Nature natureByName(String name) =>
     allNatures.firstWhere((n) => n.name == name,
         orElse: () => const Nature('まじめ', 0, 0));
 
+/// 性格に応じた標準努力値を返す（PC版 pokedata/nature.py get_default_doryoku の移植）。
+/// EV は表示スケール(0-32)。[baseStats] は [H,A,B,C,D,S]、戻り値も [H,A,B,C,D,S]。
+/// 該当しない性格（まじめ等）は全 0。
+List<int> defaultEvForNature(String nature, List<int> baseStats) {
+  final a = baseStats.length > 1 ? baseStats[1] : 0;
+  final c = baseStats.length > 3 ? baseStats[3] : 0;
+  final s = baseStats.length > 5 ? baseStats[5] : 0;
+  final ev = List<int>.filled(6, 0); // [H,A,B,C,D,S]
+  switch (nature) {
+    case 'ようき': // A↑ S↑
+      ev[1] = 32; ev[5] = 32;
+    case 'おくびょう': // C↑ S↑
+      ev[3] = 32; ev[5] = 32;
+    case 'ゆうかん': // H↑ A↑
+      ev[0] = 32; ev[1] = 32;
+    case 'れいせい': // H↑ C↑
+      ev[0] = 32; ev[3] = 32;
+    case 'ずぶとい':
+    case 'わんぱく':
+    case 'のんき': // H↑ B↑
+      ev[0] = 32; ev[2] = 32;
+    case 'おだやか':
+    case 'しんちょう':
+    case 'なまいき': // H↑ D↑
+      ev[0] = 32; ev[4] = 32;
+    case 'いじっぱり':
+    case 'さみしがり':
+    case 'やんちゃ': // A↑ ＋（素早90以上なら S、未満なら H）
+      ev[1] = 32;
+      if (s >= 90) { ev[5] = 32; } else { ev[0] = 32; }
+    case 'ひかえめ':
+    case 'おっとり':
+    case 'うっかりや': // C↑ ＋（素早90以上なら S、未満なら H）
+      ev[3] = 32;
+      if (s >= 90) { ev[5] = 32; } else { ev[0] = 32; }
+    case 'せっかち':
+    case 'むじゃき': // S↑ ＋（攻撃と特攻の高い方）
+      if (a > c) ev[1] = 32;
+      if (c > a) ev[3] = 32;
+      ev[5] = 32;
+  }
+  // 主配分が無い性格（まじめ等）は全 0 のまま。
+  if (ev.every((e) => e == 0)) return ev;
+  // 余り（合計 66＝32+32+2 にする）の配分。
+  // ev 添字: 0=H 1=A 2=B 3=C 4=D 5=S。性格の up/down も 1=A..5=S で ev 添字と一致。
+  final n = natureByName(nature);
+  final lowered = n.down; // 0=なし, 1=A..5=S
+  var remaining = 66 - ev.fold<int>(0, (x, y) => x + y);
+  if (remaining <= 0) return ev;
+
+  int cap(int v) => v > 32 ? 32 : v;
+
+  // ルール2: 防御能力(B/D)が下降補正の性格は、余りを全て S（素早）へ。
+  if ((lowered == 2 || lowered == 4) && ev[5] < 32) {
+    ev[5] = cap(ev[5] + remaining);
+    return ev;
+  }
+
+  // ルール1: H が空き（攻撃型）なら余りは H へ。ただし HP 実数値が奇数になるよう調整。
+  // lv50: HP = 種族H + 努力H + 75 → 奇数 ⟺ (種族H + 努力H) が偶数。
+  // 努力H=2 だと種族Hが奇数のとき HP 偶数になるので、その場合は H1＋残りを B/D へ。
+  if (ev[0] < 32) {
+    final baseHp = baseStats.isNotEmpty ? baseStats[0] : 0;
+    if (baseHp.isEven) {
+      ev[0] = cap(ev[0] + remaining); // H+2 → HP 奇数
+    } else {
+      ev[0] += 1;
+      remaining -= 1; // H+1 → HP 奇数。残りは B/D（無ければ C/A/S）へ。
+      for (final idx in [2, 4, 3, 1, 5]) {
+        if (remaining <= 0) break;
+        if (idx == lowered || ev[idx] >= 32) continue;
+        ev[idx] += 1;
+        remaining -= 1;
+      }
+    }
+    return ev;
+  }
+
+  // その他（H は既に 32）: 守備寄りの 1 ステへまとめて配分。
+  for (final idx in [0, 2, 4, 3, 1, 5]) {
+    if (remaining <= 0) break;
+    if (idx == lowered || ev[idx] >= 32) continue;
+    final add = remaining < 32 - ev[idx] ? remaining : 32 - ev[idx];
+    ev[idx] += add;
+    remaining -= add;
+  }
+  return ev;
+}
+
 /// タイプ→表示色（旧アプリのタイプアイコン色に準拠した近似）。
 const Map<PokeType, Color> typeColors = {
   PokeType.normal: Color(0xFF9099A1),

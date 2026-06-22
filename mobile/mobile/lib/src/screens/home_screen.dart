@@ -17,6 +17,7 @@ import '../service/appear_ability.dart';
 import '../service/damage_engine.dart';
 import '../data/battle_db.dart';
 import '../data/app_settings.dart';
+import '../widgets/nature_picker.dart';
 import 'adder_dialog.dart';
 import 'battle_analysis_screen.dart';
 import 'similar_party_dialog.dart';
@@ -82,11 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Weather _weather = Weather.none;
   Field _field = Field.none;
 
-  // タイマー（原典 TimerFrame：20分・残10分で青/5分黄/3分赤）。閉じても計測継続。
-  static const int _timerInitial = 1200;
-  final ValueNotifier<int> _timerLeft = ValueNotifier(_timerInitial);
-  Timer? _timerTicker;
-  DateTime? _timerEnd;
 
   // 自分パーティの識別（番号/連番/タイトル）。対戦記録の絞り込みキー。
   String _myPartyNum = '';
@@ -111,8 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _timerTicker?.cancel();
-    _timerLeft.dispose();
     for (final c in _counterTitles) {
       c.dispose();
     }
@@ -159,13 +153,29 @@ class _HomeScreenState extends State<HomeScreen> {
     await _restoreLast();
     await HomeStats.instance.load();
     var changed = false;
-    for (final p in [..._myParty, ..._oppParty]) {
+    // 自分は4技、相手は5枠目（スカウト枠）を含めて補完。
+    for (final p in _myParty) {
       if (p.name.isNotEmpty && !p.homeFilled) {
-        await _fillFromHome(p);
+        await _fillFromHome(p, cap: 4);
+        changed = true;
+      }
+    }
+    for (final p in _oppParty) {
+      if (p.name.isNotEmpty && !p.homeFilled) {
+        await _fillFromHome(p, cap: 5);
         changed = true;
       }
     }
     if (changed && mounted) setState(() {});
+  }
+
+  /// 保存パーティ由来の自分ポケモンは「保存内容が正」なので、起動時の
+  /// バトルデータ自動補完(_fillFromHome)で性格/持物/特性/努力値/技を上書き
+  /// されないよう homeFilled を立てる（fromJson では homeFilled は非永続のため）。
+  void _markMyPartyLoaded() {
+    for (final p in _myParty) {
+      if (p.name.isNotEmpty) p.homeFilled = true;
+    }
   }
 
   /// 前回セッションの自分パーティのみ復元（相手は毎回スカウトし直すため復元しない）。
@@ -186,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _myParty = _ensure6(
               [for (final p in s!.party) BattlePokemon.fromJson(p.toJson())]);
+          _markMyPartyLoaded();
           _myActive = -1;
           _myPartyNum = s.num;
           _myPartySubnum = s.subnum;
@@ -199,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted || my == null) return;
     setState(() {
       _myParty = _ensure6(my);
+      _markMyPartyLoaded();
       _myActive = -1; // 起動・読込直後は未選択（明示タップまで選択中表示しない）
     });
     _backfillWeights();
@@ -282,7 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // 初回選出時の HOME 自動補完（実ポケモンで技が空・未補完のときだけ）。
     final p = isMy ? _myParty[i] : _oppParty[i];
     if (p.name.isNotEmpty && !p.homeFilled && p.moves.every((m) => m.isEmpty)) {
-      await _fillFromHome(p);
+      // 自分は4技、相手は5枠目（スカウト枠）を含めて補完。
+      await _fillFromHome(p, cap: isMy ? 4 : 5);
     }
     if (!isMy && p.name.isNotEmpty) {
       // 相手はダメージ計算用に「物理・特殊のみ5枠」へ整える（変化技を除外し、
@@ -387,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: '自分',
                 accent: Colors.blue,
                 isTablet: _isTablet,
-                moveCount: 5,
+                moveCount: 5, // 5枠目は空で表示し能動的に選択可（自動補完は4まで）
                 party: _myParty,
                 activeIndex: _myActive,
                 chosen: _myChosen,
@@ -401,6 +414,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _myChosen.remove(i);
                 }),
                 onEdit: () => _editParty(_myParty, '自分'),
+                // 自分の選出は相手OCR（選出画面スクショ）と同時に自動反映するため、
+                // 自分側からの取込トリガは設けない。
                 footer: _isTablet ? _bottomControls() : null,
               ),
             ),
@@ -448,40 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ===== タイマー / カウンタ（原典 TimerFrame / CountersFrame）=====
-
-  bool get _timerRunning => _timerTicker != null;
-
-  /// スタート/ストップの切替（原典 start_button_clicked）。
-  void _timerStartStop() {
-    if (_timerRunning) {
-      _timerTicker?.cancel();
-      _timerTicker = null;
-      _timerEnd = null;
-    } else if (_timerLeft.value >= 1) {
-      _timerEnd = DateTime.now().add(Duration(seconds: _timerLeft.value));
-      _timerTicker = Timer.periodic(const Duration(milliseconds: 250), (_) {
-        final leftMs = _timerEnd!.difference(DateTime.now()).inMilliseconds;
-        final left = (leftMs / 1000).ceil();
-        if (left <= 0) {
-          _timerTicker?.cancel();
-          _timerTicker = null;
-          _timerEnd = null;
-          _timerLeft.value = 0;
-        } else {
-          _timerLeft.value = left;
-        }
-      });
-    }
-  }
-
-  void _timerReset() {
-    _timerTicker?.cancel();
-    _timerTicker = null;
-    _timerEnd = null;
-    _timerLeft.value = _timerInitial;
-    _notify('タイマーをリセットしました');
-  }
+  // ===== カウンタ（原典 CountersFrame）=====
 
   /// 切替/クリア操作の結果をスナックバーで知らせる（特性長押しと同じ通知）。
   void _notify(String msg) {
@@ -500,44 +482,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _clearField() {
     setState(() => _field = Field.none);
     _notify('フィールドをクリアしました');
-  }
-
-  /// 残り時間の色（原典: <180 赤 / <300 黄 / <600 青 / それ以上 緑）。
-  Color _timerColor(int left) {
-    if (left < 180) return Colors.red;
-    if (left < 300) return Colors.amber;
-    if (left < 600) return Colors.blue;
-    return Colors.lightGreen;
-  }
-
-  String _mmss(int s) =>
-      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
-
-  /// 中央列のタイマー（直接表示）。一回押し＝スタート/ストップ、長押し＝リセット。
-  /// サイズ固定でレイアウトがずれないようにする。
-  Widget _timerInline() {
-    return ValueListenableBuilder<int>(
-      valueListenable: _timerLeft,
-      builder: (_, left, __) => GestureDetector(
-        onTap: _timerStartStop,
-        onLongPress: _timerReset,
-        child: Container(
-          width: 64,
-          height: 20,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _timerColor(left).withValues(alpha: 0.30),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(_mmss(left),
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  height: 1.0,
-                  fontFeatures: [FontFeature.tabularFigures()])),
-        ),
-      ),
-    );
   }
 
   Future<void> _restoreCounters() async {
@@ -560,11 +504,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveCounters();
   }
 
-  /// 中央列のカウンタ（[0] のみ・直接表示）。上段に値、下段に −/＋ を横いっぱいに
-  /// 並べて押しやすくする。**長押しで 0 リセット**（複数カウンタの一覧は置き場所検討中）。
-  Widget _counterInline() {
+  /// 中央列のカウンタ（idx を直接表示）。上段に値、下段に −/＋ を横いっぱいに
+  /// 並べて押しやすくする。**長押しで 0 リセット**。
+  Widget _counterInline(int idx) {
     return GestureDetector(
-      onLongPress: () => _setCounter(0, 0),
+      onLongPress: () => _setCounter(idx, 0),
       child: Container(
         width: 64,
         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -577,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 上段：値。
-            Text('${_counterValues[0]}',
+            Text('${_counterValues[idx]}',
                 style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.bold, height: 1.0)),
             const SizedBox(height: 2),
@@ -586,11 +530,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                     child: _counterTap(
-                        '−', () => _setCounter(0, _counterValues[0] - 1))),
+                        '−', () => _setCounter(idx, _counterValues[idx] - 1))),
                 const SizedBox(width: 2),
                 Expanded(
                     child: _counterTap(
-                        '＋', () => _setCounter(0, _counterValues[0] + 1))),
+                        '＋', () => _setCounter(idx, _counterValues[idx] + 1))),
               ],
             ),
           ],
@@ -789,7 +733,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onClear: () => _clearField()),
         ),
         const SizedBox(width: 10),
-        Expanded(child: _counterInline()),
+        Expanded(child: _counterInline(0)),
+        const SizedBox(width: 10),
+        Expanded(child: _counterInline(1)),
       ],
     );
   }
@@ -803,15 +749,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // アイコンは間隔を詰め、天候/フィールド/タイマー/カウンタは間隔を広くとる。
+          // アイコンは間隔を詰め、天候/フィールド/カウンタは間隔を広くとる。
           _centerIcon(Icons.menu, 'メニュー',
               () => _scaffoldKey.currentState?.openEndDrawer()),
-          const SizedBox(height: 8),
-          // タイマー（ハンバーガーの下）。一回押し=スタート/ストップ、長押し=リセット。
-          _timerInline(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 1),
           _centerIcon(
-              Icons.home_filled, 'HOME 使用率（相手）', () => _showHomeInfo(opp)),
+              Icons.query_stats, 'バトルデータ（相手）', () => _showHomeInfo(opp)),
           const SizedBox(height: 1),
           Badge(
             isLabelVisible: _similarHits > 0,
@@ -834,8 +777,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 (f) => setState(() => _field = f),
                 onClear: () => _clearField()),
             const SizedBox(height: 12),
-            // カウンタ（[0]・直接表示）。ダブルタップでポップアップ、長押しでリセット。
-            _counterInline(),
+            // カウンタ（[0]・直接表示）。長押しでリセット。
+            _counterInline(0),
+            const SizedBox(height: 6),
+            // 2個目のカウンタ（[1]）。タイマー撤去で空いた領域へ一番下に配置。
+            _counterInline(1),
           ],
           const SizedBox(height: 8),
         ],
@@ -893,7 +839,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// HOME 使用率データから性格・持ち物・特性・努力値・技を自動補完する
   /// （旧 champ-edge：登録時に HOME データから反映）。
-  Future<void> _fillFromHome(BattlePokemon p) async {
+  Future<void> _fillFromHome(BattlePokemon p, {int cap = 5}) async {
     await HomeStats.instance.load();
     final s = HomeStats.instance;
     final nat = s.entries(p.name, HomeCategory.nature);
@@ -912,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       }
     }
-    // 技：HOME 使用率上位を DB で解決して最大5つ（5枠目＝相手スカウトの暫定技）。
+    // 技：バトルデータ使用率上位を DB で解決して最大 cap 個（自分4・相手は5枠目＝スカウト枠）。
     // ダメージ計算用に**物理・特殊のみ**を採用し、変化技は除外する。
     final moves = <BattleMove>[];
     for (final e in s.entries(p.name, HomeCategory.waza)) {
@@ -921,11 +867,11 @@ class _HomeScreenState extends State<HomeScreen> {
           mv.category != MoveCategory.status &&
           !_isHiddenAttackMove(mv)) {
         moves.add(mv);
-        if (moves.length >= 5) break;
+        if (moves.length >= cap) break;
       }
     }
     if (moves.isNotEmpty) {
-      while (moves.length < 5) {
+      while (moves.length < cap) {
         moves.add(emptyMove());
       }
       p.moves = moves;
@@ -1029,7 +975,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (pid == null) return;
                       final p = await PokeDb.instance.buildPokemon(pid);
                       if (p != null) {
-                        await _fillFromHome(p); // HOME使用率から技/性格/持物/特性/努力値
+                        // バトルデータから技/性格/持物/特性/努力値（自分は4技）。
+                        await _fillFromHome(p, cap: side == '自分' ? 4 : 5);
                         party[i] = p;
                         chosen.remove(i); // 登録した枠は選出から外す（明示タップで選出）
                         setDlg(() {});
@@ -1160,7 +1107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.home_filled, size: 20),
                     const SizedBox(width: 6),
                     Expanded(
-                        child: Text('HOME 使用率：${target.name}（タップで反映/解除）',
+                        child: Text('バトルデータ：${target.name}（タップで反映/解除）',
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold))),
                     IconButton(
@@ -1301,6 +1248,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _myParty = _ensure6(
           [for (final p in used.party) BattlePokemon.fromJson(p.toJson())]);
+      _markMyPartyLoaded();
       _myActive = -1;
       _myChosen.clear();
       _myPartyNum = used.num;
@@ -1360,10 +1308,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// スクショ取込画面で相手6体を認識→相手パーティへ反映（#3）。
   /// [initialImage] を渡すとピッカーを開かずその画像を即解析する（長押し経由）。
   Future<void> _importOpponentFromScreenshot({Uint8List? initialImage}) async {
-    final pids = await Navigator.of(context).push<List<String>>(
+    final res = await Navigator.of(context).push<OcrImportResult>(
         MaterialPageRoute(
             builder: (_) => OcrImportScreen(initialImage: initialImage)));
-    if (pids == null || !mounted) return;
+    if (res == null || !mounted) return;
+    final pids = res.pids;
     var changed = false;
     for (var i = 0; i < pids.length && i < _oppParty.length; i++) {
       if (pids[i].isEmpty) continue;
@@ -1373,9 +1322,27 @@ class _HomeScreenState extends State<HomeScreen> {
         changed = true;
       }
     }
-    if (changed && mounted) {
-      setState(() => _oppChosen.clear());
+    // 同じ選出画面スクショから読んだ「自分の選出順」を反映（番号順に選出セット）。
+    final myChosen = [
+      for (final i in res.myChosen)
+        if (i >= 0 && i < _myParty.length && _myParty[i].name.isNotEmpty) i
+    ];
+    if (changed || myChosen.isNotEmpty) {
+      setState(() {
+        if (changed) _oppChosen.clear();
+        if (myChosen.isNotEmpty) {
+          _myChosen
+            ..clear()
+            ..addAll(myChosen.take(3));
+          _myActive = _myChosen.first; // 1番目を自動フォーカス
+          _applyAbilityWeatherField(_myActiveP);
+          applyAppearAbility(_myActiveP, _oppActiveP);
+        }
+      });
       _autosaveLast();
+      if (myChosen.isNotEmpty) {
+        _snack('自分の選出を${myChosen.length}体読み取りました（順番反映）');
+      }
     }
   }
 
@@ -1531,7 +1498,10 @@ class _SidePanel extends StatelessWidget {
             ],
           ),
           SizedBox(height: isTablet ? 10 : 4),
-          _SelectedInfo(pokemon: active, onChanged: onChanged),
+          _SelectedInfo(
+              pokemon: active,
+              onChanged: onChanged,
+              isOpponent: title == '相手'),
           SizedBox(height: isTablet ? 8 : 3),
           // 技は moveCount 枠（iPadの相手は10枠）。効果ボタンは各行右端。
           for (int mi = 0; mi < moveCount; mi++) ...[
@@ -1680,9 +1650,12 @@ class _MiniBtn extends StatelessWidget {
 
 /// 選択ポケモンの基本情報カード（タップで各項目編集）。
 class _SelectedInfo extends StatelessWidget {
-  const _SelectedInfo({required this.pokemon, required this.onChanged});
+  const _SelectedInfo(
+      {required this.pokemon, required this.onChanged, this.isOpponent = false});
   final BattlePokemon pokemon;
   final VoidCallback onChanged;
+  // 相手のみ：性格枠の長押しで PC版準拠の標準努力値を自動設定する。
+  final bool isOpponent;
 
   @override
   Widget build(BuildContext context) {
@@ -1840,12 +1813,25 @@ class _SelectedInfo extends StatelessWidget {
                         : () => _showEffectDetail(context, '持ち物: ${pokemon.item}',
                             PokeDb.instance.itemEffect(pokemon.item))),
                 _editChip(context, '性格', pokemon.nature, () async {
-                  final v = await _pickNature(context, pokemon.nature);
+                  final v = await pickNature(context, pokemon.nature);
                   if (v != null) {
                     pokemon.nature = v;
                     onChanged();
                   }
-                }, showLabel: false),
+                },
+                    showLabel: false,
+                    // 相手のみ：長押しで性格に応じた標準努力値（PC版準拠）を自動設定。
+                    onLongPress: isOpponent
+                        ? () {
+                            pokemon.ev =
+                                defaultEvForNature(pokemon.nature, pokemon.baseStats);
+                            onChanged();
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                duration: const Duration(milliseconds: 1100),
+                                content: Text(
+                                    '${pokemon.nature}の標準努力値を設定しました')));
+                          }
+                        : null),
               ],
             ),
             const SizedBox(height: 2),
@@ -3145,80 +3131,6 @@ Future<String?> _pickString(BuildContext context, String title,
 }
 
 /// 性格を 5×5 表形式（行=↑能力、列=↓能力）で選択する。
-Future<String?> _pickNature(BuildContext context, String current) {
-  const stat = ['', 'A', 'B', 'C', 'D', 'S'];
-  String? natureAt(int up, int down) {
-    if (up == down) return up == 3 ? 'まじめ' : null;
-    for (final n in allNatures) {
-      if (n.up == up && n.down == down) return n.name;
-    }
-    return null;
-  }
-
-  Widget headerCell(String t) => SizedBox(
-        width: 54,
-        height: 24,
-        child: Center(
-            child: Text(t,
-                style: const TextStyle(fontSize: 11, color: Colors.black54))),
-      );
-
-  return showDialog<String>(
-    context: context,
-    builder: (_) => AlertDialog(
-      titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-      contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      title: const Text('性格（↑行 × ↓列）', style: TextStyle(fontSize: 14)),
-      content: SingleChildScrollView(
-        child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            headerCell(''),
-            for (int d = 1; d <= 5; d++) headerCell('↓${stat[d]}')
-          ]),
-          for (int u = 1; u <= 5; u++)
-            Row(
-              children: [
-                headerCell('↑${stat[u]}'),
-                for (int d = 1; d <= 5; d++)
-                  Builder(builder: (_) {
-                    final name = natureAt(u, d);
-                    final selected = name != null && name == current;
-                    return GestureDetector(
-                      onTap: name == null
-                          ? null
-                          : () => Navigator.of(context).pop(name),
-                      child: Container(
-                        width: 54,
-                        height: 28,
-                        margin: const EdgeInsets.all(1),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: name == null
-                              ? Colors.grey.withValues(alpha: 0.08)
-                              : selected
-                                  ? Colors.blue.withValues(alpha: 0.25)
-                                  : Colors.blue.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                              color: selected ? Colors.blue : Colors.black12),
-                        ),
-                        child: Text(name ?? '—',
-                            style: const TextStyle(fontSize: 9),
-                            textAlign: TextAlign.center),
-                      ),
-                    );
-                  }),
-              ],
-            ),
-        ],
-      ),
-      ),
-    ),
-  );
-}
-
 /// 技を文字入力検索で選択する（DB waza_data。未接続時はサンプル moveDex）。
 /// 元威力が -1 の攻撃技（カウンター等の可変威力技）はダメージ計算で表示できないため、
 /// 変化技と同様に技一覧へ出さない。変化技自体（category==status）はここでは対象外。
@@ -3295,7 +3207,7 @@ Future<BattleMove?> _pickMove(BuildContext context, BattleMove current,
                             Padding(
                               padding:
                                   const EdgeInsets.fromLTRB(12, 6, 12, 2),
-                              child: Text('HOME 使用率上位（$ownerName）',
+                              child: Text('バトルデータ使用率上位（$ownerName）',
                                   style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -3449,30 +3361,11 @@ class _StatEditorDialogState extends State<_StatEditorDialog> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    // ランク（HP 行はランク無し → クリアボタン）
+                    // ランク（HP 行はランク無し。ランククリアは下部 actions へ）
                     SizedBox(
                       width: 96,
                       child: i == 0
-                          ? Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
-                                  minimumSize: const Size(0, 28),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                icon: const Icon(Icons.delete_sweep, size: 14),
-                                label: const Text('ランククリア',
-                                    style: TextStyle(fontSize: 9)),
-                                onPressed: () => setState(() {
-                                  for (var k = 1; k < 6; k++) {
-                                    p.boosts[k] = 0;
-                                  }
-                                }),
-                              ),
-                            )
+                          ? const SizedBox()
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
@@ -3523,39 +3416,30 @@ class _StatEditorDialogState extends State<_StatEditorDialog> {
                 const SizedBox(width: 96),
               ],
             ),
-            // 合計の下に努力値の一括クリア（ランククリアと対）。
-            Row(
-              children: [
-                const SizedBox(width: 64),
-                const SizedBox(width: 36),
-                const SizedBox(width: 40),
-                Expanded(
-                  child: Center(
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      icon: const Icon(Icons.delete_sweep, size: 14),
-                      label: const Text('努力値クリア',
-                          style: TextStyle(fontSize: 9)),
-                      onPressed: () => setState(() {
-                        for (var k = 0; k < 6; k++) {
-                          p.ev[k] = 0;
-                        }
-                      }),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 96),
-              ],
-            ),
           ],
           ),
         ),
       ),
+      // クリア系は scroll 外の actions に置き常時表示。左から 努力値クリア／ランククリア／閉じる。
       actions: [
+        TextButton.icon(
+          icon: const Icon(Icons.delete_sweep, size: 18),
+          label: const Text('努力値クリア'),
+          onPressed: () => setState(() {
+            for (var k = 0; k < 6; k++) {
+              p.ev[k] = 0;
+            }
+          }),
+        ),
+        TextButton.icon(
+          icon: const Icon(Icons.delete_sweep, size: 18),
+          label: const Text('ランククリア'),
+          onPressed: () => setState(() {
+            for (var k = 0; k < 6; k++) {
+              p.boosts[k] = 0;
+            }
+          }),
+        ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('閉じる'),

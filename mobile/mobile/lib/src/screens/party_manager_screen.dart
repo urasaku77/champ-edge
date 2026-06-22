@@ -6,6 +6,7 @@ import '../data/party_store.dart';
 import '../data/poke_db.dart';
 import '../model/battle_pokemon.dart';
 import '../service/damage/poke_types.dart';
+import '../widgets/nature_picker.dart';
 import 'my_party_import_screen.dart';
 import 'pokemon_picker.dart';
 
@@ -774,20 +775,8 @@ class _PokemonEditScreenState extends State<PokemonEditScreen> {
   }
 
   Future<void> _pickNature() async {
-    final v = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('性格', style: TextStyle(fontSize: 14)),
-        children: [
-          for (final n in allNatures)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, n.name),
-              child: Text(n.name +
-                  (n.up == n.down ? '' : '  (↑${_evLabels[n.up]}/↓${_evLabels[n.down]})')),
-            ),
-        ],
-      ),
-    );
+    // Top と同じ表形式（↑行×↓列）のピッカーを共用。
+    final v = await pickNature(context, _p.nature);
     if (v != null) setState(() => _p.nature = v);
   }
 

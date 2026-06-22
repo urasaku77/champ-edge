@@ -1,9 +1,20 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
+import '../data/my_chosen_ocr.dart';
 import '../data/sprite_template_matcher.dart';
+
+/// 相手OCRの結果。相手6体の pid に加え、同じ選出画面スクショから読み取った
+/// **自分の選出順**（パーティ枠インデックスの並び）も返す。
+class OcrImportResult {
+  OcrImportResult(this.pids, this.myChosen);
+  final List<String> pids;
+  final List<int> myChosen;
+}
 
 /// スクショから相手パーティを取り込む画面（#3）。
 ///
@@ -55,7 +66,14 @@ class _OcrImportScreenState extends State<OcrImportScreen> {
       for (final r in results)
         r.candidates.isNotEmpty ? r.candidates.first.pid : '',
     ];
-    if (mounted) Navigator.of(context).pop(pids);
+    // 同じ選出画面スクショから「自分の選出順」も読み取る（PC版と同タイミング）。
+    var myChosen = const <int>[];
+    try {
+      final tmp = '${(await getTemporaryDirectory()).path}/_oppsel.png';
+      await File(tmp).writeAsBytes(bytes);
+      myChosen = await MyChosenOcr.parse(tmp);
+    } catch (_) {}
+    if (mounted) Navigator.of(context).pop(OcrImportResult(pids, myChosen));
   }
 
   @override
