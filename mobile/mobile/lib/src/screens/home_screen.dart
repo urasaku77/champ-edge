@@ -17,6 +17,7 @@ import '../service/appear_ability.dart';
 import '../service/damage_engine.dart';
 import '../data/battle_db.dart';
 import '../data/app_settings.dart';
+import '../data/entitlement_service.dart';
 import '../widgets/nature_picker.dart';
 import 'adder_dialog.dart';
 import 'battle_analysis_screen.dart';
@@ -105,8 +106,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<TextEditingController> _counterTitles =
       List.generate(_counterCount, (_) => TextEditingController());
 
+  /// フル機能が解放済みか。未解放なら有料 UI を描画せず、バトルデータ自動補完も行わない。
+  bool get _unlocked => EntitlementService.instance.unlocked;
+
+  void _onEntitlementChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    EntitlementService.instance.removeListener(_onEntitlementChanged);
     for (final c in _counterTitles) {
       c.dispose();
     }
@@ -121,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    EntitlementService.instance.addListener(_onEntitlementChanged);
     _initDb();
     BattleDb.instance.open();
     _initParties();
@@ -255,7 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 自動検索モードがオンなら相手パーティで類似検索し、ヒット数をバッジ用に保持。
   Future<void> _maybeAutoSimilar() async {
-    if (!AppSettings.instance.autoSimilarSearch) {
+    // 類似パーティ検索はフル機能（バトルデータ由来）。未解放では実行しない。
+    if (!_unlocked || !AppSettings.instance.autoSimilarSearch) {
       if (_similarHits != 0 && mounted) setState(() => _similarHits = 0);
       return;
     }
@@ -416,9 +427,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 onEdit: () => _editParty(_myParty, '自分'),
                 // 自分の選出は相手OCR（選出画面スクショ）と同時に自動反映するため、
                 // 自分側からの取込トリガは設けない。
-                // 編集ボタン長押し＝使用中パーティの確認・反映。
-                onEditLongPress: _showUsingParty,
-                editTooltip: 'パーティ編集（長押し:使用中パーティを表示）',
+                // 編集ボタン長押し＝使用中パーティの確認・反映（フル機能のみ）。
+                onEditLongPress: _unlocked ? _showUsingParty : null,
+                editTooltip: _unlocked
+                    ? 'パーティ編集（長押し:使用中パーティを表示）'
+                    : null,
                 footer: _isTablet ? _bottomControls() : null,
               ),
             ),
@@ -442,8 +455,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   _oppChosen.remove(i);
                 }),
                 onEdit: () => _editParty(_oppParty, '相手'),
-                onEditLongPress: _importOpponentFromLatestScreenshot,
-                onEditDoubleTap: _importOpponentFromScreenshot,
+                // スクショ取込（OCR）はフル機能（未解放では長押し/ダブルタップ無効）。
+                onEditLongPress:
+                    _unlocked ? _importOpponentFromLatestScreenshot : null,
+                onEditDoubleTap:
+                    _unlocked ? _importOpponentFromScreenshot : null,
               ),
             ),
           ],
@@ -755,20 +771,23 @@ class _HomeScreenState extends State<HomeScreen> {
           // アイコンは間隔を詰め、天候/フィールド/カウンタは間隔を広くとる。
           _centerIcon(Icons.menu, 'メニュー',
               () => _scaffoldKey.currentState?.openEndDrawer()),
-          const SizedBox(height: 1),
-          _centerIcon(
-              Icons.query_stats, 'バトルデータ（相手）', () => _showHomeInfo(opp)),
-          const SizedBox(height: 1),
-          Badge(
-            isLabelVisible: _similarHits > 0,
-            label: Text('$_similarHits'),
-            child: _centerIcon(Icons.travel_explore, '類似パーティ検索', () {
-              setState(() => _similarHits = 0); // 開いたらバッジを消す
-              showSimilarPartyDialog(context, _oppParty);
-            }),
-          ),
-          const SizedBox(height: 1),
-          _centerIcon(Icons.history_edu, '対戦記録', _recordBattle),
+          // バトルデータ表示・類似パーティ検索・対戦記録はフル機能（未解放では非表示）。
+          if (_unlocked) ...[
+            const SizedBox(height: 1),
+            _centerIcon(
+                Icons.query_stats, 'バトルデータ（相手）', () => _showHomeInfo(opp)),
+            const SizedBox(height: 1),
+            Badge(
+              isLabelVisible: _similarHits > 0,
+              label: Text('$_similarHits'),
+              child: _centerIcon(Icons.travel_explore, '類似パーティ検索', () {
+                setState(() => _similarHits = 0); // 開いたらバッジを消す
+                showSimilarPartyDialog(context, _oppParty);
+              }),
+            ),
+            const SizedBox(height: 1),
+            _centerIcon(Icons.history_edu, '対戦記録', _recordBattle),
+          ],
           // iPad では天候/フィールド/カウンタは「自分の技の下」に移動（footer）。
           if (!_isTablet) ...[
             const SizedBox(height: 12),
@@ -842,7 +861,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// HOME 使用率データから性格・持ち物・特性・努力値・技を自動補完する
   /// （旧 champ-edge：登録時に HOME データから反映）。
+  /// バトルデータの自動補完はフル機能（未解放なら何もしない＝手動入力）。
   Future<void> _fillFromHome(BattlePokemon p, {int cap = 5}) async {
+    if (!_unlocked) return;
     await HomeStats.instance.load();
     final s = HomeStats.instance;
     final nat = s.entries(p.name, HomeCategory.nature);
@@ -885,6 +906,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 相手の技を「物理・特殊のみ5枠」に整える。変化技（状態技）は除外し、足りない枠を
   /// HOME 使用率上位（非変化・重複なし）で補完する。5枠目＝スカウト枠の自動補完を兼ねる。
   Future<void> _normalizeOpponentMoves(BattlePokemon p) async {
+    // HOME 使用率による技補完はフル機能（未解放なら何もしない＝手動入力）。
+    if (!_unlocked) return;
     await HomeStats.instance.load();
     // iPad（大画面）は変化技も含め HOME 使用率トップ10、iPhone は非変化技5枠。
     final cap = _isTablet ? 10 : 5;
@@ -1494,30 +1517,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMenuDrawer() {
+    // 比較・設定は無料。パーティ／戦績はフル機能（未解放では非表示）。
+    final groups = <List<List<Object>>>[
+      const [
+        ['素早さ比較', Icons.speed],
+        ['重さ比較', Icons.scale],
+      ],
+      if (_unlocked)
+        const [
+          ['パーティ編集', Icons.edit],
+          ['ボックス編集', Icons.inventory_2],
+        ],
+      if (_unlocked)
+        const [
+          ['対戦履歴', Icons.history],
+          ['対戦分析', Icons.analytics],
+        ],
+      const [
+        ['設定', Icons.settings],
+      ],
+    ];
     return Drawer(
       width: 260,
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
-            // 区切り線で4グループ：比較 / パーティ / 戦績 / 設定。
-            for (final (gi, group) in const [
-              [
-                ['素早さ比較', Icons.speed],
-                ['重さ比較', Icons.scale],
-              ],
-              [
-                ['パーティ編集', Icons.edit],
-                ['ボックス編集', Icons.inventory_2],
-              ],
-              [
-                ['対戦履歴', Icons.history],
-                ['対戦分析', Icons.analytics],
-              ],
-              [
-                ['設定', Icons.settings],
-              ],
-            ].indexed) ...[
+            for (final (gi, group) in groups.indexed) ...[
               for (final m in group)
                 ListTile(
                   dense: true,
@@ -1528,7 +1554,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _onMenuTap(m[0] as String);
                   },
                 ),
-              if (gi < 3) const Divider(height: 8, indent: 12, endIndent: 12),
+              if (gi < groups.length - 1)
+                const Divider(height: 8, indent: 12, endIndent: 12),
             ],
           ],
         ),

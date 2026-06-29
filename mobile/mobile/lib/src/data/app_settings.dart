@@ -22,6 +22,10 @@ class AppSettings {
   /// 類似パーティ自動検索（相手パーティ確定時に自動実行）。既定 OFF。
   bool autoSimilarSearch = false;
 
+  /// フル機能の解放状態（IAP 購入／プロモコード引き換えで true）。
+  /// 解放判定の永続化先。EntitlementService が読み書きする。
+  bool unlocked = false;
+
   /// 相手選出の自動登録（相手を選ぶと選出にも自動登録）。常時 ON（変更不可）。
   bool get autoRegisterOpponentChoice => true;
 
@@ -49,6 +53,7 @@ class AppSettings {
         final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
         megaEnabled = j['megaEnabled'] as bool? ?? true;
         autoSimilarSearch = j['autoSimilarSearch'] as bool? ?? false;
+        unlocked = j['unlocked'] as bool? ?? false;
       }
     } catch (e) {
       debugPrint('[AppSettings] load failed: $e');
@@ -62,6 +67,7 @@ class AppSettings {
       await f.writeAsString(jsonEncode({
         'megaEnabled': megaEnabled,
         'autoSimilarSearch': autoSimilarSearch,
+        'unlocked': unlocked,
       }));
     } catch (e) {
       debugPrint('[AppSettings] save failed: $e');

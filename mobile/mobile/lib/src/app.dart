@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/auth_gate.dart';
+import 'screens/home_screen.dart';
 
 /// 画面に収まるときはスクロールさせず、はみ出したときだけスクロールする。
 /// （iOS の既定 BouncingScrollPhysics は内容が収まっていても弾むため、
@@ -24,7 +24,7 @@ class ChampEdgeMobileApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const AuthGate(),
+      home: const HomeScreen(),
     );
   }
 }

@@ -1,7 +1,7 @@
 name: champ_edge_mobile
 description: "champ-edge-mobile Phase 1 MVP Flutter skeleton"
 publish_to: none
-version: 1.0.0+32
+version: 1.0.0+33
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
@@ -24,6 +24,8 @@ dependencies:
   opencv_dart: ^2.2.1
   photo_manager: ^3.9.0
   google_mlkit_text_recognition: ^0.15.1
+  in_app_purchase: ^3.2.0
+  in_app_purchase_storekit: ^0.4.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

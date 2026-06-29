@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../data/entitlement_service.dart';
 import '../data/ref_data.dart';
 import 'cloud_account_screen.dart';
+import 'unlock_sheet.dart';
 
 /// 設定画面（旧 champ-edge の「アプリ設定」相当の最小版）。
 /// ルール（シングル＋メガ固定。ダブル/Z技/ダイマは P4）＋クラウド/参照データ更新。
@@ -14,12 +16,24 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _ent = EntitlementService.instance;
   String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _ent.addListener(_onEntChanged);
+  }
+
+  @override
+  void dispose() {
+    _ent.removeListener(_onEntChanged);
+    super.dispose();
+  }
+
+  void _onEntChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadVersion() async {
@@ -77,28 +91,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const Divider(height: 1),
-            ListTile(
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              title: const Text('クラウドアカウント'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const CloudAccountScreen()),
+            // クラウドアカウントはフル機能（解放済みのみ表示）。
+            if (_ent.unlocked)
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                title: const Text('クラウドアカウント'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const CloudAccountScreen()),
+                ),
               ),
-            ),
-            ListTile(
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              title: const Text('HOMEデータを更新'),
-              trailing: _refreshing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.cloud_download_outlined),
-              onTap: _refreshing ? null : _refreshRefData,
-            ),
+            // HOMEデータ更新はバトルデータ（フル機能）に関わるため解放済みのみ。
+            if (_ent.unlocked)
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                title: const Text('HOMEデータを更新'),
+                trailing: _refreshing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.cloud_download_outlined),
+                onTap: _refreshing ? null : _refreshRefData,
+              ),
             const Divider(height: 1),
             _sectionHeader('アプリ情報'),
             ListTile(
@@ -110,6 +128,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _appVersion.isEmpty ? '—' : 'バージョン $_appVersion',
                 style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
+            ),
+            // 控えめなフル機能の導線（解放済みは状態表示）。一般ユーザーには
+            // 目立たせず、コードを持つ人・購入したい人だけがここから解放する。
+            ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: Icon(
+                _ent.unlocked ? Icons.verified : Icons.lock_open_outlined,
+                size: 18,
+                color: _ent.unlocked ? Colors.indigo : Colors.black45,
+              ),
+              title: Text(_ent.unlocked ? 'フル機能：有効' : 'フル機能 / コードをお持ちの方'),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => showUnlockSheet(context),
             ),
           ],
         ),

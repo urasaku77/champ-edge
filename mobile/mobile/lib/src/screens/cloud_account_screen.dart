@@ -1,17 +1,19 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
 import '../data/drive_sync.dart';
-import '../data/invite_service.dart';
 import '../data/sync_service.dart';
-import 'admin_screen.dart';
-import 'auth_gate.dart';
+import 'home_screen.dart';
 
-/// クラウドアカウント画面（アカウント情報・サインアウト・管理者メニュー入口）。
+/// クラウドアカウント画面（フル機能側）。
 ///
-/// 起動ゲート（AuthGate）通過後にここへ来るため通常は登録済み状態を表示する。
-/// 管理者（users.role == 'admin'）にのみ管理者メニューを表示する。
+/// サインイン（Google / Apple）して、対戦記録・パーティ・設定を本人の Google
+/// ドライブへバックアップ／復元する。フル機能解放済みのユーザーのみがここへ到達する
+/// （設定画面側で entitlement によりゲートしている）。利用に招待コードや allowlist は
+/// 不要で、サインインのみで使える。
 class CloudAccountScreen extends StatefulWidget {
   const CloudAccountScreen({super.key});
 
@@ -21,13 +23,10 @@ class CloudAccountScreen extends StatefulWidget {
 
 class _CloudAccountScreenState extends State<CloudAccountScreen> {
   final _auth = AuthService.instance;
-  final _invite = InviteService.instance;
-  final _codeCtrl = TextEditingController();
 
+  bool _initializing = true; // Firebase 初期化中
+  bool _initFailed = false;
   User? _user;
-  bool? _allowed; // null=未判定
-  bool _isAdmin = false;
-  String _myName = '';
   bool _busy = false;
   bool _syncBusy = false;
   DateTime? _lastBackup;
@@ -36,78 +35,46 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
   @override
   void initState() {
     super.initState();
-    _user = _auth.currentUser;
-    if (_user != null) _checkAllowed();
+    _init();
   }
 
-  @override
-  void dispose() {
-    _codeCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _checkAllowed() async {
-    final u = _user;
-    if (u == null) return;
-    setState(() => _busy = true);
-    final status = await _invite.allowStatus(u.uid);
-    final entry =
-        status == AllowStatus.allowed ? await _invite.getUser(u.uid) : null;
-    if (!mounted) return;
+  Future<void> _init() async {
     setState(() {
-      _allowed = status == AllowStatus.allowed;
-      _isAdmin = entry?.isAdmin ?? false;
-      _myName = entry?.name ?? '';
-      if (status == AllowStatus.unknown) {
-        _error = '利用状態を確認できませんでした（オフラインの可能性）。';
-      }
-      _busy = false;
+      _initializing = true;
+      _initFailed = false;
+    });
+    // クラウド機能を開いたときに初めて Firebase を初期化（遅延初期化）。
+    final ok = await _auth.ensureFirebaseInitialized();
+    if (!mounted) return;
+    if (!ok) {
+      setState(() {
+        _initializing = false;
+        _initFailed = true;
+      });
+      return;
+    }
+    setState(() {
+      _user = _auth.currentUser;
+      _initializing = false;
     });
   }
 
-  Future<void> _signIn() async {
+  Future<void> _signIn(Future<User?> Function() action) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final u = await _auth.signInWithGoogle();
+      final u = await action();
       if (!mounted) return;
-      if (u == null) {
-        setState(() => _busy = false); // キャンセル
-        return;
-      }
-      setState(() => _user = u);
-      await _checkAllowed();
+      setState(() {
+        if (u != null) _user = u;
+        _busy = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = 'サインインに失敗しました: $e';
-        _busy = false;
-      });
-    }
-  }
-
-  Future<void> _redeem() async {
-    final u = _user;
-    if (u == null) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final res = await _invite.redeem(_codeCtrl.text, u);
-    if (!mounted) return;
-    if (res.ok) {
-      setState(() {
-        _allowed = true;
-        _busy = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('利用登録が完了しました')),
-      );
-    } else {
-      setState(() {
-        _error = res.message;
         _busy = false;
       });
     }
@@ -119,8 +86,6 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
     if (!mounted) return;
     setState(() {
       _user = null;
-      _allowed = null;
-      _codeCtrl.clear();
       _busy = false;
       _error = null;
     });
@@ -173,9 +138,9 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
       final found = await SyncService.instance.restoreFromDrive();
       if (!mounted) return;
       if (found) {
-        // 画面スタックを破棄してゲート（→Top）から作り直し、復元データを即反映。
+        // 画面スタックを破棄して Top から作り直し、復元データを即反映。
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AuthGate()),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
           (route) => false,
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -223,14 +188,24 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
   }
 
   Widget _body() {
-    if (_busy && _user == null) {
+    if (_initializing) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_user == null) return _signedOutView();
-    if (_allowed == null || (_busy && _allowed == null)) {
-      return const Center(child: CircularProgressIndicator());
+    if (_initFailed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('クラウドへの接続に失敗しました。ネットワークを確認して再試行してください。'),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _init,
+            icon: const Icon(Icons.refresh),
+            label: const Text('再試行'),
+          ),
+        ],
+      );
     }
-    return _allowed == true ? _allowedView() : _inviteView();
+    return _user == null ? _signedOutView() : _allowedView();
   }
 
   Widget _signedOutView() {
@@ -238,60 +213,29 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'クラウド連携は任意です。サインインしなくても、計算・パーティ編集・'
-          '対戦記録などアプリの全機能はこの端末でそのまま使えます。',
+          'クラウド連携は任意です。サインインすると、対戦記録・パーティ・設定を本人の'
+          ' Google ドライブへバックアップ／復元できます（機種変更の引き継ぎ用）。',
         ),
         const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: _busy ? null : _signIn,
-          icon: const Icon(Icons.login),
-          label: const Text('Google でサインイン'),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          '※ 利用には招待コードが必要です（招待制）。',
-          style: TextStyle(fontSize: 12, color: Colors.black54),
-        ),
-      ],
-    );
-  }
-
-  Widget _inviteView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('サインイン済み: ${_user!.email ?? _user!.uid}'),
-        const SizedBox(height: 16),
-        const Text('招待コードを入力して利用登録してください。'),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _codeCtrl,
-          decoration: const InputDecoration(
-            labelText: '招待コード',
-            border: OutlineInputBorder(),
+        if (_busy)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          FilledButton.icon(
+            onPressed: () => _signIn(_auth.signInWithGoogle),
+            icon: const Icon(Icons.login),
+            label: const Text('Google でサインイン'),
           ),
-          autocorrect: false,
-          enableSuggestions: false,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            FilledButton(
-              onPressed: _busy ? null : _redeem,
-              child: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('登録'),
-            ),
-            const SizedBox(width: 12),
-            TextButton(
-              onPressed: _busy ? null : _signOut,
-              child: const Text('サインアウト'),
+          if (Platform.isIOS) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black, foregroundColor: Colors.white),
+              onPressed: () => _signIn(_auth.signInWithApple),
+              icon: const Icon(Icons.apple),
+              label: const Text('Apple でサインイン'),
             ),
           ],
-        ),
+        ],
       ],
     );
   }
@@ -300,45 +244,25 @@ class _CloudAccountScreenState extends State<CloudAccountScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // アカウント情報＋サインアウト（上部・スクロール不要）。
+        // アカウント情報＋サインアウト。
         Row(
           children: [
             const Icon(Icons.verified_user, color: Colors.indigo, size: 20),
             const SizedBox(width: 8),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_myName.isNotEmpty)
-                    Text(_myName,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(_user!.email ?? _user!.uid,
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.black54)),
-                ],
-              ),
+              child: Text(_user!.email ?? _user!.uid,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
               onPressed: _busy ? null : _signOut,
               icon: const Icon(Icons.logout, size: 18),
               label: const Text('サインアウト'),
-              style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact),
+              style:
+                  OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],
         ),
-        // 管理者メニュー（管理者のみ・サインアウトの直下＝上部に配置）。
-        if (_isAdmin) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonalIcon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AdminScreen()),
-            ),
-            icon: const Icon(Icons.admin_panel_settings),
-            label: const Text('管理者メニュー'),
-          ),
-        ],
         const Divider(height: 28),
         const Text('クラウドバックアップ（任意）',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
