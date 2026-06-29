@@ -1133,29 +1133,60 @@ class _PokemonEditScreenState extends State<PokemonEditScreen> {
             child: Text(t, style: const TextStyle(fontSize: 11)),
           ),
         );
+    // 種族値・実数値（実数値は努力値に応じて動的に変化する）。
+    final base = i < _p.baseStats.length ? _p.baseStats[i] : 0;
+    final actual = i < _p.stats.length ? _p.stats[i] : 0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-              width: 56,
-              child: Text(_evLabels[i],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11))),
-          btn('0', () => setState(() => _p.ev[i] = 0)),
-          const SizedBox(width: 4),
-          btn('−', () => setState(() => _p.ev[i] = (_p.ev[i] - 1).clamp(0, 32))),
-          SizedBox(
-              width: 26,
-              child: Text('${_p.ev[i]}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.bold))),
-          btn('＋', () => setState(() => _p.ev[i] = (_p.ev[i] + 1).clamp(0, 32))),
-          const SizedBox(width: 4),
-          btn('32', () => setState(() => _p.ev[i] = 32)),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            // ラベル＋種族値（ラベル下に小さく種族値）。
+            SizedBox(
+                width: 50,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_evLabels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11)),
+                    Text('$base',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF1F3A73),
+                            fontWeight: FontWeight.w600)),
+                  ],
+                )),
+            btn('0', () => setState(() => _p.ev[i] = 0)),
+            const SizedBox(width: 3),
+            btn('−',
+                () => setState(() => _p.ev[i] = (_p.ev[i] - 1).clamp(0, 32))),
+            SizedBox(
+                width: 24,
+                child: Text('${_p.ev[i]}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold))),
+            btn('＋',
+                () => setState(() => _p.ev[i] = (_p.ev[i] + 1).clamp(0, 32))),
+            const SizedBox(width: 3),
+            btn('32', () => setState(() => _p.ev[i] = 32)),
+            const SizedBox(width: 5),
+            // 実数値（茶系・右端）。
+            SizedBox(
+                width: 30,
+                child: Text('$actual',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9C4221),
+                        fontWeight: FontWeight.bold))),
+          ],
+        ),
       ),
     );
   }

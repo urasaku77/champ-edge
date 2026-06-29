@@ -416,6 +416,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onEdit: () => _editParty(_myParty, '自分'),
                 // 自分の選出は相手OCR（選出画面スクショ）と同時に自動反映するため、
                 // 自分側からの取込トリガは設けない。
+                // 編集ボタン長押し＝使用中パーティの確認・反映。
+                onEditLongPress: _showUsingParty,
+                editTooltip: 'パーティ編集（長押し:使用中パーティを表示）',
                 footer: _isTablet ? _bottomControls() : null,
               ),
             ),
@@ -1259,6 +1262,127 @@ class _HomeScreenState extends State<HomeScreen> {
     _autosaveLast();
   }
 
+  /// 編集ボタン長押し＝現在「使用中」に設定されている保存パーティを表示する。
+  /// Top の表示を編集中でも、登録済みの使用中パーティを確認でき、その場で反映もできる。
+  Future<void> _showUsingParty() async {
+    final usingId = await PartyStore.instance.loadUsingPartyId();
+    if (!mounted) return;
+    if (usingId == null || usingId.isEmpty) {
+      _snack('使用中パーティが設定されていません（パーティ編集で「使用中」に設定できます）');
+      return;
+    }
+    final list = await PartyStore.instance.listSavedParties();
+    if (!mounted) return;
+    SavedParty? using;
+    for (final p in list) {
+      if (p.id == usingId) {
+        using = p;
+        break;
+      }
+    }
+    if (using == null) {
+      _snack('使用中パーティが見つかりませんでした');
+      return;
+    }
+    final s = using;
+    final members = [for (final p in s.party) if (p.name.isNotEmpty) p];
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.indigo, size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('使用中: ${s.label.isEmpty ? '（無題）' : s.label}',
+                  style: const TextStyle(fontSize: 15)),
+            ),
+          ],
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        content: SizedBox(
+          width: 340,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (s.memo.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(s.memo,
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.black54)),
+                  ),
+                ],
+                if (members.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('ポケモンが登録されていません',
+                        style: TextStyle(color: Colors.black54)),
+                  ),
+                for (final p in members)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Image.asset(p.imageAsset,
+                            width: 34,
+                            height: 34,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox(width: 34, height: 34)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                  [
+                                    if (p.item.isNotEmpty && p.item != 'なし')
+                                      p.item,
+                                    if (p.nature.isNotEmpty) p.nature,
+                                    if (p.ability.isNotEmpty && p.ability != '—')
+                                      p.ability,
+                                  ].join(' / '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 10, color: Colors.black54)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('閉じる')),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _applyUsedParty(s);
+              _snack('使用中パーティを反映しました');
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: const Text('反映'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// ボックス（個別ポケモンの保管庫）を開く。
   Future<void> _openBox() async {
     await Navigator.of(context).push(
@@ -1432,6 +1556,7 @@ class _SidePanel extends StatelessWidget {
     required this.onEdit,
     this.onEditLongPress,
     this.onEditDoubleTap,
+    this.editTooltip,
     this.footer,
   });
 
@@ -1453,6 +1578,8 @@ class _SidePanel extends StatelessWidget {
   // 相手パネルのみ設定：編集ボタン長押し＝最新スクショ取込／ダブルタップ＝ピッカー取込。
   final VoidCallback? onEditLongPress;
   final VoidCallback? onEditDoubleTap;
+  // 編集ボタンのツールチップ上書き（自分側＝長押しで使用中パーティ表示）。
+  final String? editTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -1488,9 +1615,10 @@ class _SidePanel extends StatelessWidget {
                 ),
               _MiniBtn(
                 icon: Icons.edit,
-                tooltip: onEditLongPress != null
-                    ? 'パーティ編集（長押し:最新スクショ／ダブルタップ:スクショ選択）'
-                    : 'パーティ編集',
+                tooltip: editTooltip ??
+                    (onEditLongPress != null
+                        ? 'パーティ編集（長押し:最新スクショ／ダブルタップ:スクショ選択）'
+                        : 'パーティ編集'),
                 onTap: onEdit,
                 onLongPress: onEditLongPress,
                 onDoubleTap: onEditDoubleTap,
